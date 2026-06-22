@@ -1,0 +1,9 @@
+## Quarto
+
+Quarto (pinned to 1.9.13 for everyone) is included and configured to render with
+the base Python environment:
+
+```bash
+quarto --version
+quarto render report.qmd
+```

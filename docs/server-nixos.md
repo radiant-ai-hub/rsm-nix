@@ -1,0 +1,145 @@
+
+
+<!-- generated from docs/src/server-nixos.qmd — edit the .qmd, then run docs/src/render-docs.sh -->
+
+# RSM-MSBA on NixOS (declarative blueprint)
+
+> **Path B — the target blueprint.** On NixOS you declare users, SSH,
+> storage, GPU, and the Nix binary cache in `configuration.nix`, and the
+> shared RSM workspace becomes part of the system definition. The
+> development environment flake stays **host-agnostic** — NixOS
+> *consumes* it, it does not replace it. This is future infrastructure,
+> not a requirement for student-laptop success.
+
+The same `flake.nix` used on laptops and the Ubuntu server (Path A) is
+used here unchanged. Below is a starting skeleton; adapt to your
+hardware and policy.
+
+------------------------------------------------------------------------
+
+## 1. System flake that pins nixpkgs and the RSM env
+
+`/etc/nixos/flake.nix`:
+
+``` nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    rsm-msba.url = "github:radiant-ai-hub/rsm-nix";   # this repo
+  };
+
+  outputs = { self, nixpkgs, rsm-msba, ... }: {
+    nixosConfigurations.rsm-server = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";          # or aarch64-linux
+      modules = [ ./configuration.nix ];
+      specialArgs = { inherit rsm-msba; };
+    };
+  };
+}
+```
+
+------------------------------------------------------------------------
+
+## 2. configuration.nix essentials
+
+``` nix
+{ config, pkgs, lib, rsm-msba, ... }:
+let
+  students = [ "student001" "student002" /* ... */ ];
+  mkStudent = name: {
+    isNormalUser = true;
+    home = "/home/${name}";
+    openssh.authorizedKeys.keyFiles = [ ./keys/${name}.pub ];
+  };
+in
+{
+  # Flakes on the host itself.
+  nix.settings.experimental-features = [ "nix-command" "flakes" ];
+
+  # A binary cache helps a fleet of identical machines.
+  nix.settings = {
+    substituters = [ "https://cache.nixos.org" ];
+    trusted-public-keys = [ "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=" ];
+    auto-optimise-store = true;
+  };
+
+  # SSH for student access (VS Code Remote-SSH).
+  services.openssh = {
+    enable = true;
+    settings.PasswordAuthentication = false;
+  };
+
+  # Declarative student accounts.
+  users.users = lib.genAttrs students mkStudent;
+
+  # Make the RSM dev shell trivially available system-wide. Students still get
+  # the full reproducible env via the flake; this just puts core CLIs on PATH.
+  environment.systemPackages = [
+    pkgs.git pkgs.direnv pkgs.nix-direnv
+    rsm-msba.packages.${pkgs.system}.rsm-setup
+  ];
+
+  # System-wide direnv + nix-direnv so ~/rsm-msba activates on cd.
+  programs.direnv = { enable = true; nix-direnv.enable = true; };
+
+  # nix-ld lets any stray non-Nix binary find common libs (rarely needed here,
+  # since the flake already wires LD_LIBRARY_PATH for the uv env).
+  programs.nix-ld.enable = true;
+
+  system.stateVersion = "24.11";
+}
+```
+
+------------------------------------------------------------------------
+
+## 3. Seeding each student’s workspace
+
+Use a NixOS activation script or a systemd unit to clone/update
+`~/rsm-msba` and write a `.envrc`-approved marker, e.g.:
+
+``` nix
+system.activationScripts.rsmWorkspaces.text = ''
+  for u in ${lib.concatStringsSep " " students}; do
+    home="/home/$u"
+    if [ ! -e "$home/rsm-msba/flake.nix" ]; then
+      ${pkgs.git}/bin/git clone https://github.com/radiant-ai-hub/rsm-nix.git "$home/rsm-msba" || true
+      chown -R "$u":users "$home/rsm-msba"
+    fi
+  done
+'';
+```
+
+Students still run `rsm-setup` once to build their personal uv env
+(per-user, not system state).
+
+------------------------------------------------------------------------
+
+## 4. GPU notes (optional)
+
+For CUDA workloads add `hardware.nvidia` +
+`nixpkgs.config.allowUnfree = true` at the system level. The dev flake
+already sets `allowUnfree`; PyTorch/CUDA remain an **optional** Python
+layer (excluded from course-core) that a student or a dedicated GPU
+profile installs on top.
+
+------------------------------------------------------------------------
+
+## 5. Why keep the flake host-agnostic
+
+- Laptops (macOS/WSL2), the Ubuntu server, and NixOS all consume the
+  **same** `devShells.default` — one definition to maintain and test.
+- NixOS adds *host* concerns (users, SSH, storage, GPU, cache); it never
+  forks the *environment* definition.
+- A change to the course-core stack is one PR to this repo; every host
+  picks it up with `git pull` + `rsm-python-sync` (or a flake input bump
+  on NixOS).
+
+------------------------------------------------------------------------
+
+## 6. Validate
+
+``` bash
+sudo nixos-rebuild switch --flake /etc/nixos#rsm-server
+# then as a student:
+cd ~/rsm-msba && nix flake check && nix develop -c bash tests/check-default.sh
+```

@@ -1,0 +1,33 @@
+---
+format: gfm
+---
+
+<!-- generated from docs/src/readme.qmd — edit the .qmd, then run docs/src/render-docs.sh -->
+
+# rsm-nix — RSM-MSBA host-native computing environment (Nix flake)
+
+A single Nix flake that reproduces the RSM-MSBA computing environment
+(Python/uv, Quarto, PostgreSQL, optional Spark/Hadoop) **natively** on macOS,
+Linux, NixOS, and Windows (WSL2) — **no Docker, no Podman**. Students clone one
+workspace at `~/rsm-msba`; direnv cascades the environment into every course
+subfolder. R is intentionally excluded.
+
+## Quickstart
+
+{{< include _includes/install.qmd >}}
+
+Per-platform guides:
+
+- Full getting-started guide: [docs/getting-started.md](docs/getting-started.md)
+- macOS Apple Silicon: [docs/student-macos.md](docs/student-macos.md)
+- Windows 11 (WSL2 + Ubuntu 26.04): [docs/student-wsl2.md](docs/student-wsl2.md)
+- Ubuntu 24.04 server (multi-user Nix): [docs/server-ubuntu-nix.md](docs/server-ubuntu-nix.md)
+- NixOS server (declarative): [docs/server-nixos.md](docs/server-nixos.md)
+
+{{< include _includes/workspace-layout.qmd >}}
+
+{{< include _includes/commands.qmd >}}
+
+{{< include _includes/flake-interfaces.qmd >}}
+
+{{< include _includes/testing.qmd >}}

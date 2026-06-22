@@ -1,0 +1,113 @@
+---
+format: gfm
+---
+
+<!-- generated from docs/src/student-macos.qmd — edit the .qmd, then run docs/src/render-docs.sh -->
+
+# Installing the RSM-MSBA computing environment on macOS (Apple Silicon)
+
+{{< include _includes/overview.qmd >}}
+
+The computing environment is consistent across all students and faculty, easy to
+update, and easy to remove. These instructions are for Macs with an Apple Silicon
+chip. The installer supports Apple Silicon only.
+
+## Automated installer
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/radiant-ai-hub/rsm-nix/main/install/macos-arm-install-rsm-nix.sh | bash
+```
+
+The installer sets up VS Code, Determinate Nix, `direnv` + `nix-direnv`, clones
+the workspace to `~/rsm-msba`, runs `rsm-setup`, and runs the smoke checks.
+
+The manual steps below are kept as a fallback and for troubleshooting.
+
+---
+
+## Install the macOS command line developer tools
+
+Open the **Terminal** app, run the command below, and follow the prompts until
+the software is installed. Nix needs these tools to build some packages.
+
+```bash
+xcode-select --install
+```
+
+## Install Nix (Determinate Systems installer)
+
+We use the Determinate Systems installer because it enables flakes by default,
+plays well with macOS upgrades, and has a clean uninstaller.
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
+```
+
+When it finishes, **quit and reopen your terminal** so the `nix` command is on
+your `PATH`. Verify with `nix --version`.
+
+> The installer adds Nix to a managed block in `/etc/zshrc`. It does **not**
+> modify your personal `~/.zshrc`.
+
+## Enable direnv (recommended)
+
+`direnv` activates the environment automatically whenever you `cd` into your
+workspace (and any course subfolder), including inside VS Code terminals.
+
+```bash
+nix profile install nixpkgs#direnv nixpkgs#nix-direnv
+mkdir -p ~/.config/direnv
+echo 'source ~/.nix-profile/share/nix-direnv/direnvrc' >> ~/.config/direnv/direnvrc
+echo 'eval "$(direnv hook zsh)"' >> ~/.zshrc
+```
+
+Reopen your terminal afterward. The `~/.zshrc` line is the **only** edit to your
+personal shell config.
+
+> Prefer not to touch `~/.zshrc`? Skip direnv and run `nix develop` manually from
+> `~/rsm-msba` each time instead.
+
+## Install VS Code
+
+Download and install VS Code from
+<https://code.visualstudio.com/docs/?dv=darwinarm64>, then install the extensions
+we rely on:
+
+```bash
+code --install-extension ms-python.python
+code --install-extension ms-toolsai.jupyter
+code --install-extension quarto.quarto
+code --install-extension mkhl.direnv
+```
+
+If you get a `code: command not found` error, open VS Code, press
+`Cmd+Shift+P`, run **"Shell Command: Install 'code' command in PATH"**, then
+retry.
+
+## Get the workspace and build it
+
+```bash
+git clone https://github.com/radiant-ai-hub/rsm-nix.git ~/rsm-msba
+cd ~/rsm-msba
+direnv allow         # if you enabled direnv; otherwise: nix develop
+rsm-setup            # uv env + Jupyter kernel + course folders (first run only)
+```
+
+`rsm-setup` is safe to re-run any time. The very first run can take a few minutes
+while it downloads Python packages.
+
+{{< include _includes/directory-structure.qmd >}}
+
+{{< include _includes/usage-vscode.qmd >}}
+
+{{< include _includes/usage-uv.qmd >}}
+
+{{< include _includes/usage-postgres.qmd >}}
+
+{{< include _includes/usage-quarto.qmd >}}
+
+{{< include _includes/usage-spark.qmd >}}
+
+{{< include _includes/maintenance.qmd >}}
+
+{{< include _includes/troubleshooting.qmd >}}

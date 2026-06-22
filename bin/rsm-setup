@@ -1,0 +1,57 @@
+# rsm-setup: one-shot workspace bootstrap.
+#   - creates RSM-owned state directories under $RSMBASE
+#   - creates/refreshes the uv base environment (delegates to rsm-python-sync)
+#   - installs/refreshes the Jupyter kernelspec used by VS Code notebooks
+#   - pre-creates course folders listed in courses.txt
+#
+# No host dotfiles (~/.zshrc, ~/.bashrc, ...) are ever written.
+
+echo "==> RSM-MSBA setup"
+echo "    workspace : $RSM_WORKSPACE"
+echo "    state dir : $RSMBASE"
+
+mkdir -p \
+  "$RSMBASE/envs" \
+  "$RSMBASE/uv-cache" \
+  "$RSMBASE/jupyter" \
+  "$RSMBASE/postgres" \
+  "$RSMBASE/zsh" \
+  "$RSMBASE/logs"
+
+# 1. Python base environment (creates venv + installs course-core packages).
+rsm-python-sync
+
+# 2. Jupyter kernelspec so VS Code / Jupyter can find the base environment.
+if [ -x "$RSM_UV_ENV/bin/python" ] && "$RSM_UV_ENV/bin/python" -c "import ipykernel" 2>/dev/null; then
+  "$RSM_UV_ENV/bin/python" -m ipykernel install \
+    --name rsm-msba \
+    --display-name "Python (RSM-MSBA)" \
+    --prefix "$RSMBASE/jupyter/_prefix" >/dev/null 2>&1 || true
+  # Normalize into $JUPYTER_DATA_DIR/kernels/rsm-msba so JUPYTER_PATH finds it.
+  src="$RSMBASE/jupyter/_prefix/share/jupyter/kernels/rsm-msba"
+  if [ -d "$src" ]; then
+    mkdir -p "$JUPYTER_DATA_DIR/kernels"
+    rm -rf "$JUPYTER_DATA_DIR/kernels/rsm-msba"
+    cp -R "$src" "$JUPYTER_DATA_DIR/kernels/rsm-msba"
+    rm -rf "$RSMBASE/jupyter/_prefix"
+  fi
+  echo "    kernel    : Python (RSM-MSBA) -> $JUPYTER_DATA_DIR/kernels/rsm-msba"
+else
+  echo "    kernel    : skipped (ipykernel not available yet)"
+fi
+
+# 3. Pre-create course folders from courses.txt (one folder name per line).
+courses_file="$RSM_WORKSPACE/courses.txt"
+if [ -f "$courses_file" ]; then
+  while IFS= read -r course || [ -n "$course" ]; do
+    course="${course%%#*}"
+    course="$(printf '%s' "$course" | tr -d '[:space:]')"
+    [ -z "$course" ] && continue
+    if [ ! -d "$RSM_WORKSPACE/$course" ]; then
+      mkdir -p "$RSM_WORKSPACE/$course"
+      echo "    course    : created $RSM_WORKSPACE/$course"
+    fi
+  done < "$courses_file"
+fi
+
+echo "==> Setup complete. Try: rsm-pg-start, then python or quarto."

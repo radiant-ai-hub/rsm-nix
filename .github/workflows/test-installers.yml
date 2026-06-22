@@ -1,0 +1,68 @@
+name: Test Installers
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    paths:
+      - 'install/**'
+      - 'docs/**'
+      - 'README.md'
+      - '.github/workflows/test-installers.yml'
+  workflow_dispatch:
+
+jobs:
+  windows:
+    name: Windows installer dry run
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Validate PowerShell syntax
+        shell: powershell
+        run: |
+          $errors = $null
+          $null = [System.Management.Automation.PSParser]::Tokenize(
+            (Get-Content .\install\windows-install-rsm-nix.ps1 -Raw),
+            [ref]$errors
+          )
+          if ($errors) {
+            $errors | Format-List | Out-String | Write-Host
+            throw "PowerShell parser reported errors."
+          }
+
+      - name: Run dry-run validation
+        shell: powershell
+        run: |
+          Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
+          .\install\windows-install-rsm-nix.ps1 -DryRun -SkipWorkspaceSetup
+
+  macos:
+    name: macOS ARM installer dry run
+    runs-on: macos-26
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Validate bash syntax
+        run: bash -n install/macos-arm-install-rsm-nix.sh
+
+      - name: Run dry-run validation
+        run: bash install/macos-arm-install-rsm-nix.sh --dry-run --skip-workspace-setup
+
+  linux:
+    name: Shell syntax
+    runs-on: ubuntu-26.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Validate bash scripts
+        run: |
+          bash -n install/macos-arm-install-rsm-nix.sh
+          bash -n tests/check-default.sh
+          bash -n tests/check-folders.sh
+          bash -n tests/check-no-host-mutation.sh
+          bash -n tests/check-postgres.sh
+          bash -n tests/check-spark-hadoop.sh

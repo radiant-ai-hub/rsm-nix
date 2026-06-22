@@ -1,0 +1,31 @@
+## Updating the environment
+
+```bash
+cd ~/rsm-msba
+git pull                           # get the latest environment definition
+direnv reload                      # or: re-run `nix develop`
+rsm-python-sync                    # refresh Python packages from the lockfile
+```
+
+## Cleanup / full reset
+
+To rebuild your environment from scratch, delete the workspace state (this does
+**not** remove your coursework, which lives in the course folders):
+
+```bash
+rsm-pg-stop 2>/dev/null
+rm -rf ~/rsm-msba/.rsm-msba
+cd ~/rsm-msba && rsm-setup
+```
+
+To reclaim disk space from old Nix builds:
+
+```bash
+nix store gc
+```
+
+To uninstall Nix entirely (Determinate installer):
+
+```bash
+/nix/nix-installer uninstall
+```

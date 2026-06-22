@@ -1,0 +1,16 @@
+## PostgreSQL
+
+A workspace-local PostgreSQL instance is included — no system service, no
+Docker. Data lives under `~/rsm-msba/.rsm-msba/postgres`.
+
+```bash
+rsm-pg-start                       # start (initializes on first run)
+rsm-pg-psql                        # open psql on the rsm-msba database
+rsm-pg-psql -c "SELECT version();" # run one statement
+rsm-pgweb                          # browse at http://127.0.0.1:8282
+rsm-pg-status                      # is it running?
+rsm-pg-stop                        # stop it
+```
+
+Connection details: host = socket under `.rsm-msba/postgres/socket` (or
+`127.0.0.1`), port = `8765`, databases = `rsm-msba` and your username.

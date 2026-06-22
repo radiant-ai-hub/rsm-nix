@@ -1,0 +1,14 @@
+## Workspace layout
+
+```text
+~/rsm-msba/                  flake.nix, .envrc, pyproject.toml, uv.lock
+├── .rsm-msba/               RSM-owned state (gitignored)
+│   ├── envs/base/           the uv "base" Python environment
+│   ├── postgres/            workspace-local PostgreSQL cluster
+│   └── jupyter/             "Python (RSM-MSBA)" notebook kernel
+├── mgta403/  mgta464/       course folders (from courses.txt)
+└── my_project/              add as many as you like
+```
+
+Nothing is written to host dotfiles (`~/.zshrc`, `~/.bashrc`, ...). To fully
+reset, delete `~/rsm-msba/.rsm-msba`.

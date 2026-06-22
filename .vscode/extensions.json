@@ -1,0 +1,8 @@
+{
+  "recommendations": [
+    "mkhl.direnv",
+    "ms-python.python",
+    "ms-toolsai.jupyter",
+    "quarto.quarto"
+  ]
+}

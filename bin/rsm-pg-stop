@@ -1,0 +1,8 @@
+# rsm-pg-stop: stop the workspace-local PostgreSQL instance (if running).
+
+if pg_ctl status -D "$PGDATA" >/dev/null 2>&1; then
+  pg_ctl stop -D "$PGDATA" -m fast
+  echo "Stopped PostgreSQL (PGDATA=$PGDATA)"
+else
+  echo "PostgreSQL is not running (PGDATA=$PGDATA)"
+fi

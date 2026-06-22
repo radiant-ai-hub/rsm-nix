@@ -1,0 +1,55 @@
+name: Nix Environment
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  nix:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Ubuntu 26.04 x64
+            runner: ubuntu-26.04
+          - name: Ubuntu 26.04 ARM64
+            runner: ubuntu-26.04-arm
+          - name: macOS 26 ARM64
+            runner: macos-26
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install Determinate Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Show Nix system
+        run: |
+          nix --version
+          nix eval --raw --impure --expr 'builtins.currentSystem'
+
+      - name: Check flake
+        run: nix flake check
+
+      - name: Record host-mutation baseline
+        run: nix develop -c bash tests/check-no-host-mutation.sh
+
+      - name: Build workspace environment
+        run: nix develop -c rsm-setup
+
+      - name: Run default smoke checks
+        run: nix develop -c bash tests/check-default.sh
+
+      - name: Run folder layout checks
+        run: nix develop -c bash tests/check-folders.sh
+
+      - name: Compare host-mutation baseline
+        run: nix develop -c bash tests/check-no-host-mutation.sh
+
+      - name: Run Spark/Hadoop checks
+        run: nix develop .#spark-hadoop -c bash tests/check-spark-hadoop.sh

@@ -1,0 +1,8 @@
+# rsm-pgweb: launch pgweb against the workspace-local PostgreSQL instance.
+# Web UI on http://127.0.0.1:8282 by default. Extra args pass through to pgweb.
+
+exec pgweb \
+  --bind=127.0.0.1 \
+  --listen=8282 \
+  --url "postgresql://$PGUSER@127.0.0.1:$PGPORT/$PGDATABASE?sslmode=disable" \
+  "$@"

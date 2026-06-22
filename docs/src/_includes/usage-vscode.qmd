@@ -1,0 +1,40 @@
+## Using VS Code (the convenient way)
+
+The smoothest workflow uses the **direnv** VS Code extension so the RSM-MSBA
+environment activates automatically — no manual interpreter selection, no venv
+juggling. This repository ships a `.vscode/` config, so when you open
+`~/rsm-msba` VS Code offers to install the right extensions and points Python at
+the base environment for you.
+
+1. **Open the workspace** — from a terminal:
+
+   ```bash
+   code ~/rsm-msba
+   ```
+
+   (You can also open a single course folder, e.g. `code ~/rsm-msba/mgta403` —
+   direnv finds the environment by walking up to `~/rsm-msba/.envrc`.)
+
+2. **Install the recommended extensions** — VS Code shows a prompt
+   ("This workspace has extension recommendations"); click **Install All**. They
+   are `mkhl.direnv`, `ms-python.python`, `ms-toolsai.jupyter`, and
+   `quarto.quarto`.
+
+3. **Allow direnv** — the direnv extension asks to allow `.envrc` the first time;
+   click **Allow** (or run `direnv allow` once in the integrated terminal). From
+   then on, every integrated terminal and the Python/Jupyter tooling use the
+   RSM-MSBA environment automatically — `python`, `quarto`, `rsm-pg-*`, etc. are
+   already on `PATH`.
+
+4. **Pick the kernel for notebooks** — open a `.ipynb`, click the kernel picker
+   (top-right), and choose **Python (RSM-MSBA)**. For `.py` files the interpreter
+   is already set to `~/rsm-msba/.rsm-msba/envs/base/bin/python`; VS Code
+   remembers your choice per folder.
+
+That's it. Open a notebook or script in any course folder and run — no activation
+step needed.
+
+> Tip: keep one VS Code window open on `~/rsm-msba` so every course folder shares
+> the same Explorer, environment, PostgreSQL, and kernel. Reopen the folder (or
+> run **Developer: Reload Window**) after `rsm-setup` so the new kernel and
+> interpreter are detected.

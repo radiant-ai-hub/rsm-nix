@@ -1,0 +1,33 @@
+# rsm-pg-start: start the workspace-local PostgreSQL instance and ensure the
+# expected databases exist. Idempotent.
+
+if [ ! -s "$PGDATA/PG_VERSION" ]; then
+  echo "No cluster found at $PGDATA; running rsm-pg-init first." >&2
+  rsm-pg-init
+fi
+
+mkdir -p "$PGHOST"
+log_file="$RSMBASE/postgres/postgres.log"
+
+if pg_ctl status -D "$PGDATA" >/dev/null 2>&1; then
+  echo "PostgreSQL already running (PGDATA=$PGDATA, port=$PGPORT)"
+else
+  pg_ctl start -D "$PGDATA" -w -l "$log_file" \
+    -o "-k $PGHOST -p $PGPORT -c listen_addresses=127.0.0.1"
+  echo "Started PostgreSQL (socket: $PGHOST, port: $PGPORT, log: $log_file)"
+fi
+
+ensure_db() {
+  db="$1"
+  exists="$(psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d postgres -tAc \
+    "SELECT 1 FROM pg_database WHERE datname = '$db'" 2>/dev/null || true)"
+  if [ "$exists" != "1" ]; then
+    createdb -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" "$db"
+    echo "Created database: $db"
+  fi
+}
+
+ensure_db "$PGUSER"
+ensure_db "$PGDATABASE"
+
+echo "PostgreSQL ready. Connect with: rsm-pg-psql"

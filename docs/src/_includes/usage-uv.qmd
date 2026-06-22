@@ -1,0 +1,34 @@
+## Using UV for Python packages
+
+The environment uses [uv](https://docs.astral.sh/uv/) for Python package
+management. There are two patterns.
+
+### Add to the shared base environment
+
+The base environment (`~/rsm-msba/.rsm-msba/envs/base`) holds the course-core
+packages. To experiment with an extra package for the current session:
+
+```bash
+sbase                 # activate the base env (alias for: source .../envs/base/bin/activate)
+uv pip install mlxtend
+```
+
+> Packages added with `uv pip install` are not tracked in the lockfile. To make
+> the base environment match the official package list again, run
+> `rsm-python-sync`.
+
+### Create a project-specific environment
+
+For packages a specific class or project needs (persisted in that folder):
+
+```bash
+cd ~/rsm-msba/my_project
+uv init .
+uv venv --python 3.12
+sp                    # alias for: source .venv/bin/activate
+uv add polars==1.1.0
+python -c "import polars as pl; print(pl.__version__)"
+```
+
+To remove a project environment, delete `.venv` (and the `uv init` scaffolding)
+or the whole project folder.

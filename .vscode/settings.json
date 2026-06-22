@@ -1,0 +1,19 @@
+{
+  // direnv injects the RSM-MSBA environment; reload it automatically.
+  "direnv.restart.automatic": true,
+
+  // Default Python interpreter = the uv "base" environment (valid when this
+  // folder, ~/rsm-msba, is the workspace root). direnv also puts it on PATH,
+  // so notebooks/terminals work even when a course subfolder is opened.
+  "python.defaultInterpreterPath": "${workspaceFolder}/.rsm-msba/envs/base/bin/python",
+
+  // direnv already provides the environment; don't let VS Code re-activate a
+  // venv on top of it in new terminals.
+  "python.terminal.activateEnvironment": false,
+
+  // Keep notebook outputs/scratch from cluttering the workspace.
+  "files.exclude": {
+    "**/.rsm-msba": true,
+    "**/.direnv": true
+  }
+}

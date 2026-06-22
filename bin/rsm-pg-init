@@ -1,0 +1,24 @@
+# rsm-pg-init: initialize a workspace-local PostgreSQL cluster.
+# Data lives under $PGDATA; no system service, launchd, or systemd involved.
+
+mkdir -p "$RSMBASE/postgres" "$PGHOST"
+
+if [ -s "$PGDATA/PG_VERSION" ]; then
+  echo "PostgreSQL cluster already initialized at $PGDATA"
+  exit 0
+fi
+
+mkdir -p "$PGDATA"
+chmod 700 "$PGDATA"
+
+# Local socket/loopback only, trust auth for the single workspace user.
+initdb \
+  --pgdata="$PGDATA" \
+  --username="$PGUSER" \
+  --auth-local=trust \
+  --auth-host=trust \
+  --encoding=UTF8 \
+  --locale=C >/dev/null
+
+echo "Initialized PostgreSQL cluster at $PGDATA (user: $PGUSER, port: $PGPORT)"
+echo "Next: rsm-pg-start"

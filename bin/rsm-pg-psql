@@ -1,0 +1,4 @@
+# rsm-pg-psql: open psql against the workspace-local instance, defaulting to the
+# rsm-msba database. Extra arguments are passed straight through to psql.
+
+exec psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" "$@"

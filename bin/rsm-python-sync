@@ -1,0 +1,27 @@
+# rsm-python-sync: create/refresh the uv base environment from the committed
+# lockfile. Idempotent. Safe to run repeatedly.
+
+if [ ! -f "$RSM_WORKSPACE/pyproject.toml" ] || [ ! -f "$RSM_WORKSPACE/uv.lock" ]; then
+  echo "rsm-python-sync: pyproject.toml/uv.lock not found in $RSM_WORKSPACE" >&2
+  echo "  Run this from your workspace root (e.g. ~/rsm-msba)." >&2
+  exit 1
+fi
+
+mkdir -p "$RSMBASE/envs" "$UV_CACHE_DIR"
+
+# Prefer the Nix-provided interpreter so native libraries stay consistent.
+py="$(command -v python3.13 || command -v python3 || true)"
+if [ -z "$py" ]; then
+  echo "rsm-python-sync: no python3.13/python3 on PATH (are you in 'nix develop'?)" >&2
+  exit 1
+fi
+
+if [ ! -x "$RSM_UV_ENV/bin/python" ]; then
+  echo "Creating uv base environment at $RSM_UV_ENV"
+  uv venv --python "$py" "$RSM_UV_ENV"
+fi
+
+echo "Syncing base environment from uv.lock (this can take a few minutes the first time)..."
+( cd "$RSM_WORKSPACE" && uv sync --frozen --python "$RSM_UV_ENV/bin/python" )
+
+echo "rsm-python-sync: base environment ready at $RSM_UV_ENV"

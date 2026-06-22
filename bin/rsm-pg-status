@@ -1,0 +1,9 @@
+# rsm-pg-status: report whether the workspace-local PostgreSQL is running.
+
+if pg_ctl status -D "$PGDATA" >/dev/null 2>&1; then
+  pg_ctl status -D "$PGDATA" || true
+  pg_isready -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" || true
+else
+  echo "PostgreSQL is not running (PGDATA=$PGDATA)"
+  exit 3
+fi

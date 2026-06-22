@@ -1,0 +1,5 @@
+# Course / project folders to pre-create under the workspace root (~/rsm-msba).
+# One name per line. Lines starting with '#' and blank lines are ignored.
+# Add more with `rsm-new-course <name>` or by editing this file then `rsm-setup`.
+mgta403
+mgta464

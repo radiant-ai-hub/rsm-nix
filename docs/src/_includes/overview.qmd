@@ -1,0 +1,7 @@
+> This is the **Nix flake** version of the RSM-MSBA environment. Instead of
+> Docker Desktop and a multi-gigabyte container image, you install native Nix
+> and get the exact same Python, Quarto, PostgreSQL, and Spark toolchain built
+> reproducibly on your own machine. There is **no Docker**, no container to
+> start, and nothing littered across your system — everything lives in the Nix
+> store and one workspace folder (`~/rsm-msba`) that you can delete to fully
+> reset.

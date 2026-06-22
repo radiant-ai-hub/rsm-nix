@@ -1,0 +1,10 @@
+## Optional: Spark / Hadoop
+
+Scalable-analytics work uses a separate, larger profile. The first activation
+downloads Spark and Hadoop, so expect a wait.
+
+```bash
+cd ~/rsm-msba
+nix develop .#spark-hadoop
+rsm-spark-hadoop-proof             # Hadoop + Spark + a local PySpark session
+```

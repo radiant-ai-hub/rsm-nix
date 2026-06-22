@@ -1,0 +1,30 @@
+# RSM-owned workspace state (uv env, postgres cluster, jupyter, caches, logs).
+/.rsm-msba/
+
+# direnv / nix-direnv
+/.direnv/
+
+# Claude Code session state
+/.claude/
+
+# Quarto render artifacts (docs are rendered from .qmd to committed .md)
+.quarto/
+/_site/
+
+# Local-only planning / internal notes (kept locally, not published)
+/nix-plan.md
+/nix-plan-init.md
+/nix-plan-gemini.md
+/nix-codex.md
+/tests/remote-run.sh
+/tests/remote-run-stage2.sh
+
+# Python virtual environments created in project subfolders
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Local editor / OS noise
+.DS_Store
+*.swp

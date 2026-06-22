@@ -1,0 +1,10 @@
+## Commands
+
+| Command | What it does |
+|---|---|
+| `rsm-setup` | Bootstrap: uv base env, Jupyter kernel, course folders |
+| `rsm-python-sync` | Refresh the base env from `uv.lock` |
+| `rsm-new-course NAME...` | Create course/project folder(s) + remember in `courses.txt` |
+| `rsm-pg-init` / `-start` / `-stop` / `-status` | Workspace-local PostgreSQL lifecycle |
+| `rsm-pg-psql` | `psql` into the `rsm-msba` database |
+| `rsm-pgweb` | pgweb UI at <http://127.0.0.1:8282> |
