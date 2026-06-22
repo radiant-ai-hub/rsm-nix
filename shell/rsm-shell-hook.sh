@@ -16,6 +16,25 @@ mkdir -p \
   "$RSMBASE/zsh" \
   "$RSMBASE/logs" 2>/dev/null || true
 
+# Neutralize any foreign, pre-activated Python virtualenv inherited from the
+# parent (login) shell. `nix develop` is IMPURE by default (it inherits the
+# calling shell's environment), and nix-direnv does not support pure mode, so a
+# stray VIRTUAL_ENV — e.g. an old /opt/base-uv that a server's /etc/zsh/zshrc
+# auto-activates — would otherwise leak in and could send `pip`/`uv` installs to
+# the wrong place. Make the RSM-MSBA environment the only active one.
+if [ -n "${VIRTUAL_ENV:-}" ] && [ "${VIRTUAL_ENV:-}" != "$RSM_UV_ENV" ]; then
+  _rsm_stale_bin="$VIRTUAL_ENV/bin"
+  _rsm_newpath=""
+  _rsm_ifs="$IFS"; IFS=":"
+  for _rsm_p in $PATH; do
+    [ "$_rsm_p" = "$_rsm_stale_bin" ] && continue
+    _rsm_newpath="${_rsm_newpath:+$_rsm_newpath:}$_rsm_p"
+  done
+  IFS="$_rsm_ifs"
+  PATH="$_rsm_newpath"; export PATH
+  unset VIRTUAL_ENV VIRTUAL_ENV_PROMPT _rsm_stale_bin _rsm_newpath _rsm_p _rsm_ifs
+fi
+
 # Put the uv base environment first on PATH so `python`, `ipython`, `jupyter`,
 # etc. resolve to the course-core environment once rsm-setup has run.
 if [ -d "$RSM_UV_ENV/bin" ]; then

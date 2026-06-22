@@ -1,0 +1,31 @@
+---
+title: "RSM-MSBA Quarto test"
+format: gfm
+jupyter: python3
+---
+
+This document verifies that **Quarto** renders with the RSM-MSBA Python
+environment. Render it from a workspace terminal:
+
+```bash
+quarto render examples/quarto_report.qmd
+```
+
+It produces `examples/quarto_report.md`. (Quarto also renders to HTML/PDF; `gfm`
+is used here so the output is easy to preview on GitHub.)
+
+```{python}
+import sys
+import numpy as np
+import pandas as pd
+
+print("python   :", sys.executable)
+print("numpy    :", np.__version__)
+print("pandas   :", pd.__version__)
+
+df = pd.DataFrame({"x": np.arange(1, 6), "y": np.arange(1, 6) ** 2})
+df
+```
+
+If `python` above points at `…/.rsm-msba/envs/base/bin/python`, Quarto is using
+the RSM-MSBA environment correctly.

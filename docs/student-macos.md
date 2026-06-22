@@ -297,5 +297,10 @@ To uninstall Nix entirely (Determinate installer):
   package.
 - **PostgreSQL won’t start** — run `rsm-pg-status`; check the log at
   `~/rsm-msba/.rsm-msba/postgres/postgres.log`.
+- **Not sure which environment you’re in?** — run
+  `python examples/check_environment.py`. It confirms `python` is the
+  RSM/Nix base env and flags a leaked `VIRTUAL_ENV` (e.g. an old
+  `/opt/base-uv` that a server auto-activates). See
+  `examples/README.md`.
 - **Still stuck?** — run the smoke check and share the output:
   `nix develop ~/rsm-msba -c bash ~/rsm-msba/tests/check-default.sh`

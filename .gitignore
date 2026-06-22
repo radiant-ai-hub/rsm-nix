@@ -10,6 +10,8 @@
 # Quarto render artifacts (docs are rendered from .qmd to committed .md)
 .quarto/
 /_site/
+/examples/quarto_report.md
+/examples/*_files/
 
 # Local-only planning / internal notes (kept locally, not published)
 /nix-plan.md
