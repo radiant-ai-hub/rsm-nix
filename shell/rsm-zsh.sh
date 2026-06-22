@@ -9,7 +9,7 @@
 # All history/cache is kept under $RSMBASE/zsh; nothing touches host dotfiles.
 
 : "${RSMBASE:=${RSM_WORKSPACE:-$PWD}/.rsm-msba}"
-: "${RSM_UV_ENV:=$RSMBASE/envs/base}"
+: "${RSM_UV_ENV:=$RSMBASE/envs/nix-uv}"
 
 mkdir -p "$RSMBASE/zsh/.cache" 2>/dev/null || true
 

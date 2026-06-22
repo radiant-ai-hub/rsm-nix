@@ -1,5 +1,6 @@
-# rsm-new-course NAME [NAME ...]: create one or more course/project folders
-# under the workspace root and remember them in courses.txt.
+# rsm-new-course NAME [NAME ...]: create one or more course/project folders in
+# the workspace ($RSM_WORKSPACE, e.g. ~/rsm-msba). Each can become its own git
+# repo (the workspace itself is not a git repo).
 
 if [ "$#" -eq 0 ]; then
   echo "usage: rsm-new-course NAME [NAME ...]" >&2
@@ -7,15 +8,9 @@ if [ "$#" -eq 0 ]; then
   exit 1
 fi
 
-courses_file="$RSM_WORKSPACE/courses.txt"
-touch "$courses_file"
-
 for course in "$@"; do
   course="$(printf '%s' "$course" | tr -d '[:space:]')"
   [ -z "$course" ] && continue
   mkdir -p "$RSM_WORKSPACE/$course"
-  if ! grep -qxF "$course" "$courses_file" 2>/dev/null; then
-    printf '%s\n' "$course" >> "$courses_file"
-  fi
   echo "created $RSM_WORKSPACE/$course"
 done

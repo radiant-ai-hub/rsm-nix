@@ -35,9 +35,11 @@ your login shell (zsh or bash), clones the workspace to `~/rsm-msba`, and runs
 # 1. install Nix (Determinate Systems installer)
 curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
 
-# 2. clone the workspace and build it
-git clone https://github.com/radiant-ai-hub/rsm-nix.git ~/rsm-msba
-cd ~/rsm-msba
-nix develop          # or: direnv allow  (with direnv + nix-direnv)
-rsm-setup            # uv env + Jupyter kernel + course folders
+# 2. clone the flake, then bootstrap your workspace
+git clone https://github.com/radiant-ai-hub/rsm-nix.git ~/rsm-nix
+nix develop ~/rsm-nix -c rsm-setup   # creates ~/rsm-msba + .envrc + nix-uv env + folders
+direnv allow ~/rsm-msba              # if using direnv (recommended)
 ```
+
+The flake lives at `~/rsm-nix` (update with `cd ~/rsm-nix && git pull`); your
+coursework + state live at `~/rsm-msba`.

@@ -436,6 +436,7 @@ function Install-RsmWorkspace {
 set -euo pipefail
 repo_url="$1"
 workspace="$2"
+flake="$HOME/rsm-nix"   # the flake repo (git pull to update)
 
 case "$workspace" in
   "~") workspace="$HOME" ;;
@@ -479,25 +480,24 @@ if ! grep -Fqx 'eval "$(direnv hook bash)"' "$HOME/.bashrc"; then
   printf '\n%s\n' 'eval "$(direnv hook bash)"' >>"$HOME/.bashrc"
 fi
 
-if [ -e "$workspace" ] && [ ! -d "$workspace/.git" ]; then
-  echo "Workspace path exists but is not a git checkout: $workspace" >&2
+if [ -e "$flake" ] && [ ! -d "$flake/.git" ]; then
+  echo "Flake path exists but is not a git checkout: $flake" >&2
   exit 1
 fi
 
-if [ ! -d "$workspace/.git" ]; then
-  mkdir -p "$(dirname "$workspace")"
-  git clone "$repo_url" "$workspace"
+if [ ! -d "$flake/.git" ]; then
+  mkdir -p "$(dirname "$flake")"
+  git clone "$repo_url" "$flake"
 else
-  echo "Reusing existing workspace: $workspace"
+  echo "Reusing existing flake checkout: $flake"
+  git -C "$flake" pull --ff-only || true
 fi
 
-cd "$workspace"
-direnv allow || true
-nix develop -c bash tests/check-no-host-mutation.sh
-nix develop -c rsm-setup
-nix develop -c bash tests/check-default.sh
-nix develop -c bash tests/check-folders.sh
-nix develop -c bash tests/check-no-host-mutation.sh
+# Bootstrap the workspace: creates $workspace + .envrc + nix-uv env + folders.
+RSM_WORKSPACE="$workspace" nix develop "$flake" -c rsm-setup
+direnv allow "$workspace" || true
+RSM_WORKSPACE="$workspace" nix develop "$flake" -c bash "$flake/tests/check-default.sh"
+RSM_WORKSPACE="$workspace" nix develop "$flake" -c bash "$flake/tests/check-folders.sh"
 '@
 
     Invoke-WslBash -User $script:EffectiveWslUser -Script $workspaceScript -Arguments @($RepoUrl, $WorkspacePath) -Description "RSM workspace setup"

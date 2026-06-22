@@ -42,7 +42,7 @@ steps.
 
 Open VS Code, choose **Connect to WSL**, select `Ubuntu-26.04`, then
 open `~/rsm-msba`. Terminals and notebooks pick up the Nix environment
-through direnv. For notebooks, choose the **Python (RSM-MSBA)** kernel.
+through direnv. For notebooks, choose the **Python (nix-uv)** kernel.
 
 ## Manual fallback
 
@@ -62,31 +62,40 @@ nix profile install nixpkgs#direnv nixpkgs#nix-direnv
 mkdir -p ~/.config/direnv
 echo 'source ~/.nix-profile/share/nix-direnv/direnvrc' >> ~/.config/direnv/direnvrc
 echo 'eval "$(direnv hook bash)"' >> ~/.bashrc
-git clone https://github.com/radiant-ai-hub/rsm-nix.git ~/rsm-msba
-cd ~/rsm-msba
-direnv allow
-rsm-setup
+git clone https://github.com/radiant-ai-hub/rsm-nix.git ~/rsm-nix
+nix develop ~/rsm-nix -c rsm-setup   # creates ~/rsm-msba + .envrc + nix-uv env + folders
+direnv allow ~/rsm-msba
 ```
 
 Keep the repo under the Linux filesystem (`~/rsm-msba`), not under
 `/mnt/c/...`; WSL file access is much faster there.
 
-## Recommended folder structure
+## Folders: the flake vs your coursework
 
-Everything lives under `~/rsm-msba`. Because direnv cascades into
-subfolders, the environment is active in every course/project folder
-automatically — no per-folder setup.
+Two separate places, so the environment can be updated with `git`
+without touching your work — and each course folder can be its own git
+repo:
 
 ``` text
-~/rsm-msba/                  <- the workspace (flake.nix, .envrc)
-├── .rsm-msba/               <- RSM-owned state (Python env, Postgres, caches)
-│   ├── envs/base/           <- the uv "base" Python environment
-│   ├── postgres/            <- your local PostgreSQL cluster
-│   └── jupyter/             <- the "Python (RSM-MSBA)" notebook kernel
-├── mgta403/                 <- a course folder (created by rsm-setup)
-├── mgta464/                 <- a course folder
-└── my_project/              <- make as many as you like
+~/rsm-nix/                   the flake (a git repo) — RSM machinery only
+                             update it with:  cd ~/rsm-nix && git pull
+
+~/rsm-msba/                  your workspace (NOT a git repo)
+├── .envrc                   generated; loads the flake from ~/rsm-nix
+├── .rsm-msba/               RSM state (survives flake updates / re-clones)
+│   ├── envs/nix-uv/         the "nix-uv" Python environment
+│   ├── postgres/            your local PostgreSQL cluster
+│   └── jupyter/             the "Python (nix-uv)" notebook kernel
+├── examples/                link to the flake's examples
+├── mgta403/                 a course folder — can be its own git repo
+├── mgta464/
+└── my_project/
 ```
+
+direnv cascades the environment into every folder under `~/rsm-msba`, so
+the tools are active in each course folder automatically. Because
+`~/rsm-msba` is **not** a git repo, you can `git init` (or `git clone`)
+inside `mgta403` with no nesting conflict.
 
 Create more course/project folders any time:
 
@@ -94,31 +103,27 @@ Create more course/project folders any time:
 rsm-new-course mgta455 mgta495
 ```
 
-(or edit `courses.txt` and re-run `rsm-setup`).
-
-In VS Code, use **File → Open Folder** and open `~/rsm-msba` (or a
-specific course folder). With the direnv extension installed, the
-integrated terminal and notebook kernels activate automatically. For
-notebooks, pick the **“Python (RSM-MSBA)”** kernel.
+In VS Code, **File → Open Folder** on `~/rsm-msba`. With the direnv
+extension, terminals and notebook kernels activate automatically. For
+notebooks, pick the **“Python (nix-uv)”** kernel.
 
 ## Using UV for Python packages
 
 The environment uses [uv](https://docs.astral.sh/uv/) for Python package
 management. There are two patterns.
 
-### Add to the shared base environment
+### Add to the shared nix-uv environment
 
-The base environment (`~/rsm-msba/.rsm-msba/envs/base`) holds the
-course-core packages. To experiment with an extra package for the
-current session:
+The `nix-uv` environment (`~/rsm-msba/.rsm-msba/envs/nix-uv`) holds the
+course-core packages and is already active in the dev shell. To
+experiment with an extra package for the current session:
 
 ``` bash
-sbase                 # activate the base env (alias for: source .../envs/base/bin/activate)
 uv pip install mlxtend
 ```
 
 > Packages added with `uv pip install` are not tracked in the lockfile.
-> To make the base environment match the official package list again,
+> To make the nix-uv environment match the official package list again,
 > run `rsm-python-sync`.
 
 ### Create a project-specific environment
@@ -179,11 +184,12 @@ rsm-spark-hadoop-proof             # Hadoop + Spark + a local PySpark session
 ## Updating the environment
 
 ``` bash
-cd ~/rsm-msba
-git pull                           # get the latest environment definition
-direnv reload                      # or: re-run `nix develop`
-rsm-python-sync                    # refresh Python packages from the lockfile
+cd ~/rsm-nix && git pull            # get the latest environment definition
+rsm-python-sync                     # refresh Python packages from the lockfile
 ```
+
+direnv reloads the workspace automatically (the `.envrc` watches the
+flake), or re-open the `~/rsm-msba` folder in VS Code.
 
 ## Cleanup / full reset
 
@@ -194,7 +200,7 @@ folders):
 ``` bash
 rsm-pg-stop 2>/dev/null
 rm -rf ~/rsm-msba/.rsm-msba
-cd ~/rsm-msba && rsm-setup
+nix develop ~/rsm-nix -c rsm-setup
 ```
 
 To reclaim disk space from old Nix builds:
@@ -217,7 +223,7 @@ To uninstall Nix entirely (Determinate installer):
 - **VS Code terminal isn’t activated** — make sure the `mkhl.direnv`
   extension is installed and you ran `direnv allow` in `~/rsm-msba`.
 - **A notebook can’t import a package** — select the **“Python
-  (RSM-MSBA)”** kernel, and run `rsm-python-sync` if it’s a course-core
+  (nix-uv)”** kernel, and run `rsm-python-sync` if it’s a course-core
   package.
 - **PostgreSQL won’t start** — run `rsm-pg-status`; check the log at
   `~/rsm-msba/.rsm-msba/postgres/postgres.log`.

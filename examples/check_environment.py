@@ -34,10 +34,10 @@ print(f"  sys.executable = {exe}")
 print(f"  sys.prefix     = {prefix}")
 print(f"  RSM_UV_ENV     = {rsm_env or '(unset)'}")
 
-# The base environment lives under <workspace>/.rsm-msba/envs/base; sys.prefix
-# is that venv root.
-in_rsm_env = ".rsm-msba/envs/base" in prefix or (bool(rsm_env) and _norm(prefix) == _norm(rsm_env))
-check("python is the RSM base environment", bool(in_rsm_env), prefix)
+# The nix-uv environment lives under <workspace>/.rsm-msba/envs/nix-uv;
+# sys.prefix is that venv root.
+in_rsm_env = ".rsm-msba/envs/nix-uv" in prefix or (bool(rsm_env) and _norm(prefix) == _norm(rsm_env))
+check("python is the nix-uv environment", bool(in_rsm_env), prefix)
 
 # %%
 print("\n== no foreign virtualenv leaking in ==")
@@ -60,7 +60,7 @@ for tool in ["python", "uv", "quarto", "psql", "git", "gh"]:
 
 # %%
 print("\n== RSM environment variables (set by the dev shell) ==")
-for var in ["RSM_WORKSPACE", "RSMBASE", "RSM_UV_ENV", "PGUSER", "PGPORT", "PGDATABASE", "QUARTO_PYTHON"]:
+for var in ["RSM_FLAKE", "RSM_WORKSPACE", "RSMBASE", "RSM_UV_ENV", "PGUSER", "PGPORT", "PGDATABASE", "QUARTO_PYTHON"]:
     print(f"  {var:14s} = {os.environ.get(var, '(unset)')}")
 check("RSM_WORKSPACE is set", bool(os.environ.get("RSM_WORKSPACE")))
 

@@ -87,10 +87,9 @@ retry.
 ## Get the workspace and build it
 
 ```bash
-git clone https://github.com/radiant-ai-hub/rsm-nix.git ~/rsm-msba
-cd ~/rsm-msba
-direnv allow         # if you enabled direnv; otherwise: nix develop
-rsm-setup            # uv env + Jupyter kernel + course folders (first run only)
+git clone https://github.com/radiant-ai-hub/rsm-nix.git ~/rsm-nix
+nix develop ~/rsm-nix -c rsm-setup   # creates ~/rsm-msba + .envrc + nix-uv env + folders
+direnv allow ~/rsm-msba              # if you enabled direnv
 ```
 
 `rsm-setup` is safe to re-run any time. The very first run can take a few minutes

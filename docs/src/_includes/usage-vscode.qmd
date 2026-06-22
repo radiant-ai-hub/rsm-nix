@@ -27,8 +27,8 @@ the base environment for you.
    already on `PATH`.
 
 4. **Pick the kernel for notebooks** — open a `.ipynb`, click the kernel picker
-   (top-right), and choose **Python (RSM-MSBA)**. For `.py` files the interpreter
-   is already set to `~/rsm-msba/.rsm-msba/envs/base/bin/python`; VS Code
+   (top-right), and choose **Python (nix-uv)**. For `.py` files the interpreter
+   is already set to `~/rsm-msba/.rsm-msba/envs/nix-uv/bin/python`; VS Code
    remembers your choice per folder.
 
 That's it. Open a notebook or script in any course folder and run — no activation

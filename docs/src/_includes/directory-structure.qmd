@@ -1,19 +1,28 @@
-## Recommended folder structure
+## Folders: the flake vs your coursework
 
-Everything lives under `~/rsm-msba`. Because direnv cascades into subfolders,
-the environment is active in every course/project folder automatically — no
-per-folder setup.
+Two separate places, so the environment can be updated with `git` without
+touching your work — and each course folder can be its own git repo:
 
 ```text
-~/rsm-msba/                  <- the workspace (flake.nix, .envrc)
-├── .rsm-msba/               <- RSM-owned state (Python env, Postgres, caches)
-│   ├── envs/base/           <- the uv "base" Python environment
-│   ├── postgres/            <- your local PostgreSQL cluster
-│   └── jupyter/             <- the "Python (RSM-MSBA)" notebook kernel
-├── mgta403/                 <- a course folder (created by rsm-setup)
-├── mgta464/                 <- a course folder
-└── my_project/              <- make as many as you like
+~/rsm-nix/                   the flake (a git repo) — RSM machinery only
+                             update it with:  cd ~/rsm-nix && git pull
+
+~/rsm-msba/                  your workspace (NOT a git repo)
+├── .envrc                   generated; loads the flake from ~/rsm-nix
+├── .rsm-msba/               RSM state (survives flake updates / re-clones)
+│   ├── envs/nix-uv/         the "nix-uv" Python environment
+│   ├── postgres/            your local PostgreSQL cluster
+│   └── jupyter/             the "Python (nix-uv)" notebook kernel
+├── examples/                link to the flake's examples
+├── mgta403/                 a course folder — can be its own git repo
+├── mgta464/
+└── my_project/
 ```
+
+direnv cascades the environment into every folder under `~/rsm-msba`, so the
+tools are active in each course folder automatically. Because `~/rsm-msba` is
+**not** a git repo, you can `git init` (or `git clone`) inside `mgta403` with no
+nesting conflict.
 
 Create more course/project folders any time:
 
@@ -21,9 +30,6 @@ Create more course/project folders any time:
 rsm-new-course mgta455 mgta495
 ```
 
-(or edit `courses.txt` and re-run `rsm-setup`).
-
-In VS Code, use **File → Open Folder** and open `~/rsm-msba` (or a specific
-course folder). With the direnv extension installed, the integrated terminal
-and notebook kernels activate automatically. For notebooks, pick the
-**"Python (RSM-MSBA)"** kernel.
+In VS Code, **File → Open Folder** on `~/rsm-msba`. With the direnv extension,
+terminals and notebook kernels activate automatically. For notebooks, pick the
+**"Python (nix-uv)"** kernel.

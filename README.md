@@ -52,12 +52,14 @@ extensions.
 # 1. install Nix (Determinate Systems installer)
 curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
 
-# 2. clone the workspace and build it
-git clone https://github.com/radiant-ai-hub/rsm-nix.git ~/rsm-msba
-cd ~/rsm-msba
-nix develop          # or: direnv allow  (with direnv + nix-direnv)
-rsm-setup            # uv env + Jupyter kernel + course folders
+# 2. clone the flake, then bootstrap your workspace
+git clone https://github.com/radiant-ai-hub/rsm-nix.git ~/rsm-nix
+nix develop ~/rsm-nix -c rsm-setup   # creates ~/rsm-msba + .envrc + nix-uv env + folders
+direnv allow ~/rsm-msba              # if using direnv (recommended)
 ```
+
+The flake lives at `~/rsm-nix` (update with `cd ~/rsm-nix && git pull`);
+your coursework + state live at `~/rsm-msba`.
 
 Per-platform guides:
 
@@ -71,20 +73,22 @@ Per-platform guides:
 - NixOS server (declarative):
   [docs/server-nixos.md](docs/server-nixos.md)
 
-## Workspace layout
+## Layout
 
 ``` text
-~/rsm-msba/                  flake.nix, .envrc, pyproject.toml, uv.lock
-├── .rsm-msba/               RSM-owned state (gitignored)
-│   ├── envs/base/           the uv "base" Python environment
-│   ├── postgres/            workspace-local PostgreSQL cluster
-│   └── jupyter/             "Python (RSM-MSBA)" notebook kernel
-├── mgta403/  mgta464/       course folders (from courses.txt)
-└── my_project/              add as many as you like
+~/rsm-nix/      the flake (a git repo) — update with: cd ~/rsm-nix && git pull
+~/rsm-msba/     your workspace (NOT a git repo)
+├── .envrc      generated; loads the flake from ~/rsm-nix
+├── .rsm-msba/  state: envs/nix-uv, postgres, jupyter (survives flake updates)
+├── mgta403/    a course folder — can be its own git repo
+└── mgta464/
 ```
 
-Nothing is written to host dotfiles (`~/.zshrc`, `~/.bashrc`, …). To
-fully reset, delete `~/rsm-msba/.rsm-msba`.
+The flake (`~/rsm-nix`) is pure machinery you `git pull`; your
+coursework and built `nix-uv` environment live under `~/rsm-msba`, which
+is **not** a git repo, so each course folder can be its own. Nothing is
+written to host dotfiles (`~/.zshrc`, `~/.bashrc`). To fully reset,
+delete `~/rsm-msba/.rsm-msba`.
 
 ## Commands
 

@@ -37,7 +37,7 @@ again. The script is idempotent and continues from the completed steps.
 
 Open VS Code, choose **Connect to WSL**, select `Ubuntu-26.04`, then open
 `~/rsm-msba`. Terminals and notebooks pick up the Nix environment through direnv.
-For notebooks, choose the **Python (RSM-MSBA)** kernel.
+For notebooks, choose the **Python (nix-uv)** kernel.
 
 ## Manual fallback
 
@@ -57,10 +57,9 @@ nix profile install nixpkgs#direnv nixpkgs#nix-direnv
 mkdir -p ~/.config/direnv
 echo 'source ~/.nix-profile/share/nix-direnv/direnvrc' >> ~/.config/direnv/direnvrc
 echo 'eval "$(direnv hook bash)"' >> ~/.bashrc
-git clone https://github.com/radiant-ai-hub/rsm-nix.git ~/rsm-msba
-cd ~/rsm-msba
-direnv allow
-rsm-setup
+git clone https://github.com/radiant-ai-hub/rsm-nix.git ~/rsm-nix
+nix develop ~/rsm-nix -c rsm-setup   # creates ~/rsm-msba + .envrc + nix-uv env + folders
+direnv allow ~/rsm-msba
 ```
 
 Keep the repo under the Linux filesystem (`~/rsm-msba`), not under `/mnt/c/...`;

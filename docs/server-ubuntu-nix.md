@@ -68,16 +68,17 @@ REPO=https://github.com/radiant-ai-hub/rsm-nix.git
 while read -r user; do
   id "$user" &>/dev/null || adduser --disabled-password --gecos "" "$user"
   install -d -o "$user" -g "$user" "/home/$user"
-  sudo -u "$user" -H git clone "$REPO" "/home/$user/rsm-msba" 2>/dev/null || true
+  sudo -u "$user" -H git clone "$REPO" "/home/$user/rsm-nix" 2>/dev/null || true
 done < students.txt
 ```
 
 Add each student’s SSH public key to
-`/home/<user>/.ssh/authorized_keys`.
+`/home/<user>/.ssh/authorized_keys`. The flake is cloned to `~/rsm-nix`;
+each student’s workspace `~/rsm-msba` is created by `rsm-setup` (below).
 
 > **Pre-warm the store** once as admin so the first student doesn’t
-> wait: `nix develop /home/<any-user>/rsm-msba -c true` and
-> `nix develop /home/<any-user>/rsm-msba#spark-hadoop -c true`.
+> wait: `nix develop /home/<any-user>/rsm-nix -c true` and
+> `nix develop /home/<any-user>/rsm-nix#spark-hadoop -c true`.
 
 ------------------------------------------------------------------------
 
@@ -95,9 +96,8 @@ curl -fsSL https://raw.githubusercontent.com/radiant-ai-hub/rsm-nix/main/install
 The manual equivalent, after SSH-ing in:
 
 ``` bash
-cd ~/rsm-msba
-nix develop          # or enable direnv (below)
-rsm-setup            # builds their uv env, kernel, course folders
+nix develop ~/rsm-nix -c rsm-setup   # creates ~/rsm-msba + .envrc + nix-uv env + folders
+direnv allow ~/rsm-msba              # if using direnv
 ```
 
 Enable direnv per account (optional, smoother for VS Code):
@@ -123,8 +123,8 @@ cd ~/rsm-msba && direnv allow
 Students install the **Remote - SSH** extension on their laptop VS Code,
 add the server as an SSH host, connect, and **Open Folder →
 `/home/<user>/rsm-msba`**. With the `mkhl.direnv` extension installed on
-the remote, terminals and notebook kernels (`Python (RSM-MSBA)`)
-activate automatically.
+the remote, terminals and notebook kernels (`Python (nix-uv)`) activate
+automatically.
 
 ------------------------------------------------------------------------
 

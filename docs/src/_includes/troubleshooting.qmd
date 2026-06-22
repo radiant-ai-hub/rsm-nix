@@ -4,7 +4,7 @@
   run `. /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh`).
 - **VS Code terminal isn't activated** — make sure the `mkhl.direnv` extension
   is installed and you ran `direnv allow` in `~/rsm-msba`.
-- **A notebook can't import a package** — select the **"Python (RSM-MSBA)"**
+- **A notebook can't import a package** — select the **"Python (nix-uv)"**
   kernel, and run `rsm-python-sync` if it's a course-core package.
 - **PostgreSQL won't start** — run `rsm-pg-status`; check the log at
   `~/rsm-msba/.rsm-msba/postgres/postgres.log`.

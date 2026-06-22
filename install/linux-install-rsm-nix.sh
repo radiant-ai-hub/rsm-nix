@@ -14,7 +14,8 @@
 set -euo pipefail
 
 REPO_URL="https://github.com/radiant-ai-hub/rsm-nix.git"
-WORKSPACE_PATH="$HOME/rsm-msba"
+FLAKE_PATH="$HOME/rsm-nix"        # the flake repo (git pull to update)
+WORKSPACE_PATH="$HOME/rsm-msba"   # your coursework + state (not a git repo)
 SKIP_WORKSPACE_SETUP=0
 DRY_RUN=0
 
@@ -141,34 +142,35 @@ setup_workspace() {
     log_detail "Skipping RSM workspace setup."
     return
   fi
-  log_section "Setting up RSM workspace"
-  local workspace
+  log_section "Setting up the RSM environment"
+  local flake workspace
+  flake="$FLAKE_PATH"
   workspace="$(expand_workspace_path)"
 
   if [ "$DRY_RUN" -eq 1 ]; then
-    log_detail "[dry-run] Would clone or reuse $REPO_URL at $workspace"
-    log_detail "[dry-run] Would run rsm-setup and smoke checks through nix develop."
+    log_detail "[dry-run] Would clone the flake $REPO_URL to $flake"
+    log_detail "[dry-run] Would bootstrap the workspace $workspace via rsm-setup."
     return
   fi
 
-  if [ -e "$workspace" ] && [ ! -d "$workspace/.git" ]; then
-    echo "Workspace path exists but is not a git checkout: $workspace" >&2
+  if [ -e "$flake" ] && [ ! -d "$flake/.git" ]; then
+    echo "Flake path exists but is not a git checkout: $flake" >&2
     exit 1
   fi
-  if [ ! -d "$workspace/.git" ]; then
-    mkdir -p "$(dirname "$workspace")"
-    git clone "$REPO_URL" "$workspace"
+  if [ ! -d "$flake/.git" ]; then
+    mkdir -p "$(dirname "$flake")"
+    git clone "$REPO_URL" "$flake"
   else
-    log_detail "Reusing existing workspace: $workspace"
+    log_detail "Reusing existing flake checkout: $flake"
+    git -C "$flake" pull --ff-only || true
   fi
 
-  cd "$workspace"
   source_nix_profile
-  direnv allow || true
-  nix develop -c bash tests/check-no-host-mutation.sh
-  nix develop -c rsm-setup
-  nix develop -c bash tests/check-default.sh
-  nix develop -c bash tests/check-folders.sh
+  # Bootstrap the workspace: creates $workspace + .envrc + nix-uv env + folders.
+  RSM_WORKSPACE="$workspace" nix develop "$flake" -c rsm-setup
+  direnv allow "$workspace" || true
+  RSM_WORKSPACE="$workspace" nix develop "$flake" -c bash "$flake/tests/check-default.sh"
+  RSM_WORKSPACE="$workspace" nix develop "$flake" -c bash "$flake/tests/check-folders.sh"
 }
 
 printf '%s\n' "Rady School of Management @ UCSD"

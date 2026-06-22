@@ -9,7 +9,7 @@
 # Resolve workspace/state defaults if not already exported by the dev shell.
 : "${RSM_WORKSPACE:=$PWD}"
 : "${RSMBASE:=$RSM_WORKSPACE/.rsm-msba}"
-: "${RSM_UV_ENV:=$RSMBASE/envs/base}"
+: "${RSM_UV_ENV:=$RSMBASE/envs/nix-uv}"
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || true)"
 

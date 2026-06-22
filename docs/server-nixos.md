@@ -101,9 +101,9 @@ Use a NixOS activation script or a systemd unit to clone/update
 system.activationScripts.rsmWorkspaces.text = ''
   for u in ${lib.concatStringsSep " " students}; do
     home="/home/$u"
-    if [ ! -e "$home/rsm-msba/flake.nix" ]; then
-      ${pkgs.git}/bin/git clone https://github.com/radiant-ai-hub/rsm-nix.git "$home/rsm-msba" || true
-      chown -R "$u":users "$home/rsm-msba"
+    if [ ! -e "$home/rsm-nix/flake.nix" ]; then
+      ${pkgs.git}/bin/git clone https://github.com/radiant-ai-hub/rsm-nix.git "$home/rsm-nix" || true
+      chown -R "$u":users "$home/rsm-nix"
     fi
   done
 '';

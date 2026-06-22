@@ -1,9 +1,12 @@
-# rsm-python-sync: create/refresh the uv base environment from the committed
-# lockfile. Idempotent. Safe to run repeatedly.
+# rsm-python-sync: create/refresh the "nix-uv" environment from the flake's
+# committed lockfile. Idempotent. Safe to run repeatedly.
+#
+# pyproject.toml + uv.lock live in the flake repo ($RSM_FLAKE); the environment
+# is built into the workspace state ($RSM_UV_ENV).
 
-if [ ! -f "$RSM_WORKSPACE/pyproject.toml" ] || [ ! -f "$RSM_WORKSPACE/uv.lock" ]; then
-  echo "rsm-python-sync: pyproject.toml/uv.lock not found in $RSM_WORKSPACE" >&2
-  echo "  Run this from your workspace root (e.g. ~/rsm-msba)." >&2
+if [ ! -f "$RSM_FLAKE/pyproject.toml" ] || [ ! -f "$RSM_FLAKE/uv.lock" ]; then
+  echo "rsm-python-sync: pyproject.toml/uv.lock not found in $RSM_FLAKE" >&2
+  echo "  Is the flake cloned there? (git clone … ~/rsm-nix)" >&2
   exit 1
 fi
 
@@ -17,11 +20,11 @@ if [ -z "$py" ]; then
 fi
 
 if [ ! -x "$RSM_UV_ENV/bin/python" ]; then
-  echo "Creating uv base environment at $RSM_UV_ENV"
-  uv venv --python "$py" "$RSM_UV_ENV"
+  echo "Creating the nix-uv environment at $RSM_UV_ENV"
+  uv venv --prompt nix-uv --python "$py" "$RSM_UV_ENV"
 fi
 
-echo "Syncing base environment from uv.lock (this can take a few minutes the first time)..."
-( cd "$RSM_WORKSPACE" && uv sync --frozen --python "$RSM_UV_ENV/bin/python" )
+echo "Syncing nix-uv from uv.lock (this can take a few minutes the first time)..."
+( cd "$RSM_FLAKE" && UV_PROJECT_ENVIRONMENT="$RSM_UV_ENV" uv sync --frozen --python "$RSM_UV_ENV/bin/python" )
 
-echo "rsm-python-sync: base environment ready at $RSM_UV_ENV"
+echo "rsm-python-sync: nix-uv environment ready at $RSM_UV_ENV"

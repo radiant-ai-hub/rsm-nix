@@ -26,7 +26,7 @@ nix develop -c bash examples/run-examples.sh
 python examples/check_environment.py
 ```
 
-`python` should resolve to `…/rsm-msba/.rsm-msba/envs/base/bin/python`,
+`python` should resolve to `…/rsm-msba/.rsm-msba/envs/nix-uv/bin/python`,
 `VIRTUAL_ENV` should be empty (or that same path), and `/opt/base-uv` must not be
 on `PATH`. If you see warnings, read the next section.
 

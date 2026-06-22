@@ -3,18 +3,18 @@
 The environment uses [uv](https://docs.astral.sh/uv/) for Python package
 management. There are two patterns.
 
-### Add to the shared base environment
+### Add to the shared nix-uv environment
 
-The base environment (`~/rsm-msba/.rsm-msba/envs/base`) holds the course-core
-packages. To experiment with an extra package for the current session:
+The `nix-uv` environment (`~/rsm-msba/.rsm-msba/envs/nix-uv`) holds the
+course-core packages and is already active in the dev shell. To experiment with
+an extra package for the current session:
 
 ```bash
-sbase                 # activate the base env (alias for: source .../envs/base/bin/activate)
 uv pip install mlxtend
 ```
 
 > Packages added with `uv pip install` are not tracked in the lockfile. To make
-> the base environment match the official package list again, run
+> the nix-uv environment match the official package list again, run
 > `rsm-python-sync`.
 
 ### Create a project-specific environment

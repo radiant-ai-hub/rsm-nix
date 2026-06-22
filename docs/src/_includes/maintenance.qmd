@@ -1,11 +1,12 @@
 ## Updating the environment
 
 ```bash
-cd ~/rsm-msba
-git pull                           # get the latest environment definition
-direnv reload                      # or: re-run `nix develop`
-rsm-python-sync                    # refresh Python packages from the lockfile
+cd ~/rsm-nix && git pull            # get the latest environment definition
+rsm-python-sync                     # refresh Python packages from the lockfile
 ```
+
+direnv reloads the workspace automatically (the `.envrc` watches the flake), or
+re-open the `~/rsm-msba` folder in VS Code.
 
 ## Cleanup / full reset
 
@@ -15,7 +16,7 @@ To rebuild your environment from scratch, delete the workspace state (this does
 ```bash
 rsm-pg-stop 2>/dev/null
 rm -rf ~/rsm-msba/.rsm-msba
-cd ~/rsm-msba && rsm-setup
+nix develop ~/rsm-nix -c rsm-setup
 ```
 
 To reclaim disk space from old Nix builds:

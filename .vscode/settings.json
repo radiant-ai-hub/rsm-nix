@@ -5,7 +5,7 @@
   // Default Python interpreter = the uv "base" environment (valid when this
   // folder, ~/rsm-msba, is the workspace root). direnv also puts it on PATH,
   // so notebooks/terminals work even when a course subfolder is opened.
-  "python.defaultInterpreterPath": "${workspaceFolder}/.rsm-msba/envs/base/bin/python",
+  "python.defaultInterpreterPath": "${workspaceFolder}/.rsm-msba/envs/nix-uv/bin/python",
 
   // direnv already provides the environment; don't let VS Code re-activate a
   // venv on top of it in new terminals.

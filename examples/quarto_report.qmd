@@ -27,5 +27,5 @@ df = pd.DataFrame({"x": np.arange(1, 6), "y": np.arange(1, 6) ** 2})
 df
 ```
 
-If `python` above points at `…/.rsm-msba/envs/base/bin/python`, Quarto is using
+If `python` above points at `…/.rsm-msba/envs/nix-uv/bin/python`, Quarto is using
 the RSM-MSBA environment correctly.
