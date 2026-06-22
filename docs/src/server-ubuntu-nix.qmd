@@ -83,7 +83,16 @@ Add each student's SSH public key to `/home/<user>/.ssh/authorized_keys`.
 
 ## 4. First-run per student
 
-Each student, after SSH-ing in:
+The quickest per-user path is the Linux installer — it installs/uses the shared
+Nix, configures **direnv + nix-direnv** for the student's login shell (so VS Code
+Remote-SSH activates the env automatically), clones the workspace, and runs
+`rsm-setup`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/radiant-ai-hub/rsm-nix/main/install/linux-install-rsm-nix.sh | bash
+```
+
+The manual equivalent, after SSH-ing in:
 
 ```bash
 cd ~/rsm-msba

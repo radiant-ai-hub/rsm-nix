@@ -18,6 +18,17 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr -useb https://raw.gi
 The installer sets up VS Code on Windows, Ubuntu 26.04 on WSL2, Determinate Nix
 inside Ubuntu, `direnv` + `nix-direnv`, and the `~/rsm-msba` workspace.
 
+### Linux / server (bare Ubuntu, or a Remote-SSH server)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/radiant-ai-hub/rsm-nix/main/install/linux-install-rsm-nix.sh | bash
+```
+
+Installs Determinate Nix (if missing), configures `direnv` + `nix-direnv` for
+your login shell (zsh or bash), clones the workspace to `~/rsm-msba`, and runs
+`rsm-setup`. It does not install VS Code — connect from your laptop with the
+**Remote - SSH** + **mkhl.direnv** extensions.
+
 ### Manual path (any platform)
 
 ```bash
