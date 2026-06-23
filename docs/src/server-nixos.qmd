@@ -176,8 +176,11 @@ build their personal env. No toy template, no `cp -r` blueprint:
 systemd.services.rsm-seed-workspaces = {
   wantedBy = [ "multi-user.target" ];
   wants = [ "network-online.target" ]; after = [ "network-online.target" ];
-  path = [ pkgs.git pkgs.coreutils ];
-  serviceConfig = { Type = "oneshot"; RemainAfterExit = true; };
+  path = [ pkgs.git pkgs.coreutils pkgs.getent ];   # getent lives in glibc, not coreutils
+  serviceConfig = {
+    Type = "oneshot"; RemainAfterExit = true;
+    Environment = "GIT_SSL_CAINFO=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+  };
   script = ''
     for u in $(getent group rsm | cut -d: -f4 | tr ',' ' '); do
       home="$(getent passwd "$u" | cut -d: -f6)"

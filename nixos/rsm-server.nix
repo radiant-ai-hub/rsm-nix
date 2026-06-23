@@ -94,10 +94,11 @@ in
     wantedBy = [ "multi-user.target" ];
     after = [ "network-online.target" ];
     wants = [ "network-online.target" ];
-    path = [ pkgs.git pkgs.coreutils ];
+    path = [ pkgs.git pkgs.coreutils pkgs.getent ];
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
+      Environment = "GIT_SSL_CAINFO=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
     };
     script = ''
       set -u
