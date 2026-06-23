@@ -4,140 +4,262 @@ format: gfm
 
 <!-- generated from docs/src/server-nixos.qmd — edit the .qmd, then run docs/src/render-docs.sh -->
 
-# RSM-MSBA on NixOS (declarative blueprint)
+# RSM-MSBA on a NixOS server (multi-user)
 
-> **Path B — the target blueprint.** On NixOS you declare users, SSH, storage,
-> GPU, and the Nix binary cache in `configuration.nix`, and the shared RSM
-> workspace becomes part of the system definition. The development environment
-> flake stays **host-agnostic** — NixOS *consumes* it, it does not replace it.
-> This is future infrastructure, not a requirement for student-laptop success.
+> **The goal:** one server, where every student logs in over **VS Code
+> Remote-SSH** and gets the *same* computing environment — most of the benefits
+> of Docker + Kubernetes (a consistent image, isolation by account, atomic
+> rollback) using **only NixOS**, no containers and no orchestrator.
 
-The same `flake.nix` used on laptops and the Ubuntu server (Path A) is used
-here unchanged. Below is a starting skeleton; adapt to your hardware and policy.
+The key idea: the server does **not** redefine the environment. It **consumes**
+the `rsm-nix` flake as an input and puts `rsm-setup` on every student's PATH. The
+toolchain is byte-for-byte what students run on their laptops, maintained in one
+place. NixOS adds only *host* concerns — accounts, SSH, storage, the firewall.
+
+A deployable, copy-pasteable version of everything below lives in the repo under
+[`nixos/`](https://github.com/radiant-ai-hub/rsm-nix/tree/main/nixos). This page
+explains the design; that directory is what you actually put in `/etc/nixos`.
+
+## What you get (and don't)
+
+| Container/k8s feature | NixOS equivalent here |
+|---|---|
+| Identical image for everyone | The shared `rsm-nix` flake, pinned by `flake.lock` |
+| Isolation between users | Separate Linux accounts + `/home`; no sudo for students |
+| Atomic deploy + rollback | `nixos-rebuild switch` / `--rollback` (bootable generations) |
+| Declarative config | `configuration.nix` + `students.nix` in git |
+| Resource limits / scheduling | **Deferred** (see the end) — systemd slices add this later |
+
+It is *not* a scheduler and (for the alpha) does not cap per-user CPU/RAM. That
+is a deliberate, documented next step, not an oversight.
 
 ---
 
-## 1. System flake that pins nixpkgs and the RSM env
+## 1. Prerequisites
 
-`/etc/nixos/flake.nix`:
+- A machine running **NixOS** (this is Path B; the Ubuntu + Nix route is
+  [server-ubuntu-nix.md](server-ubuntu-nix.md)).
+- Admin (sudo) access and the students' **SSH public keys**.
+- Flakes enabled (the config below turns them on).
+
+---
+
+## 2. The files
+
+Copy these from [`nixos/`](https://github.com/radiant-ai-hub/rsm-nix/tree/main/nixos)
+into `/etc/nixos`:
+
+| File | Purpose |
+|------|---------|
+| `flake.nix` | System flake: pins `nixpkgs` + the `rsm-nix` input → `nixosConfigurations.<host>`. |
+| `configuration.nix` | Host glue: hostname, boot loader, Nix daemon, locale, `stateVersion`. |
+| `rsm-server.nix` | The reusable RSM module (everything in §3). |
+| `students.nix` | Account registry — copied from `students.nix.example`, with real keys. |
+
+`flake.nix` wires it together and consumes the environment flake:
 
 ```nix
-{
-  inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    rsm-msba.url = "github:radiant-ai-hub/rsm-nix";   # this repo
+inputs = {
+  nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  rsm-nix.url = "github:radiant-ai-hub/rsm-nix";   # the student/dev environment
+};
+outputs = { self, nixpkgs, rsm-nix, ... }: {
+  nixosConfigurations.rsm-server = nixpkgs.lib.nixosSystem {
+    system = "x86_64-linux";
+    specialArgs = { inherit rsm-nix; };
+    modules = [ ./configuration.nix ./rsm-server.nix ./students.nix ];
   };
-
-  outputs = { self, nixpkgs, rsm-msba, ... }: {
-    nixosConfigurations.rsm-server = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";          # or aarch64-linux
-      modules = [ ./configuration.nix ];
-      specialArgs = { inherit rsm-msba; };
-    };
-  };
-}
+};
 ```
 
+> We deliberately let `rsm-nix` use its **own pinned nixpkgs** (no
+> `follows`), so the env stays identical to the laptop build. The cost is a
+> second, cached nixpkgs eval — worth it for reproducibility.
+
 ---
 
-## 2. configuration.nix essentials
+## 3. The RSM module, decision by decision
+
+All of this is in `nixos/rsm-server.nix`.
+
+### 3.1 nix-ld — the VS Code Remote-SSH fix (most important)
+
+VS Code's "server" downloads its own dynamically-linked Node binary. On NixOS
+there is no `/lib64/ld-linux-*.so` for it to use, so without help Remote-SSH
+connects and immediately drops. `nix-ld` supplies a standard loader plus common
+libraries:
 
 ```nix
-{ config, pkgs, lib, rsm-msba, ... }:
-let
-  students = [ "student001" "student002" /* ... */ ];
-  mkStudent = name: {
-    isNormalUser = true;
-    home = "/home/${name}";
-    openssh.authorizedKeys.keyFiles = [ ./keys/${name}.pub ];
-  };
-in
-{
-  # Flakes on the host itself.
-  nix.settings.experimental-features = [ "nix-command" "flakes" ];
-
-  # A binary cache helps a fleet of identical machines.
-  nix.settings = {
-    substituters = [ "https://cache.nixos.org" ];
-    trusted-public-keys = [ "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=" ];
-    auto-optimise-store = true;
-  };
-
-  # SSH for student access (VS Code Remote-SSH).
-  services.openssh = {
-    enable = true;
-    settings.PasswordAuthentication = false;
-  };
-
-  # Declarative student accounts.
-  users.users = lib.genAttrs students mkStudent;
-
-  # Make the RSM dev shell trivially available system-wide. Students still get
-  # the full reproducible env via the flake; this just puts core CLIs on PATH.
-  environment.systemPackages = [
-    pkgs.git pkgs.direnv pkgs.nix-direnv
-    rsm-msba.packages.${pkgs.system}.rsm-setup
-  ];
-
-  # System-wide direnv + nix-direnv so ~/rsm-msba activates on cd.
-  programs.direnv = { enable = true; nix-direnv.enable = true; };
-
-  # nix-ld lets any stray non-Nix binary find common libs (rarely needed here,
-  # since the flake already wires LD_LIBRARY_PATH for the uv env).
-  programs.nix-ld.enable = true;
-
-  system.stateVersion = "24.11";
-}
+programs.nix-ld.enable = true;
+programs.nix-ld.libraries = with pkgs; [
+  stdenv.cc.cc zlib glib openssl curl icu util-linux
+];
 ```
 
----
+This is the single change most likely to be missing from a hand-rolled config.
 
-## 3. Seeding each student's workspace
-
-Use a NixOS activation script or a systemd unit to clone/update `~/rsm-msba` and
-write a `.envrc`-approved marker, e.g.:
+### 3.2 SSH (key-only) + firewall
 
 ```nix
-system.activationScripts.rsmWorkspaces.text = ''
-  for u in ${lib.concatStringsSep " " students}; do
-    home="/home/$u"
-    if [ ! -e "$home/rsm-nix/flake.nix" ]; then
-      ${pkgs.git}/bin/git clone https://github.com/radiant-ai-hub/rsm-nix.git "$home/rsm-nix" || true
-      chown -R "$u":users "$home/rsm-nix"
-    fi
-  done
+services.openssh.enable = true;
+services.openssh.settings = {
+  PasswordAuthentication = false;
+  KbdInteractiveAuthentication = false;
+  AllowTcpForwarding = true;        # forward pgweb / Postgres to the laptop
+};
+networking.firewall.allowedTCPPorts = [ 22 ];   # only SSH is exposed
+```
+
+Per-student databases are reached through SSH port-forwarding, never published
+on the network.
+
+### 3.3 No `wheel` for students (security)
+
+On a shared box students must **not** have sudo. In `students.nix` they get only
+the `rsm` group; keep a *separate* admin account with `wheel` (or you lock
+yourself out of `nixos-rebuild`):
+
+```nix
+extraGroups = [ "rsm" ];          # students: NO "wheel"
+```
+
+### 3.4 Shared uv cache (disk)
+
+One uv env is ~1.2 GB **plus** ~1.2 GB of downloads. Per student that adds up
+fast. Because `rsm-nix` runs uv in **copy** link-mode, each student's venv gets
+private copies — only the *downloads* can be shared safely:
+
+```nix
+users.groups.rsm = { };
+systemd.tmpfiles.rules = [
+  "d /srv/uv-cache 2775 root rsm - -"               # setgid: new files inherit group rsm
+  "a+ /srv/uv-cache - - - - d:g:rsm:rwx,g:rsm:rwx"  # default ACL: group-writable regardless of umask
+];
+environment.sessionVariables.UV_CACHE_DIR = "/srv/uv-cache";
+```
+
+`rsm-nix/bin/rsm-env.sh` already honors an inherited `UV_CACHE_DIR`, so this Just
+Works. (If uv ever complains about permissions across users, drop the shared dir
+and fall back to the per-user default — correctness over disk.)
+
+### 3.5 Per-user Postgres port
+
+Every student's `rsm-pg-start` would bind `127.0.0.1:8765` — a collision on one
+host. The `rsm-pg-*` scripts honor `$PGPORT`, so give each UID its own:
+
+```nix
+environment.etc."profile.d/rsm-pgport.sh".text = ''
+  export PGPORT="$(( 8765 + $(id -u) % 50 ))"
 '';
 ```
 
-Students still run `rsm-setup` once to build their personal uv env (per-user,
-not system state).
+(The unix socket used by `rsm-pg-psql` is already per-user and never collides;
+this covers the TCP listener and `pgweb`.)
+
+### 3.6 direnv, system-wide
+
+```nix
+programs.direnv = { enable = true; nix-direnv.enable = true; };
+```
+
+This is the fix for "direnv: command not found" inside VS Code terminals: every
+login shell gets the hook, so `~/rsm-msba` (and course subfolders) activate on
+`cd`.
+
+### 3.7 Workspace seeding (the real flake, not a template)
+
+A `oneshot` unit clones `rsm-nix` into each student's `~/rsm-nix` if missing —
+the real flake is the only source of truth. Students then run `rsm-setup` once to
+build their personal env. No toy template, no `cp -r` blueprint:
+
+```nix
+systemd.services.rsm-seed-workspaces = {
+  wantedBy = [ "multi-user.target" ];
+  wants = [ "network-online.target" ]; after = [ "network-online.target" ];
+  path = [ pkgs.git pkgs.coreutils ];
+  serviceConfig = { Type = "oneshot"; RemainAfterExit = true; };
+  script = ''
+    for u in $(getent group rsm | cut -d: -f4 | tr ',' ' '); do
+      home="$(getent passwd "$u" | cut -d: -f6)"
+      [ -e "$home/rsm-nix/flake.nix" ] || \
+        git clone https://github.com/radiant-ai-hub/rsm-nix.git "$home/rsm-nix" && \
+        chown -R "$u":rsm "$home/rsm-nix"
+    done
+  '';
+};
+```
+
+### 3.8 Atomic rollback (the headline safety net)
+
+`environment.systemPackages` puts `git`, `direnv`, and `rsm-msba.packages.<sys>.rsm-setup`
+on PATH. The Nix daemon is configured with flakes + `auto-optimise-store` + weekly
+GC. Every `nixos-rebuild switch` is a new **bootable generation**; if a change
+breaks the box, `sudo nixos-rebuild switch --rollback` (or selecting the prior
+generation at boot) restores it instantly. That is the k8s-style "roll back the
+deployment" guarantee, built in.
 
 ---
 
-## 4. GPU notes (optional)
+## 4. Deploy
 
-For CUDA workloads add `hardware.nvidia` + `nixpkgs.config.allowUnfree = true`
-at the system level. The dev flake already sets `allowUnfree`; PyTorch/CUDA
-remain an **optional** Python layer (excluded from course-core) that a student
-or a dedicated GPU profile installs on top.
+```bash
+# On the host, as admin:
+cd /etc/nixos
+# bring in flake.nix, configuration.nix, rsm-server.nix
+sudo nixos-generate-config                # real hardware-configuration.nix
+cp students.nix.example students.nix      # then edit: usernames + real keys
+# set networking.hostName, nixosConfigurations.<name>, and
+# system.stateVersion (= this machine's install release) to match
+nix develop github:radiant-ai-hub/rsm-nix -c true   # pre-warm the store (optional)
+sudo nixos-rebuild switch --flake /etc/nixos#<host>
+```
+
+If anything goes wrong: `sudo nixos-rebuild switch --rollback`.
 
 ---
 
-## 5. Why keep the flake host-agnostic
+## 5. Per-student first run
 
-- Laptops (macOS/WSL2), the Ubuntu server, and NixOS all consume the **same**
-  `devShells.default` — one definition to maintain and test.
-- NixOS adds *host* concerns (users, SSH, storage, GPU, cache); it never forks
-  the *environment* definition.
-- A change to the course-core stack is one PR to this repo; every host picks it
-  up with `git pull` + `rsm-python-sync` (or a flake input bump on NixOS).
+After the switch, each student (from a laptop):
+
+1. **VS Code → Remote-SSH** to `<user>@<host>` (install the *Remote - SSH* and
+   *direnv* extensions).
+2. In a remote terminal: `cd ~ && nix develop ~/rsm-nix -c rsm-setup` (the seed
+   unit already cloned `~/rsm-nix`). This builds their nix-uv env, the
+   "Python (nix-uv)" kernel, and course folders — a few minutes the first time.
+3. **Open Folder → `~/rsm-msba`**. Terminals and notebooks pick up the env via
+   direnv; choose the **Python (nix-uv)** kernel for notebooks.
 
 ---
 
 ## 6. Validate
 
 ```bash
-sudo nixos-rebuild switch --flake /etc/nixos#rsm-server
-# then as a student:
-cd ~/rsm-msba && nix flake check && nix develop -c bash tests/check-default.sh
+# as a student account:
+cd ~/rsm-msba
+python examples/check_environment.py     # expect: ALL GOOD
+rsm-pg-start && rsm-pg-psql -c '\l'      # Postgres on the per-user PGPORT
 ```
+
+Then confirm two accounts can run `rsm-pg-start` **at the same time** without a
+port clash, and that a second student's `rsm-setup` is fast (shared
+`/srv/uv-cache` hit).
+
+---
+
+## 7. Deferred past the alpha
+
+These are intentionally **out of scope** for a 4-user alpha; the design leaves a
+clean place for each:
+
+- **Per-user resource limits** (the one real container feature missing): systemd
+  `user-.slice` with `MemoryMax` / `MemoryHigh` / `CPUQuota`, plus
+  `systemd-oomd`, so one runaway job can't starve the box.
+- **Disk quotas** on `/home` (e.g. `fileSystems` `usrquota` + `quota` service).
+- **Account automation / SSO** — replace the hand-written `students.nix` with an
+  `AuthorizedKeysCommand` or a generated registry once the roster grows.
+- **Local binary cache / substituter** — for a large cohort, to avoid every
+  machine pulling from `cache.nixos.org`.
+- **GPU/CUDA** — `hardware.nvidia` + an optional PyTorch layer.
+
+Add them incrementally; none change the environment definition, only the host.

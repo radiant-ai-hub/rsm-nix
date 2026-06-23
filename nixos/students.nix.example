@@ -1,0 +1,43 @@
+# Student/account registry. Copy to `students.nix` and fill in real usernames
+# and SSH PUBLIC keys (one per student laptop). Keep this file out of any public
+# repo if you treat usernames/keys as sensitive.
+#
+# SECURITY: students are NOT in `wheel` — they must not have sudo on a shared
+# box. They share the `rsm` group (shared uv cache + workspace seeding).
+#
+# ADMIN: keep at least one separate admin account WITH `wheel` and your key, or
+# you will lock yourself out of `sudo nixos-rebuild`. Example `vnijs` below.
+{ config, pkgs, lib, ... }:
+
+let
+  # Replace the placeholder keys with real `ssh-ed25519 ...` public keys.
+  students = [
+    { username = "aaa111"; name = "Instructor (test profile)"; key = "ssh-ed25519 AAAA_REPLACE_ME instructor@laptop"; }
+    { username = "student001"; name = "Alpha Tester 1"; key = "ssh-ed25519 AAAA_REPLACE_ME s1@laptop"; }
+    { username = "student002"; name = "Alpha Tester 2"; key = "ssh-ed25519 AAAA_REPLACE_ME s2@laptop"; }
+    { username = "student003"; name = "Alpha Tester 3"; key = "ssh-ed25519 AAAA_REPLACE_ME s3@laptop"; }
+  ];
+
+  mkStudent = s: {
+    name = s.username;
+    value = {
+      isNormalUser = true;
+      description = s.name;
+      extraGroups = [ "rsm" ]; # NO "wheel" — no sudo for students
+      openssh.authorizedKeys.keys = [ s.key ];
+      shell = pkgs.zsh;
+    };
+  };
+in
+{
+  users.users = builtins.listToAttrs (map mkStudent students) // {
+    # Admin account — keep this (or another wheel account) so you can rebuild.
+    vnijs = {
+      isNormalUser = true;
+      description = "Admin";
+      extraGroups = [ "wheel" "rsm" ];
+      openssh.authorizedKeys.keys = [ "ssh-ed25519 AAAA_REPLACE_ME admin@laptop" ];
+      shell = pkgs.zsh;
+    };
+  };
+}

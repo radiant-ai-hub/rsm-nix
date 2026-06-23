@@ -13,6 +13,9 @@
 /examples/quarto_report.md
 /examples/*_files/
 
+# NixOS server: real account registry with SSH keys (use students.nix.example)
+/nixos/students.nix
+
 # Local-only planning / internal notes (kept locally, not published)
 /nix-plan.md
 /nix-plan-init.md
