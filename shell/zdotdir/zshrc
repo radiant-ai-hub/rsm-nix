@@ -1,13 +1,14 @@
-# RSM-MSBA environment .zshrc — loaded via ZDOTDIR, so it applies ONLY to shells
-# started inside the rsm-msba environment (e.g. the VS Code integrated terminal,
-# which rsm-setup points at this directory). Your normal login shell is left
-# alone. Installed/refreshed by `rsm-setup`; edit the source in the flake
-# (shell/zdotdir/zshrc), not this copy.
+# RSM-MSBA environment .zshrc — the full oh-my-zsh + powerlevel10k shell for the
+# rsm-msba environment. Loaded two ways: at startup when ZDOTDIR points here (VS
+# Code terminals), and mid-session by the system zsh chpwd hook when you cd into
+# ~/rsm-msba (kitty and other terminals). Installed/refreshed by `rsm-setup`;
+# edit the source in the flake (shell/zdotdir/zshrc), not this copy.
 
-# Powerlevel10k instant prompt — keep near the top. Cache lives in this dir.
-if [[ -r "${ZDOTDIR}/.cache/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
-  source "${ZDOTDIR}/.cache/p10k-instant-prompt-${(%):-%n}.zsh"
-fi
+# Guard against double-sourcing (the chpwd hook plus a ZDOTDIR startup read can
+# both fire). p10k instant prompt is disabled in .p10k.zsh, so there is no
+# instant-prompt cache to source here and mid-session loading stays clean.
+[[ -n ${_RSM_ZSHRC_DONE:-} ]] && return 0
+typeset -g _RSM_ZSHRC_DONE=1
 
 export ZSH="${ZDOTDIR}/.oh-my-zsh"
 export ZSH_CACHE_DIR="${ZDOTDIR}/.cache"

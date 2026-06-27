@@ -6,6 +6,7 @@
 let
   system = pkgs.stdenv.hostPlatform.system; # e.g. "x86_64-linux"
   rsmSetup = rsm-nix.packages.${system}.rsm-setup;
+  rsmMsba = rsm-nix.packages.${system}.rsm-msba;
 in
 {
   # --- VS Code Remote-SSH fix (the important one) ----------------------------
@@ -40,9 +41,29 @@ in
   networking.firewall.enable = true;
   networking.firewall.allowedTCPPorts = [ 22 ];
 
-  # zsh is the environment's native shell (banner, aliases, oh-my-zsh prompt).
-  # Enabling it here lets students.nix set it as the login shell.
-  programs.zsh.enable = true;
+  # zsh is the environment's native shell. Enabling it here lets students.nix set
+  # it as the login shell. The interactiveShellInit hook loads the full rsm shell
+  # (oh-my-zsh + powerlevel10k, installed per-workspace by rsm-setup) the moment
+  # you enter ~/rsm-msba — in ANY terminal (kitty SSH as well as VS Code). direnv
+  # can't do this (it only moves env vars), so a zsh chpwd hook sources the
+  # workspace's rsm .zshrc. It persists for that terminal's session (oh-my-zsh
+  # has no clean unload); the per-folder signal that reverts is the (nix-uv) venv
+  # segment + active python (direnv).
+  programs.zsh = {
+    enable = true;
+    interactiveShellInit = ''
+      _rsm_zsh_load() {
+        local zd="$HOME/rsm-msba/.rsm-msba/zsh"
+        if [[ -z ''${_RSM_ZSH_LOADED:-} && -f "$zd/.zshrc" && ( $PWD == "$HOME/rsm-msba" || $PWD == "$HOME/rsm-msba"/* ) ]]; then
+          export _RSM_ZSH_LOADED=1 ZDOTDIR="$zd"
+          source "$zd/.zshrc"
+        fi
+      }
+      autoload -Uz add-zsh-hook
+      add-zsh-hook chpwd _rsm_zsh_load
+      _rsm_zsh_load
+    '';
+  };
 
   # --- Shared group + uv download cache --------------------------------------
   # Students share the `rsm` group (set in students.nix) so they can share one
@@ -80,6 +101,7 @@ in
     vim
     direnv
     rsmSetup # `rsm-setup` available system-wide
+    rsmMsba # `rsm-msba` — clone-if-missing + rsm-setup, for full reset
   ];
 
   # --- Seed each student's flake checkout ------------------------------------

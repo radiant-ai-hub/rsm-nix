@@ -94,12 +94,14 @@ if [ -n "${RSM_OMZ_SRC:-}" ] && [ -d "$RSM_OMZ_SRC" ]; then
   mkdir -p "$zdotdir"
   if [ ! -d "$zdotdir/.oh-my-zsh" ]; then
     cp -r "$RSM_OMZ_SRC/." "$zdotdir/"
-    chmod -R u+w "$zdotdir/.oh-my-zsh" 2>/dev/null || true
   fi
   if [ -n "${RSM_ZDOTDIR_TEMPLATE:-}" ] && [ -d "$RSM_ZDOTDIR_TEMPLATE" ]; then
     cp -f "$RSM_ZDOTDIR_TEMPLATE/zshrc" "$zdotdir/.zshrc"
     cp -f "$RSM_ZDOTDIR_TEMPLATE/p10k.zsh" "$zdotdir/.p10k.zsh"
   fi
+  # The omz copy pulls plugin symlinks in as read-only Nix-store dirs; make the
+  # whole tree user-writable so `rm -rf ~/rsm-msba` works cleanly.
+  chmod -R u+w "$zdotdir" 2>/dev/null || true
   echo "    zsh       : oh-my-zsh + powerlevel10k -> $zdotdir (ZDOTDIR)"
 fi
 

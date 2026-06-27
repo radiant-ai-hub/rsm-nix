@@ -1,0 +1,16 @@
+# rsm-msba: (re)bootstrap the whole RSM-MSBA environment from nothing.
+#
+# Clones the flake to $RSM_FLAKE (~/rsm-nix) if it is missing, then runs
+# rsm-setup to (re)build the workspace (~/rsm-msba), the nix-uv environment, the
+# Jupyter kernel, course folders, examples, and the zsh setup. Safe to re-run.
+#
+# Reset from scratch:   rm -rf ~/rsm-msba ~/rsm-nix && rsm-msba
+
+flake="${RSM_FLAKE:-$HOME/rsm-nix}"
+
+if [ ! -e "$flake/flake.nix" ]; then
+  echo "==> cloning rsm-nix -> $flake"
+  git clone https://github.com/radiant-ai-hub/rsm-nix.git "$flake"
+fi
+
+exec rsm-setup
