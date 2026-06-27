@@ -157,7 +157,7 @@
           rsm-pg-status = mk "rsm-pg-status" [ pkgs.postgresql_16 pkgs.coreutils ];
           rsm-pg-psql = mk "rsm-pg-psql" [ pkgs.postgresql_16 ];
           rsm-pgweb = mk "rsm-pgweb" [ pkgs.pgweb ];
-          pg = mk "pg" [ pkgs.postgresql_16 pkgs.coreutils ];
+          pg = mk "pg" [ rsm-pg-start rsm-pg-stop rsm-pg-status rsm-pg-psql rsm-pgweb rsm-pg-init pkgs.postgresql_16 pkgs.coreutils ];
         };
     in
     {

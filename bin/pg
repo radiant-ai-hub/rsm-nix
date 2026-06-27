@@ -1,27 +1,49 @@
-# pg: at-a-glance PostgreSQL status + the available rsm-pg-* / rsm-pgweb commands.
+# pg: PostgreSQL status + an interactive menu of the rsm-pg-* actions.
 # (The PG* variables come from the shared env header, bin/rsm-env.sh.)
 
-echo "PostgreSQL (workspace-local)"
-echo "  data     : $PGDATA"
-echo "  socket   : $PGHOST"
-echo "  port     : $PGPORT"
-echo "  database : $PGDATABASE    user: $PGUSER"
-echo
+_pg_status() {
+  echo "PostgreSQL (workspace-local)"
+  echo "  data     : $PGDATA"
+  echo "  socket   : $PGHOST"
+  echo "  port     : $PGPORT"
+  echo "  database : $PGDATABASE    user: $PGUSER"
+  if pg_ctl -D "$PGDATA" status >/dev/null 2>&1; then
+    echo "  status   : ● RUNNING"
+  elif [ ! -d "$PGDATA/base" ]; then
+    echo "  status   : ○ not initialized yet"
+  else
+    echo "  status   : ○ stopped"
+  fi
+}
 
-if pg_ctl -D "$PGDATA" status >/dev/null 2>&1; then
-  echo "  status   : ● RUNNING  (connect with: rsm-pg-psql)"
-elif [ ! -d "$PGDATA" ]; then
-  echo "  status   : ○ not initialized  (run: rsm-pg-start)"
-else
-  echo "  status   : ○ stopped  (start with: rsm-pg-start)"
+_pg_status
+
+# No terminal attached (piped / non-interactive): print the command list, done.
+if [ ! -t 0 ] || [ ! -t 1 ]; then
+  echo
+  echo "Commands: rsm-pg-start  rsm-pg-stop  rsm-pg-status  rsm-pg-psql  rsm-pg-init  rsm-pgweb"
+  exit 0
 fi
-echo
 
-echo "Commands:"
-printf '  %-14s %s\n' "rsm-pg-start"  "start the server (initializes the cluster on first run)"
-printf '  %-14s %s\n' "rsm-pg-stop"   "stop the server"
-printf '  %-14s %s\n' "rsm-pg-status" "detailed running status"
-printf '  %-14s %s\n' "rsm-pg-psql"   "open a psql shell on this database"
-printf '  %-14s %s\n' "rsm-pg-init"   "(re)initialize the data directory"
-printf '  %-14s %s\n' "rsm-pgweb"     "browse the database in a web UI"
-printf '  %-14s %s\n' "pg"            "show this overview"
+# Interactive menu.
+while true; do
+  echo
+  echo "  1) start server         4) open psql shell"
+  echo "  2) stop server          5) launch pgweb (web UI)"
+  echo "  3) detailed status      6) (re)initialize data dir"
+  echo "  r) refresh status       q) quit"
+  printf 'pg> '
+  read -r ans || break
+  echo
+  case "$ans" in
+    1) rsm-pg-start ;;
+    2) rsm-pg-stop ;;
+    3) rsm-pg-status ;;
+    4) rsm-pg-psql ;;
+    5) rsm-pgweb ;;
+    6) rsm-pg-init ;;
+    r | R) _pg_status ;;
+    q | Q | "") break ;;
+    *) echo "  ? unknown option: $ans" ;;
+  esac
+done

@@ -35,14 +35,20 @@ if [ -n "${VIRTUAL_ENV:-}" ] && [ "${VIRTUAL_ENV:-}" != "$RSM_UV_ENV" ]; then
   unset VIRTUAL_ENV VIRTUAL_ENV_PROMPT _rsm_stale_bin _rsm_newpath _rsm_p _rsm_ifs
 fi
 
-# Put the uv base environment first on PATH so `python`, `ipython`, `jupyter`,
-# etc. resolve to the course-core environment once rsm-setup has run.
+# Activate the nix-uv environment the way a normal venv would: put it first on
+# PATH and mark it active via VIRTUAL_ENV. Setting VIRTUAL_ENV (not just PATH) is
+# what makes the environment visibly "on" — `which python` points at it, uv
+# targets it, and prompt frameworks (powerlevel10k's virtualenv segment) show
+# `(nix-uv)`. direnv snapshots the environment, so leaving the workspace cleanly
+# reverts all of this — exactly like sourcing/deactivating a venv.
 if [ -d "$RSM_UV_ENV/bin" ]; then
   case ":$PATH:" in
     *":$RSM_UV_ENV/bin:"*) ;;
     *) PATH="$RSM_UV_ENV/bin:$PATH" ;;
   esac
   export PATH
+  export VIRTUAL_ENV="$RSM_UV_ENV"
+  export VIRTUAL_ENV_PROMPT="(nix-uv) "
 fi
 
 # Quarto should render with the course-core interpreter.
