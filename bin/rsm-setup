@@ -99,8 +99,8 @@ if [ -n "${RSM_OMZ_SRC:-}" ] && [ -d "$RSM_OMZ_SRC" ]; then
   # First clean up any read-only copy left by an older rsm-setup.
   for _link in .oh-my-zsh plugins; do
     if [ -e "$zdotdir/$_link" ] && [ ! -L "$zdotdir/$_link" ]; then
-      chmod -R u+w "$zdotdir/$_link" 2>/dev/null || true
-      rm -rf "$zdotdir/$_link" 2>/dev/null || true
+      chmod -R u+w "${zdotdir:?}/$_link" 2>/dev/null || true
+      rm -rf "${zdotdir:?}/$_link" 2>/dev/null || true
     fi
     ln -sfn "$RSM_OMZ_SRC/$_link" "$zdotdir/$_link"
   done
