@@ -144,7 +144,7 @@
           # the assembled zsh assets + the ZDOTDIR template it installs.
           rsm-setup = pkgs.writeShellApplication {
             name = "rsm-setup";
-            runtimeInputs = [ pythonSync pkgs.uv pkgs.python313 pkgs.coreutils ];
+            runtimeInputs = [ pythonSync pkgs.uv pkgs.python313 pkgs.coreutils pkgs.git ];
             excludeShellChecks = [ "SC1090" "SC1091" "SC2164" ];
             text = rsmEnvHeader + "\n" + ldLibHook pkgs + ''
               export RSM_OMZ_SRC="${zshOmz}"
@@ -153,7 +153,7 @@
           };
           # Bootstrap/reset: clone the flake if missing, then rsm-setup. Lives on
           # the server PATH so `rm -rf ~/rsm-msba ~/rsm-nix && rsm-msba` recovers.
-          rsm-msba = mk "rsm-msba" [ rsm-setup pkgs.git pkgs.coreutils ];
+          rsm-msba = mk "rsm-msba" [ rsm-setup pkgs.coreutils ];
           rsm-new-course = mk "rsm-new-course" [ pkgs.coreutils pkgs.gnugrep ];
           rsm-pg-start = mk "rsm-pg-start" [ pgInit pkgs.postgresql_16 pkgs.coreutils pkgs.gnugrep ];
           rsm-pg-stop = mk "rsm-pg-stop" [ pkgs.postgresql_16 pkgs.coreutils ];

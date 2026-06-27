@@ -1,16 +1,8 @@
-# rsm-msba: (re)bootstrap the whole RSM-MSBA environment from nothing.
+# rsm-msba: alias for `rsm-setup`. As of now rsm-setup clones the flake if it is
+# missing, fast-forwards it if present, and (re)builds the workspace — so the two
+# commands are equivalent. Kept for discoverability and the "reset" mental model:
 #
-# Clones the flake to $RSM_FLAKE (~/rsm-nix) if it is missing, then runs
-# rsm-setup to (re)build the workspace (~/rsm-msba), the nix-uv environment, the
-# Jupyter kernel, course folders, examples, and the zsh setup. Safe to re-run.
-#
-# Reset from scratch:   rm -rf ~/rsm-msba ~/rsm-nix && rsm-msba
-
-flake="${RSM_FLAKE:-$HOME/rsm-nix}"
-
-if [ ! -e "$flake/flake.nix" ]; then
-  echo "==> cloning rsm-nix -> $flake"
-  git clone https://github.com/radiant-ai-hub/rsm-nix.git "$flake"
-fi
+#   rm -rf ~/rsm-msba ~/rsm-nix && rsm-msba    # full reset from nothing
+#   rsm-msba                                   # update + rebuild
 
 exec rsm-setup

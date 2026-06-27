@@ -14,6 +14,20 @@ echo "    flake     : $RSM_FLAKE"
 echo "    workspace : $RSM_WORKSPACE"
 echo "    state     : $RSMBASE"
 
+# Make sure the flake is present and current. This makes `rsm-setup` the single
+# command for everything: it clones the flake if it is missing (so it works even
+# after deleting ~/rsm-nix), and fast-forwards it to the latest otherwise (so
+# `rsm-setup` doubles as the update command). All environment content
+# (packages, examples, zsh, scripts) then comes from this one place.
+if [ ! -e "$RSM_FLAKE/flake.nix" ]; then
+  echo "    flake     : cloning rsm-nix -> $RSM_FLAKE"
+  git clone https://github.com/radiant-ai-hub/rsm-nix.git "$RSM_FLAKE"
+elif [ -d "$RSM_FLAKE/.git" ]; then
+  if git -C "$RSM_FLAKE" pull --ff-only >/dev/null 2>&1; then
+    echo "    flake     : updated $RSM_FLAKE to latest"
+  fi
+fi
+
 mkdir -p "$RSM_WORKSPACE"
 
 # 0a. Generate the workspace .envrc (loads the flake; cascades into subfolders).
