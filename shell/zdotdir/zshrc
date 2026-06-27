@@ -1,0 +1,36 @@
+# RSM-MSBA environment .zshrc — loaded via ZDOTDIR, so it applies ONLY to shells
+# started inside the rsm-msba environment (e.g. the VS Code integrated terminal,
+# which rsm-setup points at this directory). Your normal login shell is left
+# alone. Installed/refreshed by `rsm-setup`; edit the source in the flake
+# (shell/zdotdir/zshrc), not this copy.
+
+# Powerlevel10k instant prompt — keep near the top. Cache lives in this dir.
+if [[ -r "${ZDOTDIR}/.cache/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+  source "${ZDOTDIR}/.cache/p10k-instant-prompt-${(%):-%n}.zsh"
+fi
+
+export ZSH="${ZDOTDIR}/.oh-my-zsh"
+export ZSH_CACHE_DIR="${ZDOTDIR}/.cache"
+[[ -d "$ZSH_CACHE_DIR" ]] || mkdir -p "$ZSH_CACHE_DIR"
+ZSH_COMPDUMP="$ZSH_CACHE_DIR/.zcompdump"
+ZSH_DISABLE_COMPFIX="true"
+DISABLE_AUTO_UPDATE="true"          # oh-my-zsh is provided by Nix; don't self-update
+
+ZSH_THEME="powerlevel10k/powerlevel10k"
+plugins=(git)                        # git via oh-my-zsh's own plugin format
+source "$ZSH/oh-my-zsh.sh"
+
+# Autosuggestions + syntax highlighting, sourced directly (robust across packaging)
+for _f in \
+  "${ZDOTDIR}/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh" \
+  "${ZDOTDIR}/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"; do
+  [[ -r "$_f" ]] && source "$_f"
+done
+unset _f
+
+alias c="clear"
+alias ll="ls -alh"
+alias la="ls -A"
+
+# Powerlevel10k prompt configuration.
+[[ ! -f "${ZDOTDIR}/.p10k.zsh" ]] || source "${ZDOTDIR}/.p10k.zsh"

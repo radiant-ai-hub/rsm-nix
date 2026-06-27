@@ -34,16 +34,19 @@ fi
 
 # 0b. Generate workspace VS Code settings (interpreter + recommended extensions).
 mkdir -p "$RSM_WORKSPACE/.vscode"
-if [ ! -f "$RSM_WORKSPACE/.vscode/settings.json" ]; then
-  cat > "$RSM_WORKSPACE/.vscode/settings.json" <<EOF
+# Generated file (always refreshed). terminal.integrated.env.* points VS Code
+# terminals at the rsm-msba ZDOTDIR so they get the full oh-my-zsh/p10k shell;
+# this scopes that shell to the rsm-msba workspace and leaves login shells alone.
+cat > "$RSM_WORKSPACE/.vscode/settings.json" <<EOF
 {
   "direnv.restart.automatic": true,
   "python.defaultInterpreterPath": "$RSM_UV_ENV/bin/python",
   "python.terminal.activateEnvironment": false,
-  "files.exclude": { "**/.rsm-msba": true, "**/.direnv": true }
+  "files.exclude": { "**/.rsm-msba": true, "**/.direnv": true },
+  "terminal.integrated.env.linux": { "ZDOTDIR": "$RSMBASE/zsh" },
+  "terminal.integrated.env.osx": { "ZDOTDIR": "$RSMBASE/zsh" }
 }
 EOF
-fi
 if [ ! -f "$RSM_WORKSPACE/.vscode/extensions.json" ]; then
   cat > "$RSM_WORKSPACE/.vscode/extensions.json" <<'EOF'
 {
@@ -79,6 +82,25 @@ if [ -x "$RSM_UV_ENV/bin/python" ] && "$RSM_UV_ENV/bin/python" -c "import ipyker
   echo "    kernel    : Python (nix-uv) -> $JUPYTER_DATA_DIR/kernels/nix-uv"
 else
   echo "    kernel    : skipped (ipykernel not available yet)"
+fi
+
+# 2b. zsh: install oh-my-zsh + powerlevel10k into the workspace ZDOTDIR
+#     ($RSMBASE/zsh). The generated .vscode/settings.json points VS Code
+#     terminals here, so the rsm-msba environment gets the full RSM shell while
+#     your normal login shell stays untouched. Assets come from the flake
+#     (RSM_OMZ_SRC), so there is no per-user GitHub cloning.
+zdotdir="$RSMBASE/zsh"
+if [ -n "${RSM_OMZ_SRC:-}" ] && [ -d "$RSM_OMZ_SRC" ]; then
+  mkdir -p "$zdotdir"
+  if [ ! -d "$zdotdir/.oh-my-zsh" ]; then
+    cp -r "$RSM_OMZ_SRC/." "$zdotdir/"
+    chmod -R u+w "$zdotdir/.oh-my-zsh" 2>/dev/null || true
+  fi
+  if [ -n "${RSM_ZDOTDIR_TEMPLATE:-}" ] && [ -d "$RSM_ZDOTDIR_TEMPLATE" ]; then
+    cp -f "$RSM_ZDOTDIR_TEMPLATE/zshrc" "$zdotdir/.zshrc"
+    cp -f "$RSM_ZDOTDIR_TEMPLATE/p10k.zsh" "$zdotdir/.p10k.zsh"
+  fi
+  echo "    zsh       : oh-my-zsh + powerlevel10k -> $zdotdir (ZDOTDIR)"
 fi
 
 # 3. Pre-create course folders from the flake's courses.txt, under the workspace.

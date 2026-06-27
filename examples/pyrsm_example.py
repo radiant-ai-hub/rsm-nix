@@ -20,11 +20,11 @@ x1 = rng.normal(size=n)
 x2 = rng.normal(size=n)
 group = rng.choice(["a", "b", "c"], size=n)
 
-# %% linear regression (OLS) with pyrsm.model.regress
+# %% linear regression (OLS) with pyrsm.model.regress — formula interface (R-style)
 price = 5 + 2.0 * x1 - 1.0 * x2 + rng.normal(scale=0.5, size=n)
 sales = pl.DataFrame({"x1": x1, "x2": x2, "group": group, "price": price})
 
-reg = rsm.model.regress(data={"sales": sales}, rvar="price", evar=["x1", "x2", "group"])
+reg = rsm.model.regress(data={"sales": sales}, formula="price ~ x1 + x2 + group")
 reg.summary()
 
 # %% logistic regression with pyrsm.model.logistic

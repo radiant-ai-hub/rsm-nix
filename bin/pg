@@ -1,0 +1,27 @@
+# pg: at-a-glance PostgreSQL status + the available rsm-pg-* / rsm-pgweb commands.
+# (The PG* variables come from the shared env header, bin/rsm-env.sh.)
+
+echo "PostgreSQL (workspace-local)"
+echo "  data     : $PGDATA"
+echo "  socket   : $PGHOST"
+echo "  port     : $PGPORT"
+echo "  database : $PGDATABASE    user: $PGUSER"
+echo
+
+if pg_ctl -D "$PGDATA" status >/dev/null 2>&1; then
+  echo "  status   : ● RUNNING  (connect with: rsm-pg-psql)"
+elif [ ! -d "$PGDATA" ]; then
+  echo "  status   : ○ not initialized  (run: rsm-pg-start)"
+else
+  echo "  status   : ○ stopped  (start with: rsm-pg-start)"
+fi
+echo
+
+echo "Commands:"
+printf '  %-14s %s\n' "rsm-pg-start"  "start the server (initializes the cluster on first run)"
+printf '  %-14s %s\n' "rsm-pg-stop"   "stop the server"
+printf '  %-14s %s\n' "rsm-pg-status" "detailed running status"
+printf '  %-14s %s\n' "rsm-pg-psql"   "open a psql shell on this database"
+printf '  %-14s %s\n' "rsm-pg-init"   "(re)initialize the data directory"
+printf '  %-14s %s\n' "rsm-pgweb"     "browse the database in a web UI"
+printf '  %-14s %s\n' "pg"            "show this overview"

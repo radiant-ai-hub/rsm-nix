@@ -110,38 +110,38 @@ notebooks, pick the **“Python (nix-uv)”** kernel.
 ## Using UV for Python packages
 
 The environment uses [uv](https://docs.astral.sh/uv/) for Python package
-management. There are two patterns.
+management. The shared `nix-uv` environment
+(`~/rsm-msba/.rsm-msba/envs/nix-uv`) already has the course-core
+packages and is active in the dev shell.
 
-### Add to the shared nix-uv environment
+### Add a package for a class or project
 
-The `nix-uv` environment (`~/rsm-msba/.rsm-msba/envs/nix-uv`) holds the
-course-core packages and is already active in the dev shell. To
-experiment with an extra package for the current session:
-
-``` bash
-uv pip install mlxtend
-```
-
-> Packages added with `uv pip install` are not tracked in the lockfile.
-> To make the nix-uv environment match the official package list again,
-> run `rsm-python-sync`.
-
-### Create a project-specific environment
-
-For packages a specific class or project needs (persisted in that
-folder):
+When a project needs an extra package, add it **to that project with
+`uv add`** (not `uv pip install`) so it is tracked in the project’s
+`pyproject.toml` and `uv.lock`:
 
 ``` bash
 cd ~/rsm-msba/my_project
-uv init .
-uv venv --python 3.12
-sp                    # alias for: source .venv/bin/activate
-uv add polars==1.1.0
-python -c "import polars as pl; print(pl.__version__)"
+uv init .                 # once — creates pyproject.toml
+uv add polars             # add a package (tracked + locked)
+uv run python -c "import polars as pl; print(pl.__version__)"
 ```
 
-To remove a project environment, delete `.venv` (and the `uv init`
-scaffolding) or the whole project folder.
+`uv run` executes inside the project’s environment; `uv add` /
+`uv remove` keep `pyproject.toml` and `uv.lock` in sync. To remove a
+project environment, delete its `.venv` (and the `uv init` scaffolding)
+or the whole folder.
+
+### Change the shared course-core packages
+
+The `nix-uv` package list is defined in the flake’s `pyproject.toml`
+(`~/rsm-nix/pyproject.toml`). To add or pin a package for **everyone**,
+edit that file and re-sync the environment:
+
+``` bash
+# edit ~/rsm-nix/pyproject.toml (add the package under dependencies), then:
+rsm-python-sync           # rebuild the nix-uv env to match the list
+```
 
 ## PostgreSQL
 
@@ -149,6 +149,7 @@ A workspace-local PostgreSQL instance is included — no system service,
 no Docker. Data lives under `~/rsm-msba/.rsm-msba/postgres`.
 
 ``` bash
+pg                                 # overview: status + all the commands below
 rsm-pg-start                       # start (initializes on first run)
 rsm-pg-psql                        # open psql on the rsm-msba database
 rsm-pg-psql -c "SELECT version();" # run one statement
@@ -156,6 +157,9 @@ rsm-pgweb                          # browse at http://127.0.0.1:8282
 rsm-pg-status                      # is it running?
 rsm-pg-stop                        # stop it
 ```
+
+Run **`pg`** any time for a quick status (running? which port?) plus a
+reminder of these commands.
 
 Connection details: host = socket under `.rsm-msba/postgres/socket` (or
 `127.0.0.1`), port = **`$PGPORT`** (run `echo $PGPORT`), databases =

@@ -123,17 +123,41 @@
           };
           pythonSync = mk "rsm-python-sync" [ pkgs.uv pkgs.python313 pkgs.coreutils ];
           pgInit = mk "rsm-pg-init" [ pkgs.postgresql_16 pkgs.coreutils ];
+
+          # Assembled oh-my-zsh + powerlevel10k + plugins for the rsm-msba ZDOTDIR
+          # (installed into the workspace by rsm-setup). Built from nixpkgs, so
+          # there is no per-user cloning from GitHub.
+          zshOmz = pkgs.runCommand "rsm-zsh-omz" { } ''
+            mkdir -p "$out"
+            cp -r ${pkgs.oh-my-zsh}/share/oh-my-zsh "$out/.oh-my-zsh"
+            chmod -R u+w "$out/.oh-my-zsh"
+            mkdir -p "$out/.oh-my-zsh/custom/themes" "$out/plugins"
+            ln -s ${pkgs.zsh-powerlevel10k}/share/zsh-powerlevel10k "$out/.oh-my-zsh/custom/themes/powerlevel10k"
+            ln -s ${pkgs.zsh-autosuggestions}/share/zsh-autosuggestions "$out/plugins/zsh-autosuggestions"
+            ln -s ${pkgs.zsh-syntax-highlighting}/share/zsh-syntax-highlighting "$out/plugins/zsh-syntax-highlighting"
+          '';
         in
         rec {
           rsm-python-sync = pythonSync;
           rsm-pg-init = pgInit;
-          rsm-setup = mk "rsm-setup" [ pythonSync pkgs.uv pkgs.python313 pkgs.coreutils ];
+          # rsm-setup is built directly (not via mk) so it can carry the paths to
+          # the assembled zsh assets + the ZDOTDIR template it installs.
+          rsm-setup = pkgs.writeShellApplication {
+            name = "rsm-setup";
+            runtimeInputs = [ pythonSync pkgs.uv pkgs.python313 pkgs.coreutils ];
+            excludeShellChecks = [ "SC1090" "SC1091" "SC2164" ];
+            text = rsmEnvHeader + "\n" + ldLibHook pkgs + ''
+              export RSM_OMZ_SRC="${zshOmz}"
+              export RSM_ZDOTDIR_TEMPLATE="${./shell/zdotdir}"
+            '' + builtins.readFile ./bin/rsm-setup;
+          };
           rsm-new-course = mk "rsm-new-course" [ pkgs.coreutils pkgs.gnugrep ];
           rsm-pg-start = mk "rsm-pg-start" [ pgInit pkgs.postgresql_16 pkgs.coreutils pkgs.gnugrep ];
           rsm-pg-stop = mk "rsm-pg-stop" [ pkgs.postgresql_16 pkgs.coreutils ];
           rsm-pg-status = mk "rsm-pg-status" [ pkgs.postgresql_16 pkgs.coreutils ];
           rsm-pg-psql = mk "rsm-pg-psql" [ pkgs.postgresql_16 ];
           rsm-pgweb = mk "rsm-pgweb" [ pkgs.pgweb ];
+          pg = mk "pg" [ pkgs.postgresql_16 pkgs.coreutils ];
         };
     in
     {

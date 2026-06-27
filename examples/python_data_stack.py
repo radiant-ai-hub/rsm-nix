@@ -5,48 +5,63 @@
 # cell exercises a different part of the environment and prints a small result.
 # The data stack here is **Polars** (not pandas).
 
-# %% numpy + polars
+# %% numpy + polars — a small synthetic regression dataset
 import numpy as np
 import polars as pl
 
-df = pl.DataFrame({"x": np.arange(1, 6), "y": np.arange(1, 6) ** 2})
-print(df)
+rng = np.random.default_rng(42)
+n = 300
+x1 = rng.normal(size=n)
+x2 = rng.normal(size=n)
+price = 5 + 2.0 * x1 - 1.0 * x2 + rng.normal(scale=0.5, size=n)
+df = pl.DataFrame({"x1": x1, "x2": x2, "price": price})
+print(df.head())
 print("polars", pl.__version__, "| numpy", np.__version__)
 
-# %% scikit-learn — fit a tiny model (Polars -> numpy)
-from sklearn.linear_model import LinearRegression
+# %% statsmodels — the R-style formula interface
+# statsmodels' formula API uses patsy, which expects a pandas frame, so convert
+# just for the fit (the data itself stays Polars).
+import statsmodels.formula.api as smf
 
-X = df.select("x").to_numpy()
-y = df.get_column("y").to_numpy()
-model = LinearRegression().fit(X, y)
-print("sklearn slope:", round(float(model.coef_[0]), 3))
+ols = smf.ols("price ~ x1 + x2", data=df.to_pandas()).fit()
+print(ols.summary())
 
-# %% statsmodels — OLS on numpy arrays (no pandas needed)
-import statsmodels.api as sm
+# %% pyrsm — the SAME model via its formula interface (takes Polars directly)
+import pyrsm as rsm
 
-res = sm.OLS(y, sm.add_constant(X)).fit()
-print("statsmodels R^2:", round(res.rsquared, 4))
+reg = rsm.model.regress(data={"df": df}, formula="price ~ x1 + x2")
+reg.summary()
 
-# %% xgboost — train a trivial model (verifies the native lib loads)
+# %% scikit-learn — a classification task (random forest), not regression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+
+label = (df.get_column("price") > df.get_column("price").median()).to_numpy()
+X = df.select(["x1", "x2"]).to_numpy()
+Xtr, Xte, ytr, yte = train_test_split(X, label, test_size=0.3, random_state=42)
+clf = RandomForestClassifier(n_estimators=100, random_state=42).fit(Xtr, ytr)
+print("random forest test accuracy:", round(clf.score(Xte, yte), 3))
+
+# %% xgboost — gradient boosting (verifies the native lib loads)
 import xgboost as xgb
 
-dtrain = xgb.DMatrix(X, label=y)
-booster = xgb.train({"max_depth": 2, "verbosity": 0}, dtrain, num_boost_round=3)
-print("xgboost predictions:", np.round(booster.predict(dtrain), 2))
+dtrain = xgb.DMatrix(X, label=df.get_column("price").to_numpy())
+booster = xgb.train({"max_depth": 2, "verbosity": 0}, dtrain, num_boost_round=5)
+print("xgboost predictions (first 5):", np.round(booster.predict(dtrain)[:5], 2))
 
 # %% polars — a few expressions (the data-wrangling workhorse)
 out = (
-    df.with_columns((pl.col("y") - pl.col("x")).alias("gap"))
-    .filter(pl.col("x") >= 2)
-    .select(pl.col("x"), pl.col("y"), pl.col("gap"))
+    df.with_columns((pl.col("price") > pl.col("price").median()).alias("expensive"))
+    .group_by("expensive")
+    .agg(pl.len().alias("n"), pl.col("price").mean().round(2).alias("avg_price"))
+    .sort("expensive")
 )
 print(out)
-print("x mean:", df.get_column("x").mean(), "| y sum:", df.get_column("y").sum())
 
 # %% plotnine — build a plot object (works directly with a Polars frame)
-from plotnine import aes, geom_line, ggplot
+from plotnine import aes, geom_point, ggplot
 
-plot = ggplot(df, aes("x", "y")) + geom_line()
+plot = ggplot(df, aes("x1", "price")) + geom_point()
 print("plotnine ggplot object:", type(plot).__name__, "OK")
 
 # %%
