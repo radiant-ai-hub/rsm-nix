@@ -68,6 +68,8 @@ Per-platform guides:
 - macOS Apple Silicon: [docs/student-macos.md](docs/student-macos.md)
 - Windows 11 (WSL2 + Ubuntu 26.04):
   [docs/student-wsl2.md](docs/student-wsl2.md)
+- **Connect to the shared server with VS Code** (students/TAs):
+  [docs/connect-server.md](docs/connect-server.md)
 - Ubuntu 24.04 server (multi-user Nix):
   [docs/server-ubuntu-nix.md](docs/server-ubuntu-nix.md)
 - NixOS server (declarative):
