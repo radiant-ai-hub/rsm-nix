@@ -266,24 +266,35 @@ rsm-spark-hadoop-proof             # Hadoop + Spark + a local PySpark session
 
 ## Updating the environment
 
+Everything (Python packages, tools, examples, the shell) is defined in
+the flake, so updating is one command:
+
 ``` bash
-cd ~/rsm-nix && git pull            # get the latest environment definition
-rsm-python-sync                     # refresh Python packages from the lockfile
+rsm-setup                          # pulls the latest flake + rebuilds the env
 ```
 
-direnv reloads the workspace automatically (the `.envrc` watches the
-flake), or re-open the `~/rsm-msba` folder in VS Code.
+`rsm-setup` fast-forwards `~/rsm-nix` to the latest and refreshes the
+Python environment, kernel, examples, and shell. It is safe to re-run
+any time and does **not** touch your coursework. direnv reloads the
+workspace automatically.
 
 ## Cleanup / full reset
 
-To rebuild your environment from scratch, delete the workspace state
-(this does **not** remove your coursework, which lives in the course
-folders):
+To rebuild the environment **state** from scratch while **keeping your
+coursework** (the course folders under `~/rsm-msba`):
 
 ``` bash
 rsm-pg-stop 2>/dev/null
-rm -rf ~/rsm-msba/.rsm-msba
-nix develop ~/rsm-nix -c rsm-setup
+rm -rf ~/rsm-msba/.rsm-msba        # removes only the RSM-owned state
+rsm-setup
+```
+
+To reset **everything** from nothing (⚠️ this also deletes the course
+folders in `~/rsm-msba` — back up any coursework first):
+
+``` bash
+rm -rf ~/rsm-msba ~/rsm-nix
+rsm-setup                          # re-clones the flake and rebuilds
 ```
 
 To reclaim disk space from old Nix builds:
