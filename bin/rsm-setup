@@ -91,17 +91,26 @@ fi
 #     (RSM_OMZ_SRC), so there is no per-user GitHub cloning.
 zdotdir="$RSMBASE/zsh"
 if [ -n "${RSM_OMZ_SRC:-}" ] && [ -d "$RSM_OMZ_SRC" ]; then
-  mkdir -p "$zdotdir"
-  if [ ! -d "$zdotdir/.oh-my-zsh" ]; then
-    cp -r "$RSM_OMZ_SRC/." "$zdotdir/"
-  fi
+  mkdir -p "$zdotdir/.cache"
+  # SYMLINK the read-only (Nix-store) oh-my-zsh + plugins instead of copying.
+  # Copying drags the store's read-only files into the workspace, which both
+  # fails mid-copy and makes `rm -rf ~/rsm-msba` impossible. Symlinks keep the
+  # workspace fully writable/deletable (rm removes the link, not the store).
+  # First clean up any read-only copy left by an older rsm-setup.
+  for _link in .oh-my-zsh plugins; do
+    if [ -e "$zdotdir/$_link" ] && [ ! -L "$zdotdir/$_link" ]; then
+      chmod -R u+w "$zdotdir/$_link" 2>/dev/null || true
+      rm -rf "$zdotdir/$_link" 2>/dev/null || true
+    fi
+    ln -sfn "$RSM_OMZ_SRC/$_link" "$zdotdir/$_link"
+  done
+  # Writable config, refreshed from the flake each run (cp -f replaces a
+  # read-only dest; chmod keeps it writable for the next refresh).
   if [ -n "${RSM_ZDOTDIR_TEMPLATE:-}" ] && [ -d "$RSM_ZDOTDIR_TEMPLATE" ]; then
     cp -f "$RSM_ZDOTDIR_TEMPLATE/zshrc" "$zdotdir/.zshrc"
     cp -f "$RSM_ZDOTDIR_TEMPLATE/p10k.zsh" "$zdotdir/.p10k.zsh"
+    chmod u+w "$zdotdir/.zshrc" "$zdotdir/.p10k.zsh" 2>/dev/null || true
   fi
-  # The omz copy pulls plugin symlinks in as read-only Nix-store dirs; make the
-  # whole tree user-writable so `rm -rf ~/rsm-msba` works cleanly.
-  chmod -R u+w "$zdotdir" 2>/dev/null || true
   echo "    zsh       : oh-my-zsh + powerlevel10k -> $zdotdir (ZDOTDIR)"
 fi
 
