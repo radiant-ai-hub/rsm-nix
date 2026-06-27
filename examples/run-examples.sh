@@ -30,6 +30,17 @@ fi
 
 run "quarto render quarto_report.qmd" quarto render quarto_report.qmd --quiet
 
+# Notebooks: execute them headlessly if jupyter/nbconvert is available. The
+# postgres notebook needs the DB, which the postgres step above started.
+if jupyter nbconvert --version >/dev/null 2>&1; then
+  for nb in notebook_intro.ipynb notebook_pyrsm.ipynb notebook_postgres.ipynb; do
+    run "execute $nb" jupyter nbconvert --to notebook --execute --output-dir /tmp/rsm-nb "$nb"
+  done
+  rm -rf /tmp/rsm-nb
+else
+  echo "  (jupyter nbconvert not available; skipping notebook execution)"
+fi
+
 printf '\n=================================================\n'
 [ "$fail" -eq 0 ] && echo "ALL EXAMPLES PASSED" || echo "SOME EXAMPLES FAILED (see above)"
 printf '(Spark is separate: nix develop .#spark-hadoop -c python examples/spark_pyspark.py)\n'

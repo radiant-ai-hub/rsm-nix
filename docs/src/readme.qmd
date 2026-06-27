@@ -11,7 +11,7 @@ PostgreSQL, and the course packages — **the same on your laptop and on the Rad
 server**. No Docker to install.
 
 There are two ways to use it. Most students use the **server** (nothing to
-install). Pick one:
+install). Pick one, then see [Using the environment](#using-the-environment).
 
 ## A. On your own laptop
 
@@ -33,24 +33,53 @@ You use the server through VS Code on your laptop.
 2. Be on the campus network or the **UCSD VPN**, then connect to
    `<your-campus-username>@rsm-compute-01.ucsd.edu` and enter your campus
    password.
-3. In a terminal, run:
-
-   ```bash
-   rsm-setup
-   ```
-
+3. In a terminal, run `rsm-setup`.
 4. Open the `~/rsm-msba` folder. For notebooks, pick the **Python (nix-uv)**
    kernel.
 
 Full walkthrough: **[docs/connect-server.md](docs/connect-server.md)**
 
-## Updating
+# Using the environment
 
-Run `rsm-setup` any time — it pulls the latest environment and rebuilds. It's
-safe to re-run and never touches your coursework.
+{{< include _includes/workspace-layout.qmd >}}
+
+{{< include _includes/usage-vscode.qmd >}}
+
+{{< include _includes/usage-shell.qmd >}}
+
+{{< include _includes/usage-uv.qmd >}}
+
+{{< include _includes/usage-postgres.qmd >}}
+
+{{< include _includes/usage-quarto.qmd >}}
+
+## Example notebooks and scripts
+
+`~/rsm-msba/examples` has small, runnable checks — open any of them in VS Code.
+
+- **Notebooks** (`.ipynb`) — open and **Run All** to confirm the
+  `Python (nix-uv)` kernel works:
+  - `notebook_intro.ipynb` — numpy, Polars, and an inline plot
+  - `notebook_pyrsm.ipynb` — a `pyrsm` regression with a plot
+  - `notebook_postgres.ipynb` — query PostgreSQL into a Polars frame
+- **Scripts** (`.py` with `# %%` cells, also runnable as notebooks):
+  `check_environment.py`, `python_data_stack.py`, `pyrsm_example.py`,
+  `postgres_python.py`, `spark_pyspark.py`, and `quarto_report.qmd`.
+
+Run the non-interactive checks all at once:
+
+```bash
+bash examples/run-examples.sh
+```
+
+{{< include _includes/usage-spark.qmd >}}
+
+{{< include _includes/maintenance.qmd >}}
+
+{{< include _includes/troubleshooting.qmd >}}
 
 ---
 
-*Instructors / developers:* the flake interfaces, the full command list, the
-directory layout, and the server configuration are in
-**[README-tech.md](README-tech.md)** and the [`docs/`](docs/) guides.
+*Instructors / developers:* the flake interfaces, the full command list, and the
+server configuration are in **[README-tech.md](README-tech.md)** and the
+[`docs/`](docs/) guides.

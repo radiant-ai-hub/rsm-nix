@@ -1,0 +1,39 @@
+## The terminal toolkit
+
+Inside `~/rsm-msba` you get a configured zsh shell (oh-my-zsh + powerlevel10k)
+with autosuggestions, syntax highlighting, and a few conveniences. It loads
+automatically when you enter the workspace, in VS Code **or** a plain SSH
+terminal.
+
+**Getting around**
+
+- `z <name>` — jump to a folder you've visited before (e.g. `z mgta403`); powered
+  by [zoxide](https://github.com/ajeetdsouza/zoxide).
+- `..`, `...`, `....` — go up 1 / 2 / 3 directories.
+- `ls`, `lsa`, `lt` — directory listings via [eza](https://eza.rocks); `lt` is a
+  2-level tree with git status.
+
+**Python environment**
+
+- The `nix-uv` environment is active automatically — you'll see `(nix-uv)` in the
+  prompt, and `python` / `jupyter` resolve to it.
+- `sbase` — re-activate the nix-uv environment if you ever need to.
+- `sp` — activate a project-local `.venv` (after `uv venv`); `de` — deactivate.
+
+**Git and GitHub**
+
+- `github` — one-time setup of your Git identity and a GitHub SSH key (run once).
+- `gh` — the GitHub CLI (`gh repo clone …`, `gh auth login`, …).
+
+**PostgreSQL**
+
+- `pg` — database status plus a menu of all the commands (see PostgreSQL below).
+
+**Personal tweaks (optional)**
+
+Put personal zsh settings in `~/.rsm-local.zsh` — it's sourced last and survives
+a workspace reset. For example, to use vi keybindings:
+
+```bash
+echo 'bindkey -v' >> ~/.rsm-local.zsh
+```

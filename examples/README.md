@@ -1,9 +1,19 @@
 # RSM-MSBA examples & quick functionality tests
 
 Small, runnable files to confirm the environment works — and that you are using
-the **Nix/direnv** environment (not a stray one). Open any `.py` file in VS Code
-and click **Run Cell** (the `# %%` markers make them interactive notebooks), or
-run them from a workspace terminal.
+the **Nix/direnv** environment (not a stray one). Open a `.ipynb` notebook and
+click **Run All**, or open a `.py` file and click **Run Cell** (the `# %%`
+markers make them interactive), or run them from a workspace terminal.
+
+### Notebooks (`.ipynb`) — open in VS Code and **Run All**
+
+| Notebook | What it checks |
+|---|---|
+| `notebook_intro.ipynb` | the **Python (nix-uv)** kernel: numpy, Polars, an inline plot |
+| `notebook_pyrsm.ipynb` | a **pyrsm** regression (formula interface) + a plot |
+| `notebook_postgres.ipynb` | PostgreSQL → Polars (run `rsm-pg-start` first) |
+
+### Scripts
 
 | File | What it checks | How to run |
 |---|---|---|
