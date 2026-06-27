@@ -2,127 +2,56 @@
 
 <!-- generated from docs/src/readme.qmd — edit the .qmd, then run docs/src/render-docs.sh -->
 
-# rsm-nix — RSM-MSBA host-native computing environment (Nix flake)
+# RSM-MSBA computing environment
 
-A single Nix flake that reproduces the RSM-MSBA computing environment
-(Python/uv, Quarto, PostgreSQL, optional Spark/Hadoop) **natively** on
-macOS, Linux, NixOS, and Windows (WSL2) — **no Docker, no Podman**.
-Students clone one workspace at `~/rsm-msba`; direnv cascades the
-environment into every course subfolder. R is intentionally excluded.
+The computing environment for the Rady MSBA program — Python, Quarto,
+PostgreSQL, and the course packages — **the same on your laptop and on
+the Rady server**. No Docker to install.
 
-## Quickstart
+There are two ways to use it. Most students use the **server** (nothing
+to install). Pick one:
 
-### macOS (Apple Silicon)
+## A. On your own laptop
 
-``` bash
-curl -fsSL https://raw.githubusercontent.com/radiant-ai-hub/rsm-nix/main/install/macos-arm-install-rsm-nix.sh | bash
-```
+Install once, then everything lives in `~/rsm-msba`.
 
-The installer sets up VS Code, Determinate Nix, `direnv` + `nix-direnv`,
-clones the workspace to `~/rsm-msba`, runs `rsm-setup`, and runs the
-smoke checks.
+1.  Install **VS Code**: <https://code.visualstudio.com>
+2.  Follow the one-page guide for your platform — it installs Nix + VS
+    Code, then has you run `rsm-setup`:
+    - **macOS (Apple Silicon):**
+      [docs/student-macos.md](docs/student-macos.md)
+    - **Windows 11:** [docs/student-wsl2.md](docs/student-wsl2.md)
+3.  Open the `~/rsm-msba` folder in VS Code. For notebooks, pick the
+    **Python (nix-uv)** kernel.
 
-### Windows 11 (WSL2 + Ubuntu 26.04)
+## B. On the Rady server (nothing to install)
 
-Run PowerShell **as Administrator** for the first WSL install:
+You use the server through VS Code on your laptop.
 
-``` powershell
-powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr -useb https://raw.githubusercontent.com/radiant-ai-hub/rsm-nix/main/install/windows-install-rsm-nix.ps1 | iex"
-```
+1.  Install **VS Code** and its **Remote - SSH** extension.
 
-The installer sets up VS Code on Windows, Ubuntu 26.04 on WSL2,
-Determinate Nix inside Ubuntu, `direnv` + `nix-direnv`, and the
-`~/rsm-msba` workspace.
+2.  Be on the campus network or the **UCSD VPN**, then connect to
+    `<your-campus-username>@rsm-compute-01.ucsd.edu` and enter your
+    campus password.
 
-### Linux / server (bare Ubuntu, or a Remote-SSH server)
+3.  In a terminal, run:
 
-``` bash
-curl -fsSL https://raw.githubusercontent.com/radiant-ai-hub/rsm-nix/main/install/linux-install-rsm-nix.sh | bash
-```
+    ``` bash
+    rsm-setup
+    ```
 
-Installs Determinate Nix (if missing), configures `direnv` +
-`nix-direnv` for your login shell (zsh or bash), clones the workspace to
-`~/rsm-msba`, and runs `rsm-setup`. It does not install VS Code —
-connect from your laptop with the **Remote - SSH** + **mkhl.direnv**
-extensions.
+4.  Open the `~/rsm-msba` folder. For notebooks, pick the **Python
+    (nix-uv)** kernel.
 
-### Manual path (any platform)
+Full walkthrough: **[docs/connect-server.md](docs/connect-server.md)**
 
-``` bash
-# 1. install Nix (Determinate Systems installer)
-curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
+## Updating
 
-# 2. clone the flake, then bootstrap your workspace
-git clone https://github.com/radiant-ai-hub/rsm-nix.git ~/rsm-nix
-nix develop ~/rsm-nix -c rsm-setup   # creates ~/rsm-msba + .envrc + nix-uv env + folders
-direnv allow ~/rsm-msba              # if using direnv (recommended)
-```
+Run `rsm-setup` any time — it pulls the latest environment and rebuilds.
+It’s safe to re-run and never touches your coursework.
 
-The flake lives at `~/rsm-nix` (update with `cd ~/rsm-nix && git pull`);
-your coursework + state live at `~/rsm-msba`.
+------------------------------------------------------------------------
 
-Per-platform guides:
-
-- Full getting-started guide:
-  [docs/getting-started.md](docs/getting-started.md)
-- macOS Apple Silicon: [docs/student-macos.md](docs/student-macos.md)
-- Windows 11 (WSL2 + Ubuntu 26.04):
-  [docs/student-wsl2.md](docs/student-wsl2.md)
-- **Connect to the shared server with VS Code** (students/TAs):
-  [docs/connect-server.md](docs/connect-server.md)
-- Ubuntu 24.04 server (multi-user Nix):
-  [docs/server-ubuntu-nix.md](docs/server-ubuntu-nix.md)
-- NixOS server (declarative):
-  [docs/server-nixos.md](docs/server-nixos.md)
-
-## Layout
-
-``` text
-~/rsm-nix/      the flake (a git repo) — update with: cd ~/rsm-nix && git pull
-~/rsm-msba/     your workspace (NOT a git repo)
-├── .envrc      generated; loads the flake from ~/rsm-nix
-├── .rsm-msba/  state: envs/nix-uv, postgres, jupyter (survives flake updates)
-├── mgta403/    a course folder — can be its own git repo
-└── mgta464/
-```
-
-The flake (`~/rsm-nix`) is pure machinery you `git pull`; your
-coursework and built `nix-uv` environment live under `~/rsm-msba`, which
-is **not** a git repo, so each course folder can be its own. Nothing is
-written to host dotfiles (`~/.zshrc`, `~/.bashrc`). To fully reset,
-delete `~/rsm-msba/.rsm-msba`.
-
-## Commands
-
-| Command | What it does |
-|----|----|
-| `rsm-setup` | Bootstrap: uv base env, Jupyter kernel, course folders |
-| `rsm-python-sync` | Refresh the base env from `uv.lock` |
-| `rsm-new-course NAME...` | Create course/project folder(s) + remember in `courses.txt` |
-| `rsm-pg-init` / `-start` / `-stop` / `-status` | Workspace-local PostgreSQL lifecycle |
-| `rsm-pg-psql` | `psql` into the `rsm-msba` database |
-| `rsm-pgweb` | pgweb UI at <http://127.0.0.1:8282> |
-
-## Flake interfaces
-
-- `devShells.<system>.default` — Python/uv, Quarto 1.9.13, PostgreSQL
-  16, pgweb, git/git-lfs, gh, notebook support, the `rsm-*` commands.
-- `devShells.<system>.spark-hadoop` — adds Java + Spark 3.5 + Hadoop +
-  PySpark.
-- `packages.<system>.{rsm-setup,rsm-python-sync,rsm-pg-*,rsm-pgweb,rsm-new-course,quarto-bin,spark-hadoop-env,spark-hadoop-proof}`
-- `apps.<system>.{check,check-spark-hadoop,rsm-setup}`
-
-Supported systems: `aarch64-darwin`, `x86_64-darwin`, `aarch64-linux`,
-`x86_64-linux`. Windows is via WSL2 Linux.
-
-## Testing
-
-``` bash
-nix flake check
-nix develop -c bash tests/check-default.sh        # toolchain + 35 course-core imports
-nix develop -c bash tests/check-postgres.sh       # PostgreSQL lifecycle
-nix develop -c bash tests/check-folders.sh        # workspace layout
-nix develop -c bash tests/check-no-host-mutation.sh
-nix develop .#spark-hadoop -c bash tests/check-spark-hadoop.sh
-nix run .#check                                   # bundled smoke check
-```
+*Instructors / developers:* the flake interfaces, the full command list,
+the directory layout, and the server configuration are in
+**[README-tech.md](README-tech.md)** and the [`docs/`](docs/) guides.

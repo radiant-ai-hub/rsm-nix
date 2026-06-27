@@ -161,6 +161,7 @@
           rsm-pg-psql = mk "rsm-pg-psql" [ pkgs.postgresql_16 ];
           rsm-pgweb = mk "rsm-pgweb" [ pkgs.pgweb ];
           pg = mk "pg" [ rsm-pg-start rsm-pg-stop rsm-pg-status rsm-pg-psql rsm-pgweb rsm-pg-init pkgs.postgresql_16 pkgs.coreutils ];
+          github = mk "github" [ pkgs.git pkgs.openssh ];
         };
     in
     {
@@ -198,6 +199,8 @@
             gh
             graphviz
             zsh
+            eza # modern `ls` (ls/lsa/lt aliases in the rsm shell)
+            zoxide # `z <name>` to jump to folders
             cacert
             coreutils
             gnused

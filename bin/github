@@ -1,0 +1,57 @@
+# github: one-time setup of your Git identity and a GitHub SSH key for this
+# account. Run it once:  github
+echo "Let's set up your Git configuration and GitHub SSH access."
+echo
+
+read -r -p "Enter your @ucsd.edu email address for Git commits: " git_email
+git config --global user.email "$git_email"
+git config --global user.name "rsm-${git_email%@ucsd.edu}"
+git config --global pull.rebase false
+git config --global init.defaultBranch main
+
+echo
+echo "Git configuration set:"
+echo "  Name : $(git config --global user.name)"
+echo "  Email: $(git config --global user.email)"
+
+# --- SSH key ---------------------------------------------------------------
+if [ -f "$HOME/.ssh/id_ed25519" ]; then
+  echo
+  echo "An SSH key already exists at ~/.ssh/id_ed25519 — reusing it."
+else
+  mkdir -p "$HOME/.ssh"
+  chmod 700 "$HOME/.ssh"
+  ssh-keygen -t ed25519 -f "$HOME/.ssh/id_ed25519" -C "rsm-msba-github" -N ""
+  chmod 600 "$HOME/.ssh/id_ed25519"
+fi
+
+echo
+echo "Copy the public key below and add it to GitHub:"
+echo
+cat "$HOME/.ssh/id_ed25519.pub"
+echo
+echo "Open: https://github.com/settings/ssh/new"
+echo "  - Title    : e.g. 'rsm-msba key'"
+echo "  - Key type : Authentication key"
+echo "  - Paste the key above, then click 'Add SSH key'"
+echo
+
+while true; do
+  read -r -p "Have you added the SSH key to GitHub? (y/n): " yn
+  case "$yn" in
+    [Yy]*) break ;;
+    [Nn]*) echo "Add the key first, then re-run: github"; exit 0 ;;
+    *) echo "Please answer y or n." ;;
+  esac
+done
+
+echo
+echo "Testing the connection:  ssh -T git@github.com"
+ssh_output="$(ssh -o StrictHostKeyChecking=accept-new -T git@github.com 2>&1)" || true
+if echo "$ssh_output" | grep -q "successfully authenticated"; then
+  echo "✅ GitHub SSH access works — you're ready to push and pull."
+else
+  echo "❌ Could not authenticate to GitHub:"
+  echo "$ssh_output"
+  echo "Double-check the key was added, or ask your instructor/TA."
+fi

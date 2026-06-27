@@ -14,6 +14,7 @@ cd "$here"
 
 guides=(
   readme.qmd
+  readme-tech.qmd
   getting-started.qmd
   student-macos.qmd
   student-wsl2.qmd
@@ -32,6 +33,7 @@ for g in getting-started student-macos student-wsl2 connect-server server-ubuntu
   mv -f "$g.md" "../$g.md"
 done
 mv -f readme.md ../../README.md
+mv -f readme-tech.md ../../README-tech.md
 
 echo "rendered: ${guides[*]}"
-echo "  -> docs/*.md and README.md"
+echo "  -> docs/*.md, README.md, README-tech.md"

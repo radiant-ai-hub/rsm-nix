@@ -1,5 +1,5 @@
-# pg: PostgreSQL status + an interactive menu of the rsm-pg-* actions.
-# (The PG* variables come from the shared env header, bin/rsm-env.sh.)
+# pg: PostgreSQL status + a menu of the rsm-pg-* actions. Each menu entry also
+# shows the command you can run directly. (PG* come from bin/rsm-env.sh.)
 
 _pg_status() {
   echo "PostgreSQL (workspace-local)"
@@ -16,22 +16,31 @@ _pg_status() {
   fi
 }
 
+_pg_menu() {
+  echo
+  echo "Actions — enter a number, or run the command directly:"
+  printf '  %-3s %-26s %s\n' "1)" "start the server" "rsm-pg-start"
+  printf '  %-3s %-26s %s\n' "2)" "stop the server" "rsm-pg-stop"
+  printf '  %-3s %-26s %s\n' "3)" "detailed status" "rsm-pg-status"
+  printf '  %-3s %-26s %s\n' "4)" "open a psql shell" "rsm-pg-psql"
+  printf '  %-3s %-26s %s\n' "5)" "launch pgweb (web UI)" "rsm-pgweb"
+  printf '  %-3s %-26s %s\n' "6)" "(re)initialize the data dir" "rsm-pg-init"
+  printf '  %-3s %-26s %s\n' "p)" "show recent server log" "tail \$RSMBASE/postgres/postgres.log"
+  printf '  %-3s %s\n' "r)" "refresh this overview"
+  printf '  %-3s %s\n' "q)" "quit"
+}
+
 _pg_status
 
-# No terminal attached (piped / non-interactive): print the command list, done.
+# No terminal attached (piped / non-interactive): print status + the list, done.
 if [ ! -t 0 ] || [ ! -t 1 ]; then
-  echo
-  echo "Commands: rsm-pg-start  rsm-pg-stop  rsm-pg-status  rsm-pg-psql  rsm-pg-init  rsm-pgweb"
+  _pg_menu
   exit 0
 fi
 
 # Interactive menu.
 while true; do
-  echo
-  echo "  1) start server         4) open psql shell"
-  echo "  2) stop server          5) launch pgweb (web UI)"
-  echo "  3) detailed status      6) (re)initialize data dir"
-  echo "  r) refresh status       q) quit"
+  _pg_menu
   printf 'pg> '
   read -r ans || break
   echo
@@ -42,6 +51,7 @@ while true; do
     4) rsm-pg-psql ;;
     5) rsm-pgweb ;;
     6) rsm-pg-init ;;
+    p | P) tail -n 30 "$RSMBASE/postgres/postgres.log" 2>/dev/null || echo "  (no log yet)" ;;
     r | R) _pg_status ;;
     q | Q | "") break ;;
     *) echo "  ? unknown option: $ans" ;;

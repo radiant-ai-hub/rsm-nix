@@ -4,31 +4,53 @@ format: gfm
 
 <!-- generated from docs/src/readme.qmd — edit the .qmd, then run docs/src/render-docs.sh -->
 
-# rsm-nix — RSM-MSBA host-native computing environment (Nix flake)
+# RSM-MSBA computing environment
 
-A single Nix flake that reproduces the RSM-MSBA computing environment
-(Python/uv, Quarto, PostgreSQL, optional Spark/Hadoop) **natively** on macOS,
-Linux, NixOS, and Windows (WSL2) — **no Docker, no Podman**. Students clone one
-workspace at `~/rsm-msba`; direnv cascades the environment into every course
-subfolder. R is intentionally excluded.
+The computing environment for the Rady MSBA program — Python, Quarto,
+PostgreSQL, and the course packages — **the same on your laptop and on the Rady
+server**. No Docker to install.
 
-## Quickstart
+There are two ways to use it. Most students use the **server** (nothing to
+install). Pick one:
 
-{{< include _includes/install.qmd >}}
+## A. On your own laptop
 
-Per-platform guides:
+Install once, then everything lives in `~/rsm-msba`.
 
-- Full getting-started guide: [docs/getting-started.md](docs/getting-started.md)
-- macOS Apple Silicon: [docs/student-macos.md](docs/student-macos.md)
-- Windows 11 (WSL2 + Ubuntu 26.04): [docs/student-wsl2.md](docs/student-wsl2.md)
-- **Connect to the shared server with VS Code** (students/TAs): [docs/connect-server.md](docs/connect-server.md)
-- Ubuntu 24.04 server (multi-user Nix): [docs/server-ubuntu-nix.md](docs/server-ubuntu-nix.md)
-- NixOS server (declarative): [docs/server-nixos.md](docs/server-nixos.md)
+1. Install **VS Code**: <https://code.visualstudio.com>
+2. Follow the one-page guide for your platform — it installs Nix + VS Code, then
+   has you run `rsm-setup`:
+   - **macOS (Apple Silicon):** [docs/student-macos.md](docs/student-macos.md)
+   - **Windows 11:** [docs/student-wsl2.md](docs/student-wsl2.md)
+3. Open the `~/rsm-msba` folder in VS Code. For notebooks, pick the
+   **Python (nix-uv)** kernel.
 
-{{< include _includes/workspace-layout.qmd >}}
+## B. On the Rady server (nothing to install)
 
-{{< include _includes/commands.qmd >}}
+You use the server through VS Code on your laptop.
 
-{{< include _includes/flake-interfaces.qmd >}}
+1. Install **VS Code** and its **Remote - SSH** extension.
+2. Be on the campus network or the **UCSD VPN**, then connect to
+   `<your-campus-username>@rsm-compute-01.ucsd.edu` and enter your campus
+   password.
+3. In a terminal, run:
 
-{{< include _includes/testing.qmd >}}
+   ```bash
+   rsm-setup
+   ```
+
+4. Open the `~/rsm-msba` folder. For notebooks, pick the **Python (nix-uv)**
+   kernel.
+
+Full walkthrough: **[docs/connect-server.md](docs/connect-server.md)**
+
+## Updating
+
+Run `rsm-setup` any time — it pulls the latest environment and rebuilds. It's
+safe to re-run and never touches your coursework.
+
+---
+
+*Instructors / developers:* the flake interfaces, the full command list, the
+directory layout, and the server configuration are in
+**[README-tech.md](README-tech.md)** and the [`docs/`](docs/) guides.

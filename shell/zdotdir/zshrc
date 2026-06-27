@@ -29,9 +29,37 @@ for _f in \
 done
 unset _f
 
+autoload -Uz add-zsh-hook
+
+# --- aliases ---------------------------------------------------------------
 alias c="clear"
-alias ll="ls -alh"
-alias la="ls -A"
+alias sbase='source "$RSM_UV_ENV/bin/activate"'   # (re)activate the nix-uv env
+alias sp='source .venv/bin/activate'              # activate a project .venv
+alias de=deactivate
+alias ..='cd ..'
+alias ...='cd ../..'
+alias ....='cd ../../..'
+if command -v eza >/dev/null 2>&1; then
+  alias ls='eza -lh --group-directories-first --icons=auto'
+  alias lsa='eza -lah --group-directories-first --icons=auto'
+  alias lt='eza --tree --level=2 --git --icons=auto'
+fi
+
+# --- zoxide (`z <name>` to jump to folders) -------------------------------
+# Init now if zoxide is on PATH; otherwise on the first prompt (once direnv has
+# loaded the environment that provides zoxide).
+_rsm_zoxide_init() {
+  command -v zoxide >/dev/null 2>&1 || return 1
+  eval "$(zoxide init zsh)"
+  add-zsh-hook -d precmd _rsm_zoxide_init 2>/dev/null
+}
+_rsm_zoxide_init || add-zsh-hook precmd _rsm_zoxide_init
 
 # Powerlevel10k prompt configuration.
 [[ ! -f "${ZDOTDIR}/.p10k.zsh" ]] || source "${ZDOTDIR}/.p10k.zsh"
+
+# --- personal, opt-in overrides -------------------------------------------
+# Sourced last so it can override anything above (e.g. `bindkey -v` for vi mode,
+# or `set -o vi`). Lives in $HOME so it survives a workspace reset; students
+# never get it unless they deliberately create the file.
+[[ -f "$HOME/.rsm-local.zsh" ]] && source "$HOME/.rsm-local.zsh"
