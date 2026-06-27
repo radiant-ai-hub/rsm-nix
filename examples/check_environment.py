@@ -68,8 +68,9 @@ check("RSM_WORKSPACE is set", bool(os.environ.get("RSM_WORKSPACE")))
 print("\n== a few key packages import and report versions ==")
 import importlib
 
-for mod, label in [("numpy", "numpy"), ("pandas", "pandas"), ("sklearn", "scikit-learn"),
-                   ("xgboost", "xgboost"), ("sqlalchemy", "sqlalchemy"), ("psycopg2", "psycopg2")]:
+for mod, label in [("numpy", "numpy"), ("polars", "polars"), ("sklearn", "scikit-learn"),
+                   ("xgboost", "xgboost"), ("sqlalchemy", "sqlalchemy"), ("psycopg2", "psycopg2"),
+                   ("pyrsm", "pyrsm")]:
     try:
         m = importlib.import_module(mod)
         check(f"import {label}", True, getattr(m, "__version__", "?"))

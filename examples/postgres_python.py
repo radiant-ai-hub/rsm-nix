@@ -1,8 +1,8 @@
 # %% [markdown]
-# # PostgreSQL from Python (SQLAlchemy + pandas)
+# # PostgreSQL from Python (SQLAlchemy + Polars)
 #
 # Connect to the workspace-local PostgreSQL, create a table, insert rows, and
-# read them back with pandas.
+# read them back with Polars.
 #
 # **First start the database** (in a terminal in the workspace):
 #
@@ -12,17 +12,18 @@
 #
 # The connection uses the `PG*` environment variables the dev shell exports
 # (`PGUSER`, `PGPORT`, `PGDATABASE`, `PGHOST`) — local socket, trust auth, no
-# password. This is the Nix/direnv Postgres, not the old container one.
+# password. On a shared server `PGPORT` is **per-user**, so don't hard-code it;
+# read it from the environment as below.
 
 # %%
 import getpass
 import os
 
 from sqlalchemy import create_engine, text
-import pandas as pd
+import polars as pl
 
 user = os.environ.get("PGUSER", getpass.getuser())
-port = os.environ.get("PGPORT", "8765")
+port = os.environ.get("PGPORT")  # set per-user by the dev shell; do not hard-code
 db = os.environ.get("PGDATABASE", "rsm-msba")
 
 # TCP loopback (works with the workspace-local server started by rsm-pg-start).
@@ -42,17 +43,19 @@ with engine.begin() as con:
         ],
     )
 
-# %% read it back with pandas
-df = pd.read_sql_query("SELECT * FROM films ORDER BY year", con=engine)
+# %% read it back with Polars
+with engine.connect() as con:
+    df = pl.read_database("SELECT * FROM films ORDER BY year", connection=con)
 print(df)
 
 # %% confirm the server identity (which database/user/port am I really on?)
-info = pd.read_sql_query(
-    "SELECT current_database() AS db, current_user AS usr, "
-    "inet_server_port() AS port, version() AS version",
-    con=engine,
-)
-print(info.T)
+with engine.connect() as con:
+    info = pl.read_database(
+        "SELECT current_database() AS db, current_user AS usr, "
+        "inet_server_port() AS port, version() AS version",
+        connection=con,
+    )
+print(info)
 
 # %% cleanup
 with engine.begin() as con:

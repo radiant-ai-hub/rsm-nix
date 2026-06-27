@@ -8,8 +8,9 @@ run them from a workspace terminal.
 | File | What it checks | How to run |
 |---|---|---|
 | `check_environment.py` | **Are you in the RSM/Nix env only?** interpreter, no foreign `VIRTUAL_ENV`, tools, versions | `python examples/check_environment.py` |
-| `python_data_stack.py` | numpy/pandas/sklearn/statsmodels/xgboost/polars/plotnine | `python examples/python_data_stack.py` |
-| `postgres_python.py` | PostgreSQL via SQLAlchemy + pandas | `rsm-pg-start` then run it |
+| `python_data_stack.py` | numpy/**polars**/sklearn/statsmodels/xgboost/plotnine | `python examples/python_data_stack.py` |
+| `pyrsm_example.py` | **pyrsm** linear + logistic regression (Polars data) | `python examples/pyrsm_example.py` |
+| `postgres_python.py` | PostgreSQL via SQLAlchemy + **Polars** | `rsm-pg-start` then run it |
 | `postgres_vscode.pgsql` | PostgreSQL via the VS Code SQL extension | see comments in the file |
 | `quarto_report.qmd` | Quarto renders with the RSM Python | `quarto render examples/quarto_report.qmd` |
 | `spark_pyspark.py` | optional Spark/Hadoop profile | `nix develop .#spark-hadoop` then run it |

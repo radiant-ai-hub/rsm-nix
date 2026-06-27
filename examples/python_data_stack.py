@@ -1,44 +1,49 @@
 # %% [markdown]
-# # Course-core Python data stack — quick functional test
+# # Course-core Python data stack — quick functional test (Polars)
 #
 # Run cell-by-cell in VS Code (or `python examples/python_data_stack.py`). Each
 # cell exercises a different part of the environment and prints a small result.
+# The data stack here is **Polars** (not pandas).
 
-# %% numpy + pandas
+# %% numpy + polars
 import numpy as np
-import pandas as pd
+import polars as pl
 
-df = pd.DataFrame({"x": np.arange(1, 6), "y": np.arange(1, 6) ** 2})
+df = pl.DataFrame({"x": np.arange(1, 6), "y": np.arange(1, 6) ** 2})
 print(df)
-print("pandas", pd.__version__, "| numpy", np.__version__)
+print("polars", pl.__version__, "| numpy", np.__version__)
 
-# %% scikit-learn — fit a tiny model
+# %% scikit-learn — fit a tiny model (Polars -> numpy)
 from sklearn.linear_model import LinearRegression
 
-model = LinearRegression().fit(df[["x"]], df["y"])
+X = df.select("x").to_numpy()
+y = df.get_column("y").to_numpy()
+model = LinearRegression().fit(X, y)
 print("sklearn slope:", round(float(model.coef_[0]), 3))
 
-# %% statsmodels — OLS summary (one line)
-import statsmodels.formula.api as smf
+# %% statsmodels — OLS on numpy arrays (no pandas needed)
+import statsmodels.api as sm
 
-res = smf.ols("y ~ x", data=df).fit()
+res = sm.OLS(y, sm.add_constant(X)).fit()
 print("statsmodels R^2:", round(res.rsquared, 4))
 
 # %% xgboost — train a trivial model (verifies the native lib loads)
 import xgboost as xgb
 
-dtrain = xgb.DMatrix(df[["x"]].values, label=df["y"].values)
+dtrain = xgb.DMatrix(X, label=y)
 booster = xgb.train({"max_depth": 2, "verbosity": 0}, dtrain, num_boost_round=3)
 print("xgboost predictions:", np.round(booster.predict(dtrain), 2))
 
-# %% polars + pyarrow
-import polars as pl
+# %% polars — a few expressions (the data-wrangling workhorse)
+out = (
+    df.with_columns((pl.col("y") - pl.col("x")).alias("gap"))
+    .filter(pl.col("x") >= 2)
+    .select(pl.col("x"), pl.col("y"), pl.col("gap"))
+)
+print(out)
+print("x mean:", df.get_column("x").mean(), "| y sum:", df.get_column("y").sum())
 
-pdf = pl.DataFrame({"a": [1, 2, 3], "b": ["x", "y", "z"]})
-print(pdf)
-print("polars", pl.__version__)
-
-# %% plotnine — build a plot object (no display needed to verify it works)
+# %% plotnine — build a plot object (works directly with a Polars frame)
 from plotnine import aes, geom_line, ggplot
 
 plot = ggplot(df, aes("x", "y")) + geom_line()

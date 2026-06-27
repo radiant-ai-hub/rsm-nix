@@ -18,6 +18,7 @@ run() {
 
 run "check_environment.py" python check_environment.py
 run "python_data_stack.py" python python_data_stack.py
+run "pyrsm_example.py" python pyrsm_example.py
 
 printf '\n########## postgres_python.py ##########\n'
 if command -v rsm-pg-start >/dev/null 2>&1; then

@@ -29,6 +29,9 @@ export JUPYTER_DATA_DIR="${JUPYTER_DATA_DIR:-$RSMBASE/jupyter}"
 
 export PGDATA="${PGDATA:-$RSMBASE/postgres/data}"
 export PGHOST="${PGHOST:-$RSMBASE/postgres/socket}"
-export PGPORT="${PGPORT:-8765}"
+# Per-user default TCP port: on a shared server every student would otherwise
+# bind 8765 and collide. id -u is stable per user, so this is deterministic.
+# Override by exporting PGPORT yourself before entering the env.
+export PGPORT="${PGPORT:-$(( 8765 + $(id -u) % 1000 ))}"
 export PGDATABASE="${PGDATABASE:-rsm-msba}"
 export PGUSER="${PGUSER:-$(id -un)}"

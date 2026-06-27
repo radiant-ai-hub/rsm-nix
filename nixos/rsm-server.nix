@@ -58,14 +58,11 @@ in
   ];
   environment.sessionVariables.UV_CACHE_DIR = "/srv/uv-cache";
 
-  # --- Per-user Postgres port (avoid collisions on a shared host) ------------
-  # rsm-pg-* honor $PGPORT (default 8765). One host means simultaneous users
-  # would collide on 8765, so give each UID its own port. (The unix-socket path
-  # used by rsm-pg-psql is already per-user and never collides; this covers the
-  # TCP listener and pgweb.)
-  environment.etc."profile.d/rsm-pgport.sh".text = ''
-    export PGPORT="$(( 8765 + $(id -u) % 50 ))"
-  '';
+  # --- Per-user Postgres port ------------------------------------------------
+  # Handled in the env header (rsm-nix/bin/rsm-env.sh): PGPORT defaults to
+  # 8765 + (uid % 1000), so simultaneous users don't collide on 8765. It lives
+  # there (not a profile.d snippet) so it applies in every context — login
+  # shells, non-login shells, the dev shell, and the rsm-pg-* wrappers alike.
 
   # --- Environment tooling on PATH ------------------------------------------
   # System-wide direnv + nix-direnv so ~/rsm-msba (and course subfolders)

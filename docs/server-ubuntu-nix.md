@@ -131,19 +131,17 @@ automatically.
 ## 6. PostgreSQL on a shared host
 
 Each student’s PostgreSQL is **workspace-local** (data under
-`~/rsm-msba/.rsm-msba/postgres`) and listens on `127.0.0.1:8765`. On a
-single shared host the port would collide between simultaneous users.
-Options:
+`~/rsm-msba/.rsm-msba/postgres`). On a single shared host the TCP
+listener would collide if everyone used `8765`, so the environment
+derives a **per-user port** automatically: `rsm-nix/bin/rsm-env.sh`
+defaults `PGPORT` to `8765 + (uid % 1000)`. Students just run
+`rsm-pg-start` and read their port with `echo $PGPORT`; nothing to
+configure.
 
-- **Per-user port:** set `export PGPORT=<unique>` in the student’s
-  `~/rsm-msba/.rsm-msba/zsh/local.zsh` (or shell rc) — the scripts honor
-  `PGPORT`.
-- **Socket-only:** students connect via the per-user socket directory
-  (`rsm-pg-psql` already does), which never collides; only the TCP
-  listener does. Skipping `pgweb` (or giving it a unique `--listen`
-  port) avoids the clash entirely.
-
-Document one convention for your cohort.
+- The per-user **socket** (`rsm-pg-psql` uses it) never collides
+  regardless.
+- `pgweb` binds a web port; give it a unique `--listen` per user (or
+  forward it per-user over SSH) if several students run it at once.
 
 ------------------------------------------------------------------------
 

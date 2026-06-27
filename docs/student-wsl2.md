@@ -158,7 +158,10 @@ rsm-pg-stop                        # stop it
 ```
 
 Connection details: host = socket under `.rsm-msba/postgres/socket` (or
-`127.0.0.1`), port = `8765`, databases = `rsm-msba` and your username.
+`127.0.0.1`), port = **`$PGPORT`** (run `echo $PGPORT`), databases =
+`rsm-msba` and your username. On your own machine the port is stable; on
+a shared server it is derived per-user (so students don’t collide on one
+port) — always read it from `$PGPORT` rather than hard-coding `8765`.
 
 ## Quarto
 

@@ -144,17 +144,17 @@ and fall back to the per-user default — correctness over disk.)
 
 ### 3.5 Per-user Postgres port
 
-Every student's `rsm-pg-start` would bind `127.0.0.1:8765` — a collision on one
-host. The `rsm-pg-*` scripts honor `$PGPORT`, so give each UID its own:
-
-```nix
-environment.etc."profile.d/rsm-pgport.sh".text = ''
-  export PGPORT="$(( 8765 + $(id -u) % 50 ))"
-'';
-```
+Every student's `rsm-pg-start` would otherwise bind `127.0.0.1:8765` — a
+collision on one host. This is handled in the environment itself, not the NixOS
+config: `rsm-nix/bin/rsm-env.sh` defaults `PGPORT` to `8765 + (uid % 1000)`, so
+each user gets a distinct port. Because the env header is sourced by every entry
+point (login *and* non-login shells, the dev shell, and the `rsm-pg-*` wrappers),
+the port is consistent everywhere — unlike a `profile.d` snippet, which only
+login shells read.
 
 (The unix socket used by `rsm-pg-psql` is already per-user and never collides;
-this covers the TCP listener and `pgweb`.)
+this covers the TCP listener and `pgweb`. For very large cohorts, `% 1000` could
+theoretically collide — assign explicit ports then.)
 
 ### 3.6 direnv, system-wide
 

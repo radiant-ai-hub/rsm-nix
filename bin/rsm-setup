@@ -95,11 +95,19 @@ if [ -f "$courses_file" ]; then
   done < "$courses_file"
 fi
 
-# 4. Link the examples into the workspace (auto-updates with the flake) so
-#    `python examples/check_environment.py` works from ~/rsm-msba.
-if [ -d "$RSM_FLAKE/examples" ] && [ ! -e "$RSM_WORKSPACE/examples" ]; then
-  ln -s "$RSM_FLAKE/examples" "$RSM_WORKSPACE/examples"
-  echo "    examples  : linked $RSM_WORKSPACE/examples -> $RSM_FLAKE/examples"
+# 4. Copy the examples into the workspace so `python examples/check_environment.py`
+#    works from ~/rsm-msba. We COPY (not symlink) so the folder lives under the
+#    workspace's own .envrc — a symlink into $RSM_FLAKE would make `cd examples`
+#    resolve into the flake repo and trip its (unallowed) .envrc. A leftover
+#    symlink from an older setup is replaced.
+if [ -d "$RSM_FLAKE/examples" ]; then
+  if [ -L "$RSM_WORKSPACE/examples" ]; then
+    rm -f "$RSM_WORKSPACE/examples"   # drop an old symlink from a previous rsm-setup
+  fi
+  if [ ! -e "$RSM_WORKSPACE/examples" ]; then
+    cp -R "$RSM_FLAKE/examples" "$RSM_WORKSPACE/examples"
+    echo "    examples  : copied $RSM_FLAKE/examples -> $RSM_WORKSPACE/examples"
+  fi
 fi
 
 echo "==> Setup complete."
