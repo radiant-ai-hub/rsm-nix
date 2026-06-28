@@ -1,0 +1,42 @@
+# rsm-vscode-ext: install the curated VS Code extensions (vscode/extensions.txt)
+# into the CURRENT `code` context.
+#
+# Why this exists: VS Code's Remote-WSL / Remote-SSH splits extensions into a
+# local (UI) side and a remote side. The installer's host-side install only
+# covers the UI side, so Python/Jupyter/etc. are missing in the WSL/server
+# host. Run this command from the VS Code integrated terminal that is connected
+# to WSL (or to the server) — there `code` is the remote CLI, so the extensions
+# install in that remote, which is where coursework actually runs.
+
+ext_file="$RSM_FLAKE/vscode/extensions.txt"
+
+if [ ! -f "$ext_file" ]; then
+  echo "rsm-vscode-ext: $ext_file not found (run rsm-setup to fetch the flake)." >&2
+  exit 1
+fi
+
+if ! command -v code >/dev/null 2>&1; then
+  echo "rsm-vscode-ext: the 'code' command is not available in this terminal." >&2
+  echo "  Open ~/rsm-msba in VS Code and run 'rsm-vscode-ext' in ITS integrated" >&2
+  echo "  terminal — that 'code' targets the WSL/SSH remote, so the extensions" >&2
+  echo "  install there (not just on your laptop)." >&2
+  exit 1
+fi
+
+echo "==> Installing VS Code extensions into: $(command -v code)"
+count=0
+fail=0
+while IFS= read -r line || [ -n "$line" ]; do
+  ext="${line%%#*}"
+  ext="$(printf '%s' "$ext" | tr -d '[:space:]')"
+  [ -z "$ext" ] && continue
+  printf '    %s\n' "$ext"
+  if ! code --install-extension "$ext" --force >/dev/null 2>&1; then
+    printf '      (skipped — not on the marketplace?)\n'
+    fail=$((fail + 1))
+  fi
+  count=$((count + 1))
+done < "$ext_file"
+
+echo "==> Done: $((count - fail))/$count extensions installed."
+[ "$fail" -eq 0 ] || echo "    ($fail could not be installed; that is usually fine.)"

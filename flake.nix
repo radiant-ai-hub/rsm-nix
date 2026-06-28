@@ -181,6 +181,10 @@
           rsm-pgweb = mk "rsm-pgweb" [ pkgs.pgweb ];
           pg = mk "pg" [ rsm-pg-start rsm-pg-stop rsm-pg-status rsm-pg-psql rsm-pgweb rsm-pg-init pkgs.postgresql_16 pkgs.coreutils ];
           github = mk "github" [ pkgs.git pkgs.openssh ];
+          # Installs the curated VS Code extensions (vscode/extensions.txt) into
+          # the remote `code` is connected to — run from the VS Code WSL/SSH
+          # integrated terminal so they land in the remote, not just the laptop.
+          rsm-vscode-ext = mk "rsm-vscode-ext" [ pkgs.coreutils ];
         };
     in
     {

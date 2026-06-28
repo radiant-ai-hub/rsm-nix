@@ -559,7 +559,8 @@ usermod -aG sudo "$wsl_user"
 # Make zsh the login shell so VS Code, Windows Terminal, and `wsl` all start in
 # it (the oh-my-zsh/powerlevel10k shell loads on entering ~/rsm-msba). Mirrors
 # the NixOS server, where zsh is already the login shell.
-chsh -s "$(command -v zsh)" "$wsl_user" || true
+zsh_path="$(command -v zsh)"
+chsh -s "$zsh_path" "$wsl_user" 2>/dev/null || usermod -s "$zsh_path" "$wsl_user" || true
 printf '%s ALL=(ALL) NOPASSWD:ALL\n' "$wsl_user" >"/etc/sudoers.d/90-rsm-nix-$wsl_user"
 chmod 0440 "/etc/sudoers.d/90-rsm-nix-$wsl_user"
 
