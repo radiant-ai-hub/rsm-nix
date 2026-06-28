@@ -17,6 +17,12 @@ let
   hadoop = pkgs.hadoop;
   java = pkgs.openjdk17_headless;
   spark = sparkPackagesNoR.spark_3_5.overrideAttrs (old: {
+    # Force the JDK Spark bakes into its launcher wrappers (--set JAVA_HOME).
+    # By default spark 3.5 derives this from hadoop.jdk = jdk11_headless, and
+    # the Nix linux-aarch64 OpenJDK 11 build crashes under real Spark workloads
+    # (ObjectSynchronizer::inflate) — Windows-ARM/WSL students would hit this.
+    # Spark 3.5 fully supports Java 17, so pin the stable jdk17 everywhere.
+    jdk = java;
     nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [
       pkgs.coreutils
       pkgs.gnugrep
