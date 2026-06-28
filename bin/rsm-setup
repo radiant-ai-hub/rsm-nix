@@ -58,7 +58,9 @@ cat > "$RSM_WORKSPACE/.vscode/settings.json" <<EOF
   "python.terminal.activateEnvironment": false,
   "files.exclude": { "**/.rsm-msba": true, "**/.direnv": true },
   "terminal.integrated.env.linux": { "ZDOTDIR": "$RSMBASE/zsh" },
-  "terminal.integrated.env.osx": { "ZDOTDIR": "$RSMBASE/zsh" }
+  "terminal.integrated.env.osx": { "ZDOTDIR": "$RSMBASE/zsh" },
+  "terminal.integrated.defaultProfile.linux": "zsh",
+  "terminal.integrated.fontFamily": "MesloLGS NF"
 }
 EOF
 if [ ! -f "$RSM_WORKSPACE/.vscode/extensions.json" ]; then

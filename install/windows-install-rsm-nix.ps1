@@ -302,6 +302,57 @@ function Install-VSCodeAndExtensions {
     Write-BlankLine
 }
 
+function Install-NerdFont {
+    # powerlevel10k draws its icons with a Nerd Font. The terminal is rendered
+    # by the Windows-side editor/terminal, so the font must be installed on
+    # Windows (not in WSL). Installs MesloLGS NF (p10k's recommended font) for
+    # the current user — no admin needed. Non-fatal: a font hiccup must never
+    # block the environment setup.
+    Write-Section "Step 1b: Installing the MesloLGS Nerd Font..."
+
+    $fontFiles = @(
+        "MesloLGS NF Regular.ttf",
+        "MesloLGS NF Bold.ttf",
+        "MesloLGS NF Italic.ttf",
+        "MesloLGS NF Bold Italic.ttf"
+    )
+    $baseUrl = "https://github.com/romkatv/powerlevel10k-media/raw/master"
+
+    if ($DryRun) {
+        foreach ($fontFile in $fontFiles) {
+            Write-Detail "[dry-run] Would install font: $fontFile"
+        }
+        Write-BlankLine
+        return
+    }
+
+    $fontsDir = Join-Path $env:LOCALAPPDATA "Microsoft\Windows\Fonts"
+    $regPath = "HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Fonts"
+    New-Item -ItemType Directory -Path $fontsDir -Force | Out-Null
+    if (-not (Test-Path $regPath)) { New-Item -Path $regPath -Force | Out-Null }
+
+    foreach ($fontFile in $fontFiles) {
+        try {
+            $dest = Join-Path $fontsDir $fontFile
+            $regName = ($fontFile -replace "\.ttf$", "") + " (TrueType)"
+            if (Test-Path $dest) {
+                Write-Detail "Font already present: $fontFile"
+            } else {
+                $url = "$baseUrl/$([uri]::EscapeDataString($fontFile))"
+                Write-Detail "Downloading $fontFile..."
+                Invoke-WebRequest -Uri $url -OutFile $dest
+            }
+            New-ItemProperty -Path $regPath -Name $regName -Value $dest -PropertyType String -Force | Out-Null
+        } catch {
+            Write-Detail "Could not install $fontFile ($($_.Exception.Message)); continuing."
+        }
+    }
+
+    Write-Detail "MesloLGS NF installed. VS Code's terminal is set to it automatically;"
+    Write-Detail "for Windows Terminal, pick 'MesloLGS NF' under Settings > Appearance > Font."
+    Write-BlankLine
+}
+
 function Ensure-WslFeature {
     Write-Section "Step 2: Checking WSL2..."
 
@@ -467,13 +518,18 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y \
   curl \
   git \
   sudo \
-  xz-utils
+  xz-utils \
+  zsh
 
 if ! id -u "$wsl_user" >/dev/null 2>&1; then
-  useradd -m -s /bin/bash "$wsl_user"
+  useradd -m -s "$(command -v zsh)" "$wsl_user"
 fi
 
 usermod -aG sudo "$wsl_user"
+# Make zsh the login shell so VS Code, Windows Terminal, and `wsl` all start in
+# it (the oh-my-zsh/powerlevel10k shell loads on entering ~/rsm-msba). Mirrors
+# the NixOS server, where zsh is already the login shell.
+chsh -s "$(command -v zsh)" "$wsl_user" || true
 printf '%s ALL=(ALL) NOPASSWD:ALL\n' "$wsl_user" >"/etc/sudoers.d/90-rsm-nix-$wsl_user"
 chmod 0440 "/etc/sudoers.d/90-rsm-nix-$wsl_user"
 
@@ -552,6 +608,35 @@ if ! grep -Fqx 'eval "$(direnv hook bash)"' "$HOME/.bashrc"; then
   printf '\n%s\n' 'eval "$(direnv hook bash)"' >>"$HOME/.bashrc"
 fi
 
+# zsh is the login shell (set in step 4). Wire up direnv for zsh and auto-load
+# the oh-my-zsh/powerlevel10k shell on entering ~/rsm-msba, so Windows Terminal
+# and plain `wsl` behave like the VS Code terminal (which loads it via ZDOTDIR).
+touch "$HOME/.zshrc"
+if ! grep -Fq '# >>> rsm-msba (managed) >>>' "$HOME/.zshrc"; then
+  cat >>"$HOME/.zshrc" <<'ZRC'
+
+# >>> rsm-msba (managed) >>>
+# Nix on PATH (safety net; harmless if the system zsh config already does this).
+[ -e /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ] && \
+  . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+# direnv: load the per-folder rsm-msba Python environment automatically.
+command -v direnv >/dev/null 2>&1 && eval "$(direnv hook zsh)"
+# Load the full oh-my-zsh + powerlevel10k shell when you enter ~/rsm-msba.
+# (In VS Code the ZDOTDIR workspace setting loads it at startup instead.)
+_rsm_zsh_load() {
+  local zd="$HOME/rsm-msba/.rsm-msba/zsh"
+  if [[ -z ${_RSM_ZSH_LOADED:-} && -f "$zd/.zshrc" && ( $PWD == "$HOME/rsm-msba" || $PWD == "$HOME/rsm-msba"/* ) ]]; then
+    export _RSM_ZSH_LOADED=1 ZDOTDIR="$zd"
+    source "$zd/.zshrc"
+  fi
+}
+autoload -Uz add-zsh-hook
+add-zsh-hook chpwd _rsm_zsh_load
+_rsm_zsh_load
+# <<< rsm-msba (managed) <<<
+ZRC
+fi
+
 if [ -e "$flake" ] && [ ! -d "$flake/.git" ]; then
   echo "Flake path exists but is not a git checkout: $flake" >&2
   exit 1
@@ -591,6 +676,7 @@ if ($DryRun) {
 Write-BlankLine
 
 Install-VSCodeAndExtensions
+Install-NerdFont
 Ensure-WslFeature
 Install-UbuntuDistro
 Configure-UbuntuUser
