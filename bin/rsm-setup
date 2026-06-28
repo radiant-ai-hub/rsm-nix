@@ -129,10 +129,15 @@ if [ -n "${RSM_OMZ_SRC:-}" ] && [ -d "$RSM_OMZ_SRC" ]; then
     ln -sfn "$RSM_OMZ_SRC/$_link" "$zdotdir/$_link"
   done
   # Writable config, refreshed from the flake each run (cp -f replaces a
-  # read-only dest; chmod keeps it writable for the next refresh).
-  if [ -n "${RSM_ZDOTDIR_TEMPLATE:-}" ] && [ -d "$RSM_ZDOTDIR_TEMPLATE" ]; then
-    cp -f "$RSM_ZDOTDIR_TEMPLATE/zshrc" "$zdotdir/.zshrc"
-    cp -f "$RSM_ZDOTDIR_TEMPLATE/p10k.zsh" "$zdotdir/.p10k.zsh"
+  # read-only dest; chmod keeps it writable for the next refresh). Prefer the
+  # LIVE flake source ($RSM_FLAKE, git-pulled at the top of this script) over the
+  # path baked into this command, so a plain `rsm-setup` applies zshrc/p10k
+  # updates without needing a Nix rebuild of the dev shell first.
+  _zdt="$RSM_FLAKE/shell/zdotdir"
+  [ -d "$_zdt" ] || _zdt="${RSM_ZDOTDIR_TEMPLATE:-}"
+  if [ -n "$_zdt" ] && [ -d "$_zdt" ]; then
+    cp -f "$_zdt/zshrc" "$zdotdir/.zshrc"
+    cp -f "$_zdt/p10k.zsh" "$zdotdir/.p10k.zsh"
     chmod u+w "$zdotdir/.zshrc" "$zdotdir/.p10k.zsh" 2>/dev/null || true
   fi
   echo "    zsh       : oh-my-zsh + powerlevel10k -> $zdotdir (ZDOTDIR)"
