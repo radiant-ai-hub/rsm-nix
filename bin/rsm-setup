@@ -63,13 +63,21 @@ cat > "$RSM_WORKSPACE/.vscode/settings.json" <<EOF
   "terminal.integrated.fontFamily": "MesloLGS NF"
 }
 EOF
-if [ ! -f "$RSM_WORKSPACE/.vscode/extensions.json" ]; then
-  cat > "$RSM_WORKSPACE/.vscode/extensions.json" <<'EOF'
+# Recommended extensions come from the curated vscode/extensions.txt in the
+# flake, so the workspace recommends the same set the installer installs (these
+# also drive extension install in the Remote-WSL / Remote-SSH host). Refreshed
+# every run; falls back to the essentials if the list is missing.
+_ext_file="$RSM_FLAKE/vscode/extensions.txt"
+if [ -f "$_ext_file" ]; then
+  _recs="$(sed -e 's/#.*//' -e 's/[[:space:]]//g' "$_ext_file" | grep -v '^$' | sed 's/.*/"&"/' | paste -sd, -)"
+else
+  _recs='"mkhl.direnv", "ms-python.python", "ms-toolsai.jupyter", "quarto.quarto"'
+fi
+cat > "$RSM_WORKSPACE/.vscode/extensions.json" <<EOF
 {
-  "recommendations": ["mkhl.direnv", "ms-python.python", "ms-toolsai.jupyter", "quarto.quarto"]
+  "recommendations": [$_recs]
 }
 EOF
-fi
 
 mkdir -p \
   "$RSMBASE/envs" \

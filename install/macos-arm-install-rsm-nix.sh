@@ -10,14 +10,16 @@ SKIP_VSCODE=0
 SKIP_WORKSPACE_SETUP=0
 DRY_RUN=0
 
+# Fallback extension list, used only if vscode/extensions.txt can't be fetched.
+# The curated list lives in vscode/extensions.txt in the repo.
 VSCODE_EXTENSIONS=(
   "ms-python.python"
   "ms-toolsai.jupyter"
   "quarto.quarto"
   "mkhl.direnv"
   "pinage404.nix-extension-pack"
-
 )
+EXTENSIONS_URL_DEFAULT="https://raw.githubusercontent.com/radiant-ai-hub/rsm-nix/main/vscode/extensions.txt"
 
 usage() {
   cat <<'EOF'
@@ -100,6 +102,31 @@ expand_workspace_path() {
     \~/*) printf '%s/%s\n' "$HOME" "${WORKSPACE_PATH#\~/}" ;;
     *) printf '%s\n' "$WORKSPACE_PATH" ;;
   esac
+}
+
+extensions_url() {
+  # Raw URL of vscode/extensions.txt in the repo being installed from.
+  case "$REPO_URL" in
+    https://github.com/*)
+      local path="${REPO_URL#https://github.com/}"
+      path="${path%.git}"
+      printf 'https://raw.githubusercontent.com/%s/main/vscode/extensions.txt\n' "$path"
+      ;;
+    *)
+      printf '%s\n' "$EXTENSIONS_URL_DEFAULT"
+      ;;
+  esac
+}
+
+desired_vscode_extensions() {
+  # One extension id per line: the curated vscode/extensions.txt, or the
+  # built-in fallback if it can't be fetched. Strips comments and blank lines.
+  local text
+  if text="$(curl -fsSL "$(extensions_url)" 2>/dev/null)" && [ -n "$text" ]; then
+    printf '%s\n' "$text" | sed 's/#.*//;s/[[:space:]]//g' | grep -v '^$'
+  else
+    printf '%s\n' "${VSCODE_EXTENSIONS[@]}"
+  fi
 }
 
 ensure_supported_system() {
@@ -202,9 +229,9 @@ install_vscode() {
   if [ "$DRY_RUN" -eq 1 ]; then
     log_detail "[dry-run] Verifying VS Code ARM64 download URL."
     test "$(curl -I -L -s -o /dev/null -w '%{http_code}' "$vscode_url")" = "200"
-    for extension in "${VSCODE_EXTENSIONS[@]}"; do
-      log_detail "[dry-run] Would install VS Code extension $extension"
-    done
+    local count
+    count="$(desired_vscode_extensions | wc -l | tr -d ' ')"
+    log_detail "[dry-run] Would install $count VS Code extensions from extensions.txt."
     return
   fi
 
@@ -240,10 +267,12 @@ install_vscode() {
     exit 1
   fi
 
-  for extension in "${VSCODE_EXTENSIONS[@]}"; do
+  while IFS= read -r extension; do
+    [ -n "$extension" ] || continue
     log_detail "Installing VS Code extension $extension..."
-    "$code_command" --install-extension "$extension" --force
-  done
+    "$code_command" --install-extension "$extension" --force \
+      || log_detail "  could not install $extension; continuing."
+  done < <(desired_vscode_extensions)
 }
 
 install_nix() {

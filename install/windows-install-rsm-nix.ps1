@@ -30,6 +30,8 @@ $ProgressPreference = "SilentlyContinue"
 # honored by WSL 0.64+ (every current Windows 11 build).
 $env:WSL_UTF8 = "1"
 
+# Fallback extension list, used only if vscode/extensions.txt can't be fetched
+# (offline, etc.). The curated list lives in vscode/extensions.txt in the repo.
 $VSCodeExtensions = @(
     "ms-vscode-remote.remote-wsl",
     "ms-python.python",
@@ -39,6 +41,33 @@ $VSCodeExtensions = @(
 )
 
 $UbuntuDistributionInfoUrl = "https://raw.githubusercontent.com/microsoft/WSL/master/distributions/DistributionInfo.json"
+
+function Get-ExtensionsUrl {
+    # Raw URL of vscode/extensions.txt in the repo being installed from.
+    # Extensions are installed before the repo is cloned (and on Windows the
+    # clone lives inside WSL), so the list is fetched over HTTP.
+    if ($RepoUrl -match '^https://github\.com/(.+?)(\.git)?$') {
+        return "https://raw.githubusercontent.com/$($Matches[1])/main/vscode/extensions.txt"
+    }
+    return "https://raw.githubusercontent.com/radiant-ai-hub/rsm-nix/main/vscode/extensions.txt"
+}
+
+function Get-DesiredVSCodeExtensions {
+    try {
+        $text = (Invoke-WebRequest -Uri (Get-ExtensionsUrl) -UseBasicParsing).Content
+        $list = @(
+            ($text -replace "`0", "") -split "`r?`n" |
+                ForEach-Object { $_.Trim() } |
+                Where-Object { $_ -and -not $_.StartsWith("#") }
+        )
+        if ($list.Count -gt 0) {
+            return $list
+        }
+    } catch {
+        Write-Detail "Could not fetch extensions.txt ($($_.Exception.Message)); using the built-in list."
+    }
+    return $VSCodeExtensions
+}
 
 function Write-BlankLine {
     Write-Host ""
@@ -254,9 +283,8 @@ function Install-VSCodeAndExtensions {
         if ($package -notmatch "Microsoft\.VisualStudioCode") {
             throw "winget could not resolve Microsoft.VisualStudioCode."
         }
-        foreach ($extension in $VSCodeExtensions) {
-            Write-Detail "[dry-run] Would install VS Code extension $extension"
-        }
+        $extensions = Get-DesiredVSCodeExtensions
+        Write-Detail "[dry-run] Would install $($extensions.Count) VS Code extensions from extensions.txt."
         Write-BlankLine
         return
     }
@@ -291,11 +319,13 @@ function Install-VSCodeAndExtensions {
         throw "VS Code installed, but the 'code' command was not found in expected locations."
     }
 
-    foreach ($extension in $VSCodeExtensions) {
-        Write-Detail "Installing VS Code extension $extension..."
+    $extensions = Get-DesiredVSCodeExtensions
+    Write-Detail "Installing $($extensions.Count) VS Code extensions..."
+    foreach ($extension in $extensions) {
+        Write-Detail "  $extension"
         & $codeCommand --install-extension $extension --force | Out-Host
         if ($LASTEXITCODE -ne 0) {
-            throw "Failed to install VS Code extension $extension."
+            Write-Detail "  could not install $extension; continuing."
         }
     }
 
