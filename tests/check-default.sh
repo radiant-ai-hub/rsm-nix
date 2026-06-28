@@ -32,6 +32,19 @@ check_cmd "uv --version"       uv --version
 check_cmd "psql --version"     psql --version
 check_cmd "pgweb --version"    pgweb --version
 
+echo "== node / claude code =="
+# Node is pinned by the flake; npm is how Claude Code is installed/updated.
+check_cmd "node --version"     node --version
+check_cmd "npm --version"      npm --version
+# Claude Code is installed per-user by rsm-setup (not part of the Nix env), so
+# verify it only when present — this catches a broken Node/Claude combo in CI
+# (where rsm-setup has run) without failing a bare check before setup.
+if have claude; then
+  check_cmd "claude --version" claude --version
+else
+  printf '  \033[33mskip\033[0m %s\n' "claude not installed yet (run rsm-setup / rsm-update)"
+fi
+
 echo "== rsm commands present =="
 for c in rsm-setup rsm-python-sync rsm-pg-init rsm-pg-start rsm-pg-stop \
          rsm-pg-status rsm-pg-psql rsm-pgweb rsm-new-course; do

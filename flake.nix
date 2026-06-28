@@ -300,6 +300,7 @@
               git
               git-lfs
               gh
+              nodejs_22
               coreutils
               gnugrep
             ]);
