@@ -228,6 +228,57 @@ Two layers that are easy to conflate:
 Either way the instructor’s personal machines are never exposed, and
 home directories are always protected by the server, not by Tailscale.
 
+### Step by step: node sharing (good for the TA pilot on sc1)
+
+For a handful of testers this is just a few clicks.
+
+**Instructor — once per person (Tailscale admin console):**
+
+1.  Make sure the server is in your tailnet and powered on
+    (e.g. `sc1-nixos`).
+2.  Open <https://login.tailscale.com/admin/machines>.
+3.  Find the server’s row, click its `...` menu, choose **Share**.
+4.  Enter the person’s email (the one they will use for *their own*
+    Tailscale account) and send it. Tailscale emails them an invite /
+    gives you a link. That single share-per-person is the only “tedious”
+    part, and only at scale.
+
+**TA / student — once:**
+
+1.  Install Tailscale (Windows or macOS app from
+    <https://tailscale.com/download>).
+2.  Sign in with **their own** account (this creates their own free
+    tailnet).
+3.  Open the invite and **Accept** — the server now appears in their
+    Tailscale machine list. Confirm Tailscale shows **Connected**.
+
+**Connecting to the server (the two paths Windows students use):**
+
+- **VS Code on Windows, Remote-SSH — simplest.** With the Tailscale
+  Windows app running, the server is reachable. In VS Code: *Remote-SSH
+  -\> Connect to Host* using `<their-username>@<server>`, where
+  `<server>` is the address shown for it in their Tailscale app (its
+  `100.x` IP always works; the MagicDNS name works once the share is
+  accepted). No WSL is needed for server access.
+
+- **From inside WSL (e.g. `ssh <server>` in a WSL terminal).** WSL2 does
+  not see the Windows Tailscale interface by default. Turn on **mirrored
+  networking** so WSL shares the Windows network (including Tailscale):
+  create/edit `C:\Users\<you>\.wslconfig` with
+
+  ``` ini
+  [wsl2]
+  networkingMode=mirrored
+  ```
+
+  then run `wsl --shutdown` and reopen. After that, `ssh <server>` from
+  WSL works. (Alternative: install Tailscale *inside* WSL as its own
+  node — more setup, and it reintroduces the CGNAT issue above, so
+  prefer mirrored networking.)
+
+macOS students install the Tailscale app, sign in, accept the share,
+then use VS Code Remote-SSH the same way.
+
 ### Before rollout — confirm on UCSD‑Protected
 
 1.  Note a laptop’s address on UCSD‑Protected (`ip addr` / `ipconfig`)
