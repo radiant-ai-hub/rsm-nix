@@ -14,6 +14,36 @@ echo "Git configuration set:"
 echo "  Name : $(git config --global user.name)"
 echo "  Email: $(git config --global user.email)"
 
+# --- GitHub username -------------------------------------------------------
+# Coursework expects your GitHub account to be named after your UCSD username:
+#   rsm-<the part of your email before @ucsd.edu>
+# Check whether that account exists; if not, rename your GitHub account to it.
+gh_user="rsm-${git_email%@ucsd.edu}"
+echo
+echo "Checking GitHub username '$gh_user' ..."
+gh_status=""
+if command -v curl >/dev/null 2>&1; then
+  gh_status="$(curl -s -o /dev/null -w '%{http_code}' "https://api.github.com/users/$gh_user" 2>/dev/null || true)"
+fi
+case "$gh_status" in
+  200)
+    echo "  ✅ A GitHub account named '$gh_user' exists — make sure you are signed in to it."
+    ;;
+  404)
+    echo
+    echo "  ⚠️  ACTION NEEDED: there is no GitHub account named '$gh_user' yet."
+    echo "      Rename your GitHub account to claim it:"
+    echo "        1. Open:  https://github.com/settings/admin"
+    echo "        2. Click the 'Change username' button"
+    echo "        3. Enter your new username:  $gh_user"
+    echo
+    read -r -p "  Press Enter once your GitHub username is '$gh_user' (or to continue anyway): "
+    ;;
+  *)
+    echo "  (Could not check GitHub right now — confirm your username is '$gh_user' yourself.)"
+    ;;
+esac
+
 # --- SSH key ---------------------------------------------------------------
 if [ -f "$HOME/.ssh/id_ed25519" ]; then
   echo
