@@ -23,6 +23,13 @@ param(
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 
+# WSL's informational output (--list, --status, --help) is UTF-16 by default,
+# which corrupts text matching from PowerShell — e.g. an available distro like
+# Ubuntu-26.04 wrongly looking "absent", sending the installer down a fragile
+# fallback path. WSL_UTF8=1 makes WSL emit UTF-8 so parsing is reliable. It is
+# honored by WSL 0.64+ (every current Windows 11 build).
+$env:WSL_UTF8 = "1"
+
 $VSCodeExtensions = @(
     "ms-vscode-remote.remote-wsl",
     "ms-python.python",
@@ -123,7 +130,9 @@ function Get-InstalledWslDistros {
 function Test-WslOnlineDistroAvailable {
     param([string]$Name)
 
-    $online = & wsl.exe --list --online 2>$null | Out-String
+    # Strip any stray NULs (UTF-16 leftovers) before matching, mirroring
+    # Get-InstalledWslDistros, in case WSL_UTF8 is not honored on this build.
+    $online = (& wsl.exe --list --online 2>$null | Out-String) -replace "`0", ""
     if ($LASTEXITCODE -ne 0) {
         return $false
     }
@@ -333,18 +342,19 @@ function Install-UbuntuDistro {
         }
     }
 
-    if (Test-WslOnlineDistroAvailable -Name $DistroName) {
-        Write-Detail "Installing $DistroName from WSL online distro list..."
-        & wsl.exe --install -d $DistroName --web-download --no-launch
-        if ($LASTEXITCODE -ne 0) {
-            throw "Installing $DistroName failed. Reboot if Windows requested it, then rerun this installer."
-        }
-    } else {
+    # Preferred path: the documented `wsl --install -d <name>`, which is what
+    # works interactively (including Ubuntu-26.04 on Windows ARM). Only fall
+    # back to a downloaded .wsl image if that genuinely fails — e.g. an older
+    # WSL build, or the distro missing from the online catalog.
+    Write-Detail "Installing $DistroName via 'wsl --install -d'..."
+    & wsl.exe --install -d $DistroName --web-download --no-launch
+    if ($LASTEXITCODE -ne 0) {
+        Write-Detail "Direct install did not succeed; trying a downloaded Ubuntu .wsl image..."
         $image = Get-UbuntuWslImageInfo -Name $DistroName
         $imagePath = Download-UbuntuWslImage -ImageInfo $image
         $help = & wsl.exe --help | Out-String
         if ($help -notmatch "--from-file") {
-            throw "$DistroName is not listed by WSL, and this WSL version does not support installing .wsl files. Run 'wsl --update --web-download', reboot, and rerun."
+            throw "Could not install $DistroName, and this WSL version cannot install .wsl files. Run 'wsl --update --web-download', reboot, and rerun."
         }
 
         Write-Detail "Installing $DistroName from Ubuntu .wsl image..."

@@ -105,23 +105,42 @@
       # specific script body, wrapped so its runtime tools are always on PATH.
       rsmEnvHeader = builtins.readFile ./bin/rsm-env.sh;
 
-      # On Linux the uv base env uses the Nix Python interpreter, whose loader
-      # does not search system lib dirs. manylinux wheels (numpy, xgboost, ...)
-      # therefore need libstdc++/libgomp/zlib on LD_LIBRARY_PATH on EVERY Linux
-      # (Ubuntu included), not just NixOS. Baked into the env header so it
-      # applies whether a command runs in the dev shell, via direnv, or `nix run`.
-      ldLibHook = pkgs: pkgs.lib.optionalString pkgs.stdenv.isLinux ''
-        export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc.lib pkgs.zlib ]}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-      '';
+      # Native runtime + build environment for the uv-installed Python wheels.
+      # Applied wherever rsm-* commands run — the dev shell, direnv, or `nix run`
+      # — so behaviour is identical on a laptop, in WSL, and on the server.
+      #
+      #  * Linux runtime: the uv env uses the Nix CPython, whose loader does not
+      #    search system lib dirs, so manylinux wheels (numpy, xgboost, ...) need
+      #    libstdc++/libgomp/zlib on LD_LIBRARY_PATH on EVERY Linux, not just NixOS.
+      #  * Linux build: some deps ship no aarch64 wheel (scikit-misc, pulled in by
+      #    pyrsm) and are compiled from source on Windows-ARM/WSL + ARM Linux.
+      #    Point pkg-config at the Nix CPython so meson uses its Python headers
+      #    instead of a stray system python (an incomplete /usr python3.14-dev
+      #    otherwise hijacks the build and fails it).
+      #  * macOS runtime: the xgboost wheel links @rpath/libomp.dylib but only
+      #    searches Homebrew paths; expose the Nix OpenMP runtime as a fallback so
+      #    xgboost imports without `brew install libomp`.
+      nativeEnvHook = pkgs:
+        pkgs.lib.optionalString pkgs.stdenv.isLinux ''
+          export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc.lib pkgs.zlib ]}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          export PKG_CONFIG_PATH="${pkgs.python313}/lib/pkgconfig''${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+        '' + pkgs.lib.optionalString pkgs.stdenv.isDarwin ''
+          export DYLD_FALLBACK_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [ pkgs.llvmPackages.openmp ]}''${DYLD_FALLBACK_LIBRARY_PATH:+:$DYLD_FALLBACK_LIBRARY_PATH}"
+        '';
 
       mkRsmScripts = pkgs:
         let
           mk = name: runtimeInputs: pkgs.writeShellApplication {
             inherit name runtimeInputs;
             excludeShellChecks = [ "SC1090" "SC1091" "SC2164" ];
-            text = rsmEnvHeader + "\n" + ldLibHook pkgs + builtins.readFile (./bin + "/${name}");
+            text = rsmEnvHeader + "\n" + nativeEnvHook pkgs + builtins.readFile (./bin + "/${name}");
           };
-          pythonSync = mk "rsm-python-sync" [ pkgs.uv pkgs.python313 pkgs.coreutils ];
+          # On Linux, deps without an aarch64 wheel (scikit-misc) are compiled
+          # from source, so rsm-python-sync needs a C/Fortran toolchain +
+          # pkg-config on PATH. gfortran's wrapper bundles cc/gcc/g++ too.
+          pythonSync = mk "rsm-python-sync"
+            ([ pkgs.uv pkgs.python313 pkgs.coreutils ]
+              ++ pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.gfortran pkgs.pkg-config ]);
           pgInit = mk "rsm-pg-init" [ pkgs.postgresql_16 pkgs.coreutils ];
 
           # Assembled oh-my-zsh + powerlevel10k + plugins for the rsm-msba ZDOTDIR
@@ -146,7 +165,7 @@
             name = "rsm-setup";
             runtimeInputs = [ pythonSync pkgs.uv pkgs.python313 pkgs.coreutils pkgs.git ];
             excludeShellChecks = [ "SC1090" "SC1091" "SC2164" ];
-            text = rsmEnvHeader + "\n" + ldLibHook pkgs + ''
+            text = rsmEnvHeader + "\n" + nativeEnvHook pkgs + ''
               export RSM_OMZ_SRC="${zshOmz}"
               export RSM_ZDOTDIR_TEMPLATE="${./shell/zdotdir}"
             '' + builtins.readFile ./bin/rsm-setup;
@@ -206,13 +225,18 @@
             gnused
             gnugrep
             which
+          ] ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
+            # C/Fortran toolchain for source-built wheels that ship no aarch64
+            # wheel (scikit-misc). gfortran's wrapper provides cc/gcc/g++ too.
+            pkgs.gfortran
+            pkgs.pkg-config
           ] ++ rsmScriptList;
 
           baseHook = ''
             ${rsmEnvHeader}
             export SSL_CERT_FILE="''${SSL_CERT_FILE:-${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt}"
             export NIX_SSL_CERT_FILE="''${NIX_SSL_CERT_FILE:-$SSL_CERT_FILE}"
-          '' + ldLibHook pkgs + ''
+          '' + nativeEnvHook pkgs + ''
             ${builtins.readFile ./shell/rsm-shell-hook.sh}
           '';
 
@@ -271,7 +295,7 @@
               gnugrep
             ]);
             excludeShellChecks = [ "SC1090" "SC1091" "SC2164" ];
-            text = rsmEnvHeader + "\n" + ldLibHook pkgs + builtins.readFile ./tests/check-default.sh;
+            text = rsmEnvHeader + "\n" + nativeEnvHook pkgs + builtins.readFile ./tests/check-default.sh;
           };
         in
         {
