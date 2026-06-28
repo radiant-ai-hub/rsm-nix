@@ -534,6 +534,37 @@ function Invoke-WslBash {
     }
 }
 
+function Initialize-WslDistro {
+    if ($DryRun) {
+        return
+    }
+
+    # A freshly registered distro — especially after an unregister/reinstall, or
+    # one installed with --no-launch — often can't run a command on the very
+    # first try: "Wsl/Service/CreateInstance/E_UNEXPECTED". Reset the WSL service
+    # and warm the distro up (as root, which bypasses the interactive first-run)
+    # with a few retries before we configure it.
+    Write-Section "Preparing $DistroName for first use..."
+    & wsl.exe --shutdown 2>$null
+    Start-Sleep -Seconds 2
+
+    for ($attempt = 1; $attempt -le 8; $attempt++) {
+        & wsl.exe -d $DistroName --user root -- true 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Detail "$DistroName is ready."
+            Write-BlankLine
+            return
+        }
+        Write-Detail "Waiting for $DistroName to become ready (attempt $attempt)..."
+        if ($attempt -eq 4) {
+            & wsl.exe --shutdown 2>$null
+        }
+        Start-Sleep -Seconds 3
+    }
+
+    throw "Could not start $DistroName (Wsl/Service/CreateInstance/E_UNEXPECTED). Run 'wsl --shutdown' (and reboot Windows if it persists), then rerun this installer."
+}
+
 function Configure-UbuntuUser {
     Write-Section "Step 4: Configuring Ubuntu user..."
 
@@ -710,6 +741,7 @@ Install-VSCodeAndExtensions
 Install-NerdFont
 Ensure-WslFeature
 Install-UbuntuDistro
+Initialize-WslDistro
 Configure-UbuntuUser
 Install-RsmWorkspace
 
