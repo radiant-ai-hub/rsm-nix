@@ -53,17 +53,37 @@ The server side needs nothing special for this — `services.tailscale.enable = 
 is enough; the fix lives in the **tailnet policy** (IP pool), so it applies to
 every node at once.
 
-### Onboarding students — single tailnet vs. node sharing
+### What students can and can't reach (isolation)
 
-- **One org tailnet + SSO + ACLs (recommended if budget allows).** Students sign
-  in with UCSD identity, join the tailnet, and an ACL limits them to the server's
-  SSH/HTTPS ports only (tag the server `tag:msba-server`, put students in
-  `group:students`). Centrally managed; students just run `tailscale up` and log
-  in. Note the free tier is limited on **users** (not just devices), so a cohort
-  needs a paid plan.
-- **Node sharing.** Share the server node into each student's own (free) tailnet.
-  Avoids the per‑user cost but is per‑student tedium and pushes tailnet management
-  onto each student.
+Two layers that are easy to conflate:
+
+- **Tailscale is a private network path to a machine — not file access.** It lets
+  a laptop *reach* the server; it does not log anyone in or open any files. On the
+  server every student is a separate account with a private home directory (same
+  as today), so reaching the server over Tailscale never lets one student read
+  another's files — the server's OS enforces that, independent of Tailscale.
+- **Student-to-student network isolation** is a separate control: either an ACL
+  (single-tailnet model) or simply keeping students in separate tailnets
+  (node-sharing model). Students never need to be on the instructor's *personal*
+  tailnet either way.
+
+### Onboarding students — dedicated tailnet vs. node sharing
+
+- **Dedicated MSBA tailnet + SSO + ACLs (recommended at class scale).** Create a
+  *separate* tailnet for the course (not your personal one). Students sign in with
+  UCSD identity; an ACL limits them to the server's SSH/HTTPS ports and blocks
+  student-to-student traffic — tag the server `tag:msba-server`, put students in
+  `group:students`, and allow only `group:students -> tag:msba-server:[22,443]`.
+  Students just run `tailscale up` and log in. The free tier is limited on
+  **users** (not just devices), so a cohort needs a paid plan.
+- **Node sharing (simplest for a few users).** "Sharing" a node gives one student
+  access to *only* the server. The student stays in **their own** tailnet — they
+  never join yours and never see your other machines — and because each student is
+  in a separate tailnet, students can't see each other either. Trade-off: it is
+  one share **per student**, so it is tedious for a large cohort.
+
+Either way the instructor's personal machines are never exposed, and home
+directories are always protected by the server, not by Tailscale.
 
 ### Before rollout — confirm on UCSD‑Protected
 
