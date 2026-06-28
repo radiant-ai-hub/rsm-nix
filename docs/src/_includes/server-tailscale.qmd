@@ -1,0 +1,80 @@
+## Reaching the MSBA server (Tailscale and the UCSD‑Protected "100.x" issue)
+
+Students need to reach the MSBA server (e.g. `sc2` / `rsm-compute-02`) from their
+laptops for both SSH and the course web apps. The campus VPN is the "official"
+path but is unreliable, so Tailscale is the preferred fallback. There is one
+campus‑networking gotcha worth recording.
+
+### What was happening
+
+The server's services live on the **campus data‑net** (public `132.249.x`
+addresses) — for example the Django app `https://rsm-django-02.ucsd.edu`
+(`132.249.225.82`, reverse‑proxied by Caddy) and SSH on `rsm-compute-02.ucsd.edu`
+(`132.249.225.85`). Students on the **UCSD‑Protected** Wi‑Fi could not load those
+pages.
+
+The cause is campus segmentation: **UCSD‑Protected is a CGNAT network** that hands
+clients addresses in `100.64.0.0/10` and does **not** route to the research /
+data‑net, so a direct hit to `132.249.x` is dropped. (Hence the "it's something
+about `100` IPs" memory — the `100.x` is UCSD‑Protected's client range, not the
+server's.)
+
+### Why Tailscale doesn't "just work" there — and the fix
+
+The server is also published over Tailscale (its tailnet IP serves `:443` too), so
+Tailscale would normally bypass the segmentation. **But Tailscale also uses
+`100.64.0.0/10`** for tailnet IPs. On UCSD‑Protected the laptop already holds a
+`100.x` address and route, so it **collides** with Tailscale's range and traffic
+to the server's `100.x` can be sent to the local Wi‑Fi interface instead of
+`tailscale0`. This is Tailscale's documented **CGNAT conflict**.
+
+It is fixable, so **student‑level Tailscale is viable**. In order of preference:
+
+1. **Restrict the tailnet to a non‑overlapping IP pool.** In the tailnet policy
+   file, pin nodes (including the server) to a `/16` inside `100.64.0.0/10` that
+   UCSD‑Protected does *not* use, e.g.:
+
+   ```json
+   { "nodeAttrs": [ { "target": ["*"], "ipPool": ["100.81.0.0/16"] } ] }
+   ```
+
+   The server's tailnet IP then no longer falls in the client's local `100.x`
+   subnet, so the more‑specific local route stops shadowing it and routing to the
+   server works. (IP pool is in beta; `100.100.0.0/24`, `100.100.100.0/24`, and
+   `100.115.92.0/23` are reserved and can't be used.)
+2. **Address the server by MagicDNS name**, not the raw `100.x` IP (e.g.
+   `sc2.<tailnet>.ts.net`), so Tailscale resolves and routes it in userspace
+   rather than relying on the conflicting IPv4 route. This is also why
+   `~/.ssh/config` uses short MagicDNS names with a campus‑DNS fallback alias.
+3. **Last resort — IPv6‑only.** The `disable-ipv4` node attribute removes the v4
+   conflict entirely, at the cost of any IPv4‑only resources.
+
+The server side needs nothing special for this — `services.tailscale.enable = true`
+is enough; the fix lives in the **tailnet policy** (IP pool), so it applies to
+every node at once.
+
+### Onboarding students — single tailnet vs. node sharing
+
+- **One org tailnet + SSO + ACLs (recommended if budget allows).** Students sign
+  in with UCSD identity, join the tailnet, and an ACL limits them to the server's
+  SSH/HTTPS ports only (tag the server `tag:msba-server`, put students in
+  `group:students`). Centrally managed; students just run `tailscale up` and log
+  in. Note the free tier is limited on **users** (not just devices), so a cohort
+  needs a paid plan.
+- **Node sharing.** Share the server node into each student's own (free) tailnet.
+  Avoids the per‑user cost but is per‑student tedium and pushes tailnet management
+  onto each student.
+
+### Before rollout — confirm on UCSD‑Protected
+
+1. Note a laptop's address on UCSD‑Protected (`ip addr` / `ipconfig`) to learn the
+   exact `100.x` subnet campus hands out.
+2. Pick an `ipPool` `/16` clearly outside that subnet and set it in the policy
+   file.
+3. Test end‑to‑end from UCSD‑Protected: `tailscale status`, SSH to the server's
+   MagicDNS name, and load a course web app over Tailscale.
+
+References: Tailscale
+[CGNAT conflicts](https://tailscale.com/docs/reference/troubleshooting/network-configuration/cgnat-conflicts),
+[IP pool](https://tailscale.com/kb/1304/ip-pool),
+[Tailscale IP addresses](https://tailscale.com/docs/concepts/tailscale-ip-addresses).
