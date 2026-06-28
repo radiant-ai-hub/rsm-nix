@@ -430,9 +430,30 @@ function Download-UbuntuWslImage {
     New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null
     $imagePath = Join-Path $cacheDir (Split-Path -Leaf $ImageInfo.Url)
 
+    # Drop any stale/partial cached copy so we fetch cleanly.
+    if (Test-Path $imagePath) {
+        $cachedHash = (Get-FileHash -Path $imagePath -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($cachedHash -ne $ImageInfo.Sha256) {
+            Remove-Item -Path $imagePath -Force -ErrorAction SilentlyContinue
+        }
+    }
+
     if (-not (Test-Path $imagePath)) {
-        Write-Detail "Downloading Ubuntu WSL image for $($ImageInfo.Architecture)..."
-        Invoke-WebRequest -Uri $ImageInfo.Url -OutFile $imagePath
+        Write-Detail "Downloading the Ubuntu WSL image (~hundreds of MB) for $($ImageInfo.Architecture)..."
+        # Prefer curl.exe (bundled with Windows 10/11): far faster and more
+        # robust than Invoke-WebRequest for large files. --speed-time aborts a
+        # stalled transfer (the "hangs at 0%" case) so --retry can restart it.
+        $curl = Get-CommandPathOrNull "curl.exe"
+        if ($curl) {
+            & $curl -L --fail --retry 5 --retry-all-errors --retry-delay 3 `
+                --speed-limit 2048 --speed-time 30 -o $imagePath $ImageInfo.Url
+            if ($LASTEXITCODE -ne 0) {
+                Remove-Item -Path $imagePath -Force -ErrorAction SilentlyContinue
+                throw "Downloading the Ubuntu image failed (curl exit $LASTEXITCODE). Check your network / VPN / proxy and rerun."
+            }
+        } else {
+            Invoke-WebRequest -Uri $ImageInfo.Url -OutFile $imagePath
+        }
     }
 
     $actualHash = (Get-FileHash -Path $imagePath -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -473,14 +494,19 @@ function Install-UbuntuDistro {
         }
     }
 
-    # Preferred path: the documented `wsl --install -d <name>`, which is what
-    # works interactively (including Ubuntu-26.04 on Windows ARM). Only fall
-    # back to a downloaded .wsl image if that genuinely fails — e.g. an older
-    # WSL build, or the distro missing from the online catalog.
+    # Try the plain `wsl --install -d <name>` first — it's what works
+    # interactively (incl. Ubuntu-26.04 on Windows ARM) and lets WSL pick the
+    # best source. If it fails, force a web download; only if that also fails do
+    # we fetch the .wsl image directly (via curl, which is more robust than
+    # WSL's own downloader when it times out / stalls).
     Write-Detail "Installing $DistroName via 'wsl --install -d'..."
-    & wsl.exe --install -d $DistroName --web-download --no-launch
+    & wsl.exe --install -d $DistroName --no-launch
     if ($LASTEXITCODE -ne 0) {
-        Write-Detail "Direct install did not succeed; trying a downloaded Ubuntu .wsl image..."
+        Write-Detail "Retrying with --web-download..."
+        & wsl.exe --install -d $DistroName --web-download --no-launch
+    }
+    if ($LASTEXITCODE -ne 0) {
+        Write-Detail "Online install did not succeed; downloading the Ubuntu .wsl image directly..."
         $image = Get-UbuntuWslImageInfo -Name $DistroName
         $imagePath = Download-UbuntuWslImage -ImageInfo $image
         $help = & wsl.exe --help | Out-String
