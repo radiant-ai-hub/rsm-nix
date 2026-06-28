@@ -127,6 +127,55 @@ function Get-InstalledWslDistros {
     )
 }
 
+function Get-WslDistroVersion {
+    param([string]$Name)
+
+    # `wsl -l -v` columns are NAME / STATE / VERSION (the default distro carries
+    # a leading '*'). Returns "1", "2", or $null when it can't be determined.
+    $lines = ((& wsl.exe --list --verbose 2>$null | Out-String) -replace "`0", "") -split "`r?`n"
+    foreach ($line in $lines) {
+        $fields = ($line -replace "^\*", "").Trim() -split "\s+"
+        if ($fields.Count -ge 3 -and $fields[0] -eq $Name) {
+            return $fields[-1]
+        }
+    }
+    return $null
+}
+
+function Set-WslDistroToV2 {
+    param([string]$Name)
+
+    # Distros from `wsl --install` are already WSL2 (we set the default version
+    # to 2 before installing), so only CONVERT when the distro is actually v1.
+    # Calling `--set-version <name> 2` on an already-v2 distro fails with
+    # WSL_E_VM_MODE_INVALID_STATE, so never force it.
+    $version = Get-WslDistroVersion -Name $Name
+    if ($version -eq "2") {
+        Write-Detail "$Name is already WSL2."
+        return
+    }
+    if ($version -eq "1") {
+        Write-Detail "Converting $Name to WSL2..."
+        & wsl.exe --set-version $Name 2
+        if ($LASTEXITCODE -ne 0) {
+            throw "Could not convert $Name to WSL2."
+        }
+        return
+    }
+    Write-Detail "Could not read $Name's WSL version; assuming WSL2 (default version is 2)."
+}
+
+function Set-WslDefaultDistro {
+    param([string]$Name)
+
+    # Make this the default distro so plain `wsl` and VS Code's 'Connect to WSL'
+    # target it. Non-fatal: the installer always addresses the distro by name.
+    & wsl.exe --set-default $Name 2>$null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Detail "$Name set as the default WSL distro."
+    }
+}
+
 function Test-WslOnlineDistroAvailable {
     param([string]$Name)
 
@@ -336,7 +385,8 @@ function Install-UbuntuDistro {
             Invoke-CheckedCommand "wsl.exe" @("--unregister", $DistroName) "Could not unregister existing $DistroName."
         } else {
             Write-Detail "$DistroName is already installed. Reusing it."
-            Invoke-CheckedCommand "wsl.exe" @("--set-version", $DistroName, "2") "Could not ensure $DistroName uses WSL2."
+            Set-WslDistroToV2 -Name $DistroName
+            Set-WslDefaultDistro -Name $DistroName
             Write-BlankLine
             return
         }
@@ -368,7 +418,8 @@ function Install-UbuntuDistro {
         }
     }
 
-    Invoke-CheckedCommand "wsl.exe" @("--set-version", $DistroName, "2") "Could not ensure $DistroName uses WSL2."
+    Set-WslDistroToV2 -Name $DistroName
+    Set-WslDefaultDistro -Name $DistroName
     Write-BlankLine
 }
 
