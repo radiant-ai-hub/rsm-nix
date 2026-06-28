@@ -436,9 +436,18 @@ function Invoke-WslBash {
         return
     }
 
+    # Transport the script as base64 instead of piping it to bash's stdin.
+    # Piping is fragile: PowerShell/wsl.exe stdin handling can reintroduce CRLF,
+    # which breaks heredocs ("here-document ... wanted 'EOF'") and appends stray
+    # \r to paths ("No such file or directory"). base64 round-trips the exact LF
+    # bytes, and running the decoded script from a pipe (not via the outer
+    # stdin) keeps the heredoc/stdin behaviour clean.
     $normalized = $Script -replace "`r`n", "`n"
-    $command = @("-d", $DistroName, "--user", $User, "--", "bash", "-se", "--") + $Arguments
-    $normalized | & wsl.exe @command
+    $b64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($normalized))
+    $argString = ($Arguments | ForEach-Object { "'" + ($_ -replace "'", "'\''") + "'" }) -join " "
+    $remote = "printf '%s' '$b64' | base64 -d | bash -s -- $argString"
+
+    & wsl.exe -d $DistroName --user $User -- bash -c $remote
     if ($LASTEXITCODE -ne 0) {
         throw "$Description failed."
     }
@@ -468,13 +477,7 @@ usermod -aG sudo "$wsl_user"
 printf '%s ALL=(ALL) NOPASSWD:ALL\n' "$wsl_user" >"/etc/sudoers.d/90-rsm-nix-$wsl_user"
 chmod 0440 "/etc/sudoers.d/90-rsm-nix-$wsl_user"
 
-cat >/etc/wsl.conf <<EOF
-[user]
-default=$wsl_user
-
-[boot]
-systemd=true
-EOF
+printf '%s\n' '[user]' "default=$wsl_user" '' '[boot]' 'systemd=true' >/etc/wsl.conf
 '@
 
     Invoke-WslBash -User "root" -Script $setupScript -Arguments @($script:EffectiveWslUser) -Description "Ubuntu base configuration"
@@ -501,7 +504,7 @@ flake="$HOME/rsm-nix"   # the flake repo (git pull to update)
 
 case "$workspace" in
   "~") workspace="$HOME" ;;
-  "~/"*) workspace="$HOME/${workspace#~/}" ;;
+  "~/"*) workspace="$HOME/${workspace#"~/"}" ;;
 esac
 
 if [ -e /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]; then
@@ -522,12 +525,20 @@ if ! command -v nix >/dev/null 2>&1; then
   exit 1
 fi
 
+# `nix profile install` is a deprecated alias for `nix profile add`; pick
+# whichever the installed Nix supports (Determinate Nix is recent enough).
+if nix profile add --help >/dev/null 2>&1; then
+  nix_profile_add="add"
+else
+  nix_profile_add="install"
+fi
+
 if ! command -v direnv >/dev/null 2>&1; then
-  nix profile install nixpkgs#direnv
+  nix profile "$nix_profile_add" nixpkgs#direnv
 fi
 
 if [ ! -e "$HOME/.nix-profile/share/nix-direnv/direnvrc" ]; then
-  nix profile install nixpkgs#nix-direnv
+  nix profile "$nix_profile_add" nixpkgs#nix-direnv
 fi
 
 mkdir -p "$HOME/.config/direnv"
