@@ -51,6 +51,15 @@ fi
 _rsm_zoxide_init() {
   command -v zoxide >/dev/null 2>&1 || return 1
   eval "$(zoxide init zsh)"
+  # zoxide is provided by the Nix env (direnv). When you cd OUT of the workspace
+  # direnv unloads it and zoxide leaves PATH, but zoxide's chpwd hook stays
+  # registered and would print "__zoxide_hook: command not found" on every cd
+  # (seen in a plain terminal; VS Code's direnv keeps the env loaded so it does
+  # not). Wrap the hook so it quietly no-ops when zoxide isn't on PATH.
+  if (( $+functions[__zoxide_hook] )); then
+    functions[__rsm_zoxide_hook_orig]=$functions[__zoxide_hook]
+    __zoxide_hook() { command -v zoxide >/dev/null 2>&1 && __rsm_zoxide_hook_orig "$@"; }
+  fi
   add-zsh-hook -d precmd _rsm_zoxide_init 2>/dev/null
 }
 _rsm_zoxide_init || add-zsh-hook precmd _rsm_zoxide_init
