@@ -35,3 +35,16 @@ export PGHOST="${PGHOST:-$RSMBASE/postgres/socket}"
 export PGPORT="${PGPORT:-$(( 8765 + $(id -u) % 1000 ))}"
 export PGDATABASE="${PGDATABASE:-rsm-msba}"
 export PGUSER="${PGUSER:-$(id -un)}"
+
+# Claude Code (and any other npm global) installs into a USER-WRITABLE prefix so
+# students and Claude can upgrade it themselves. It is intentionally NOT pinned
+# by the flake — it ships updates very frequently and self-updates — while Node
+# itself IS pinned by the flake. Put the prefix's bin on PATH so `claude` works.
+export NPM_CONFIG_PREFIX="${NPM_CONFIG_PREFIX:-$RSMBASE/npm}"
+# Keep the npm cache/logs workspace-local too, so npm never writes to ~/.npm
+# (preserves the "no host mutation" guarantee and stays per-user on the server).
+export NPM_CONFIG_CACHE="${NPM_CONFIG_CACHE:-$RSMBASE/npm-cache}"
+case ":$PATH:" in
+  *":$NPM_CONFIG_PREFIX/bin:"*) ;;
+  *) PATH="$NPM_CONFIG_PREFIX/bin:$PATH"; export PATH ;;
+esac

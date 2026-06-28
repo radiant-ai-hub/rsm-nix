@@ -163,7 +163,7 @@
           # the assembled zsh assets + the ZDOTDIR template it installs.
           rsm-setup = pkgs.writeShellApplication {
             name = "rsm-setup";
-            runtimeInputs = [ pythonSync pkgs.uv pkgs.python313 pkgs.coreutils pkgs.git ];
+            runtimeInputs = [ pythonSync pkgs.uv pkgs.python313 pkgs.coreutils pkgs.git pkgs.nodejs_22 ];
             excludeShellChecks = [ "SC1090" "SC1091" "SC2164" ];
             text = rsmEnvHeader + "\n" + nativeEnvHook pkgs + ''
               export RSM_OMZ_SRC="${zshOmz}"
@@ -173,6 +173,10 @@
           # Bootstrap/reset: clone the flake if missing, then rsm-setup. Lives on
           # the server PATH so `rm -rf ~/rsm-msba ~/rsm-nix && rsm-msba` recovers.
           rsm-msba = mk "rsm-msba" [ rsm-setup pkgs.coreutils ];
+          # `rsm-update` is a friendlier name for the same idempotent operation
+          # (pull the flake, re-sync, refresh shell/examples, update Claude Code
+          # to the latest). It sets RSM_CLAUDE_LATEST so Claude is bumped.
+          rsm-update = mk "rsm-update" [ rsm-setup pkgs.coreutils ];
           rsm-new-course = mk "rsm-new-course" [ pkgs.coreutils pkgs.gnugrep ];
           rsm-pg-start = mk "rsm-pg-start" [ pgInit pkgs.postgresql_16 pkgs.coreutils pkgs.gnugrep ];
           rsm-pg-stop = mk "rsm-pg-stop" [ pkgs.postgresql_16 pkgs.coreutils ];
@@ -220,6 +224,7 @@
             git
             git-lfs
             gh
+            nodejs_22 # Node runtime for Claude Code (installed per-user via npm)
             graphviz
             zsh
             eza # modern `ls` (ls/lsa/lt aliases in the rsm shell)

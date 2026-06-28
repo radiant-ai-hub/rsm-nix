@@ -1,0 +1,11 @@
+# rsm-update: bring the whole RSM-MSBA environment up to date — pull the flake,
+# re-sync the Python environment, refresh the shell/examples/README, and update
+# Claude Code to the latest release.
+#
+# This is the same idempotent operation as `rsm-setup` (it also sets things up
+# the first time), just under a name that reads more clearly as "update", with
+# Claude Code forced to the latest version via RSM_CLAUDE_LATEST.
+
+export RSM_CLAUDE_LATEST=1
+echo "==> rsm-update: updating the RSM-MSBA environment to the latest"
+exec rsm-setup

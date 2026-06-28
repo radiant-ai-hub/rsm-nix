@@ -169,5 +169,41 @@ if [ -d "$RSM_FLAKE/examples" ]; then
   echo "    examples  : refreshed $RSM_WORKSPACE/examples"
 fi
 
+# 5. README: a live shortcut to the flake's README, so the workspace always
+#    shows the current usage/testing docs (updated whenever the flake is pulled).
+#    A symlink (not a copy) keeps it in sync; it is a file, so there is no
+#    `cd`-into-the-flake problem like the examples folder had.
+if [ -f "$RSM_FLAKE/README.md" ]; then
+  ln -sfn "$RSM_FLAKE/README.md" "$RSM_WORKSPACE/README.md"
+  echo "    readme    : $RSM_WORKSPACE/README.md -> flake README"
+fi
+
+# 6. Claude Code: install into the user-writable npm prefix (NPM_CONFIG_PREFIX,
+#    set in rsm-env.sh) so students and Claude can upgrade it themselves. It is
+#    intentionally NOT pinned by the flake — it updates very frequently and
+#    self-updates — while Node IS pinned. Install if missing; `rsm-update` (which
+#    sets RSM_CLAUDE_LATEST) forces it to the latest. Non-fatal and time-bounded
+#    so a slow/absent network never blocks setup.
+if command -v npm >/dev/null 2>&1; then
+  mkdir -p "$NPM_CONFIG_PREFIX"
+  if ! command -v claude >/dev/null 2>&1; then
+    echo "    claude    : installing @anthropic-ai/claude-code (npm global)"
+    if timeout 180 npm install -g @anthropic-ai/claude-code >/dev/null 2>&1; then
+      echo "    claude    : $(claude --version 2>/dev/null || echo installed)"
+    else
+      echo "    claude    : skipped (offline or npm error; run 'rsm-update' later)"
+    fi
+  elif [ -n "${RSM_CLAUDE_LATEST:-}" ]; then
+    echo "    claude    : updating @anthropic-ai/claude-code to latest"
+    if timeout 180 npm install -g @anthropic-ai/claude-code@latest >/dev/null 2>&1; then
+      echo "    claude    : $(claude --version 2>/dev/null || echo updated)"
+    else
+      echo "    claude    : update skipped (offline or npm error)"
+    fi
+  else
+    echo "    claude    : $(claude --version 2>/dev/null || echo present)  (run 'rsm-update' to force latest)"
+  fi
+fi
+
 echo "==> Setup complete."
 echo "    Open $RSM_WORKSPACE in VS Code. Try: rsm-pg-start, then python or quarto."
