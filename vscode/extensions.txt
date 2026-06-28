@@ -30,4 +30,4 @@ tomoki1207.pdf
 cweijan.vscode-office
 nefrob.vscode-just-syntax
 davidanson.vscode-markdownlint
-vnijs.rsm-vscode
+vnijs.rsm-vscode-nix
