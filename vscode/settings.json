@@ -43,7 +43,6 @@
         "*": true
     },
     "github.copilot.nextEditSuggestions.enabled": true,
-    "python.defaultInterpreterPath": "/opt/base-uv/.venv/bin/python",
     "python.terminal.activateEnvironment": false,
     "python.terminal.activateEnvInCurrentTerminal": false,
     "python.testing.pytestEnabled": true,
@@ -70,7 +69,7 @@
     "cSpell.customDictionaries": {
       "custom-dictionary-user": {
         "name": "custom-dictionary-user",
-        "path": "~/rsm-msba/.rsm-msba/cspell/custom-dictionary-user.txt",
+        "path": "~/.config/cspell/custom-dictionary-user.txt",
         "addWords": true,
         "scope": "user"
       }
