@@ -33,8 +33,13 @@ run "quarto render quarto_report.qmd" quarto render quarto_report.qmd --quiet
 # Notebooks: execute them headlessly if jupyter/nbconvert is available. The
 # postgres notebook needs the DB, which the postgres step above started.
 if jupyter nbconvert --version >/dev/null 2>&1; then
+  # ipykernel 7 warns "Kernel is running over TCP without encryption ..." on
+  # every headless run. We're executing a trusted local notebook, so switch the
+  # kernel to IPC (Unix-socket) transport — the fix the warning itself suggests.
+  # Endpoint paths stay ~86 chars, well under the macOS 104-char socket limit.
   for nb in notebook_intro.ipynb notebook_pyrsm.ipynb notebook_postgres.ipynb; do
-    run "execute $nb" jupyter nbconvert --to notebook --execute --output-dir /tmp/rsm-nb "$nb"
+    run "execute $nb" jupyter nbconvert --to notebook --execute --output-dir /tmp/rsm-nb \
+      --KernelManager.transport=ipc "$nb"
   done
   rm -rf /tmp/rsm-nb
 else

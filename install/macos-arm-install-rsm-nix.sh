@@ -268,12 +268,55 @@ install_vscode() {
     exit 1
   fi
 
+  # NODE_NO_WARNINGS silences the Node deprecation noise (e.g. url.parse /
+  # DEP0169) that the VS Code 'code' CLI prints on every --install-extension.
   while IFS= read -r extension; do
     [ -n "$extension" ] || continue
     log_detail "Installing VS Code extension $extension..."
-    "$code_command" --install-extension "$extension" --force \
+    NODE_NO_WARNINGS=1 "$code_command" --install-extension "$extension" --force \
       || log_detail "  could not install $extension; continuing."
   done < <(desired_vscode_extensions)
+}
+
+install_nerd_font() {
+  # powerlevel10k draws its prompt with a Nerd Font. Install MesloLGS NF (p10k's
+  # recommended font) for the current user - no admin needed. VS Code's terminal
+  # is already pointed at it (.vscode/settings.json); for Terminal.app / iTerm2
+  # the student selects "MesloLGS NF" as the profile font. Non-fatal.
+  log_section "Checking MesloLGS Nerd Font"
+
+  local base fonts_dir
+  base="https://github.com/romkatv/powerlevel10k-media/raw/master"
+  fonts_dir="$HOME/Library/Fonts"
+  local files=(
+    "MesloLGS NF Regular.ttf"
+    "MesloLGS NF Bold.ttf"
+    "MesloLGS NF Italic.ttf"
+    "MesloLGS NF Bold Italic.ttf"
+  )
+
+  if [ "$DRY_RUN" -eq 1 ]; then
+    log_detail "[dry-run] Would install MesloLGS NF (4 styles) into $fonts_dir"
+    return
+  fi
+
+  mkdir -p "$fonts_dir"
+  local f dest url
+  for f in "${files[@]}"; do
+    dest="$fonts_dir/$f"
+    if [ -f "$dest" ]; then
+      log_detail "Font already present: $f"
+      continue
+    fi
+    url="$base/$(printf '%s' "$f" | sed 's/ /%20/g')"
+    if curl -fsSL -o "$dest" "$url"; then
+      log_detail "Installed $f"
+    else
+      log_detail "Could not download $f; continuing."
+      rm -f "$dest"
+    fi
+  done
+  log_detail "MesloLGS NF ready. In Terminal.app/iTerm2, set the profile font to 'MesloLGS NF'."
 }
 
 install_tailscale() {
@@ -335,18 +378,27 @@ configure_direnv() {
   log_section "Checking direnv and nix-direnv"
 
   source_nix_profile
+
+  # 'nix profile install' was renamed to 'add'; prefer 'add' when the Nix in use
+  # supports it, so it doesn't print "'install' is a deprecated alias for 'add'".
+  # Falls back to 'install' on older Nix.
+  local nix_add="install"
+  if nix profile add --help >/dev/null 2>&1; then
+    nix_add="add"
+  fi
+
   if [ "$DRY_RUN" -eq 1 ]; then
-    log_detail "[dry-run] Would run: nix profile install nixpkgs#direnv nixpkgs#nix-direnv"
-    log_detail "[dry-run] Would configure ~/.config/direnv/direnvrc and ~/.zshrc"
+    log_detail "[dry-run] Would run: nix profile $nix_add nixpkgs#direnv nixpkgs#nix-direnv"
+    log_detail "[dry-run] Would configure ~/.config/direnv/direnvrc and the managed ~/.zshrc block"
     return
   fi
 
   if ! command_exists direnv; then
-    nix profile install nixpkgs#direnv
+    nix profile "$nix_add" nixpkgs#direnv
   fi
 
   if [ ! -e "$HOME/.nix-profile/share/nix-direnv/direnvrc" ]; then
-    nix profile install nixpkgs#nix-direnv
+    nix profile "$nix_add" nixpkgs#nix-direnv
   fi
 
   mkdir -p "$HOME/.config/direnv"
@@ -355,11 +407,36 @@ configure_direnv() {
     printf '%s\n' 'source ~/.nix-profile/share/nix-direnv/direnvrc' >>"$HOME/.config/direnv/direnvrc"
   fi
 
+  # Managed ~/.zshrc block so EVERY terminal (Terminal.app, iTerm2, VS Code)
+  # loads direnv and auto-loads the full oh-my-zsh/powerlevel10k shell on
+  # entering ~/rsm-msba. The Nix-on-PATH line is a safety net for terminals
+  # (e.g. iTerm2) that don't pick up the system Nix shell snippet, which is the
+  # usual reason "nothing happens" there. Mirrors the Windows/WSL installer;
+  # idempotent via the marker.
   touch "$HOME/.zshrc"
-  # shellcheck disable=SC2016
-  if ! grep -Fqx 'eval "$(direnv hook zsh)"' "$HOME/.zshrc"; then
-    # shellcheck disable=SC2016
-    printf '\n%s\n' 'eval "$(direnv hook zsh)"' >>"$HOME/.zshrc"
+  if ! grep -Fq '# >>> rsm-msba (managed) >>>' "$HOME/.zshrc"; then
+    cat >>"$HOME/.zshrc" <<'ZRC'
+
+# >>> rsm-msba (managed) >>>
+# Nix on PATH (safety net; harmless if the system zsh config already does this).
+[ -e /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ] && \
+  . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+# direnv: load the per-folder rsm-msba Python environment automatically.
+command -v direnv >/dev/null 2>&1 && eval "$(direnv hook zsh)"
+# Load the full oh-my-zsh + powerlevel10k shell when you enter ~/rsm-msba.
+# (In VS Code the ZDOTDIR workspace setting loads it at startup instead.)
+_rsm_zsh_load() {
+  local zd="$HOME/rsm-msba/.rsm-msba/zsh"
+  if [[ -z ${_RSM_ZSH_LOADED:-} && -f "$zd/.zshrc" && ( $PWD == "$HOME/rsm-msba" || $PWD == "$HOME/rsm-msba"/* ) ]]; then
+    export _RSM_ZSH_LOADED=1 ZDOTDIR="$zd"
+    source "$zd/.zshrc"
+  fi
+}
+autoload -Uz add-zsh-hook
+add-zsh-hook chpwd _rsm_zsh_load
+_rsm_zsh_load
+# <<< rsm-msba (managed) <<<
+ZRC
   fi
 }
 
@@ -413,6 +490,7 @@ log_detail "Workspace: $(expand_workspace_path)"
 ensure_supported_system
 ensure_xcode_command_line_tools
 install_vscode
+install_nerd_font
 install_tailscale
 install_nix
 configure_direnv
