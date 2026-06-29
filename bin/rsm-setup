@@ -205,5 +205,14 @@ if command -v npm >/dev/null 2>&1; then
   fi
 fi
 
+# 7. Approve the generated workspace .envrc so entering ~/rsm-msba "just works"
+#    (no "direnv: .envrc is blocked" on first cd). rsm-setup wrote this .envrc
+#    itself, so auto-allowing our own generated file is safe.
+if command -v direnv >/dev/null 2>&1; then
+  if direnv allow "$RSM_WORKSPACE" 2>/dev/null; then
+    echo "    direnv    : allowed $RSM_WORKSPACE"
+  fi
+fi
+
 echo "==> Setup complete."
 echo "    Open $RSM_WORKSPACE in VS Code. Try: rsm-pg-start, then python or quarto."
