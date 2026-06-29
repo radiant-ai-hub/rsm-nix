@@ -224,6 +224,7 @@
             quarto
             postgresql_16
             pgweb
+            duckdb # the `duckdb` CLI (the Python `duckdb` package is separate, via uv)
             git
             git-lfs
             gh
