@@ -280,18 +280,41 @@ home directories are always protected by the server, not by Tailscale.
 macOS students install the Tailscale app, sign in, accept the share,
 then use VS Code Remote-SSH the same way.
 
-**Optional — restrict shared users to SSH/HTTPS only.** By default a
-shared user can reach the whole shared machine. To limit them to SSH
-(22) and HTTPS (443), add an ACL grant for `autogroup:shared` (the set
-of users you’ve shared with) in the tailnet policy file:
+### Restrict shared users to SSH only (recommended hardening)
+
+By default a shared user can reach **every** port on the machine shared
+to them — the default `"src": ["*"]` allow-all rule applies to shared
+users too. To limit them to **SSH only** (which still covers VS Code
+Remote-SSH), edit the tailnet policy so your own devices keep full
+access while shared users get **only TCP 22**:
 
 ``` json
 {
   "acls": [
-    { "action": "accept", "src": ["autogroup:shared"], "dst": ["sc1-nixos:22,443"] }
+    { "action": "accept", "src": ["autogroup:members"], "dst": ["*:*"] },
+    { "action": "accept", "src": ["autogroup:shared"],  "dst": ["*:22"] }
   ]
 }
 ```
+
+Why this is correct and reusable for every server:
+
+- The first rule replaces the default `"src": ["*"]` with
+  `autogroup:members`, so the blanket allow applies to **you and your
+  own devices only**, not to shared users. (If you also have *tagged*
+  devices that initiate connections, add rules for them.)
+- The second rule is then the *only* thing matching shared users, so
+  they get **port 22 and nothing else**.
+- `dst` is `*:22` on purpose — not a hostname or tag. **Sharing already
+  limits a recipient to the one machine you shared with them**, and
+  **tags/hostnames are stripped from shared nodes**, so the rule keys on
+  the *port*. That means it covers **sc1 today and sc2 the moment you
+  share it** — no per-server edit.
+
+To apply: Tailscale admin console -\> **Access controls** -\> merge in
+the two rules -\> **Save**. Shared TAs/students can then SSH (and use VS
+Code Remote-SSH) to the server, but can’t reach any other port or
+machine.
 
 ### Before rollout — confirm on UCSD‑Protected
 

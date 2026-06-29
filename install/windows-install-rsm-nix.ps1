@@ -383,6 +383,49 @@ function Install-NerdFont {
     Write-BlankLine
 }
 
+function Install-Tailscale {
+    # Tailscale lets students reach the MSBA server from any network (incl.
+    # UCSD-Protected) without the campus VPN. We install the app here; the
+    # student still has to sign in (their own account) and accept the
+    # instructor's share link — those are interactive and can't be automated.
+    Write-Section "Step 1c: Installing Tailscale..."
+
+    if ($DryRun) {
+        Write-Detail "[dry-run] Would install Tailscale (winget id Tailscale.Tailscale)."
+        Write-BlankLine
+        return
+    }
+
+    if (-not (Get-CommandPathOrNull "winget.exe")) {
+        Write-Detail "winget not found; skipping Tailscale (install from https://tailscale.com/download/windows)."
+        Write-BlankLine
+        return
+    }
+
+    $installed = $false
+    try {
+        $list = winget list --exact --id Tailscale.Tailscale --accept-source-agreements 2>$null | Out-String
+        $installed = $list -match "Tailscale\.Tailscale"
+    } catch {
+        $installed = $false
+    }
+
+    if ($installed) {
+        Write-Detail "Tailscale already installed."
+    } else {
+        Write-Detail "Installing Tailscale with winget (you may see a Windows admin prompt)..."
+        & winget.exe install --exact --id Tailscale.Tailscale --source winget `
+            --accept-package-agreements --accept-source-agreements --silent | Out-Host
+        if ($LASTEXITCODE -ne 0) {
+            Write-Detail "Tailscale did not install automatically — install it from https://tailscale.com/download/windows"
+        }
+    }
+
+    Write-Detail "Tailscale, once: open it, sign in with your OWN account, then open the"
+    Write-Detail "instructor's share link and click Accept to reach the server."
+    Write-BlankLine
+}
+
 function Ensure-WslFeature {
     Write-Section "Step 2: Checking WSL2..."
 
@@ -765,6 +808,7 @@ Write-BlankLine
 
 Install-VSCodeAndExtensions
 Install-NerdFont
+Install-Tailscale
 Ensure-WslFeature
 Install-UbuntuDistro
 Initialize-WslDistro

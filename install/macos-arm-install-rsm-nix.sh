@@ -20,6 +20,7 @@ VSCODE_EXTENSIONS=(
   "pinage404.nix-extension-pack"
 )
 EXTENSIONS_URL_DEFAULT="https://raw.githubusercontent.com/radiant-ai-hub/rsm-nix/main/vscode/extensions.txt"
+TAILSCALE_PKG_URL="https://pkgs.tailscale.com/stable/Tailscale-latest-macos.pkg"
 
 usage() {
   cat <<'EOF'
@@ -275,6 +276,37 @@ install_vscode() {
   done < <(desired_vscode_extensions)
 }
 
+install_tailscale() {
+  # Tailscale lets students reach the MSBA server from any network (incl.
+  # UCSD-Protected) without the campus VPN. We install the app; signing in
+  # (their own account) and accepting the instructor's share link are
+  # interactive and done by the student.
+  log_section "Checking Tailscale"
+
+  if [ -d "/Applications/Tailscale.app" ]; then
+    log_detail "Tailscale already installed."
+    return
+  fi
+
+  if [ "$DRY_RUN" -eq 1 ]; then
+    log_detail "[dry-run] Would install Tailscale from $TAILSCALE_PKG_URL"
+    return
+  fi
+
+  local pkg
+  pkg="$(mktemp -d)/Tailscale.pkg"
+  if curl -fL -o "$pkg" "$TAILSCALE_PKG_URL"; then
+    sudo installer -pkg "$pkg" -target / \
+      || log_detail "Tailscale install failed — install it from https://tailscale.com/download/mac"
+  else
+    log_detail "Could not download Tailscale — install it from https://tailscale.com/download/mac"
+  fi
+  rm -f "$pkg"
+
+  log_detail "Tailscale, once: open it, approve the system extension, sign in with your"
+  log_detail "OWN account, then accept the instructor's share link to reach the server."
+}
+
 install_nix() {
   log_section "Checking Determinate Nix"
 
@@ -381,6 +413,7 @@ log_detail "Workspace: $(expand_workspace_path)"
 ensure_supported_system
 ensure_xcode_command_line_tools
 install_vscode
+install_tailscale
 install_nix
 configure_direnv
 setup_workspace
