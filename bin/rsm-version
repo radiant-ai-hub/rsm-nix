@@ -1,0 +1,28 @@
+# rsm-version: print the version of the rsm-nix environment, so it is easy to
+# check that everyone (students, TAs, faculty) is on the SAME setup.
+#
+# The "version" IS the flake's git commit: flake.nix, flake.lock, uv.lock, and
+# all the scripts are pinned by that commit, so two machines on the same commit
+# have the same environment (per platform). Compare the short SHA across users.
+
+flake="${RSM_FLAKE:-$HOME/rsm-nix}"
+
+if [ -d "$flake/.git" ]; then
+  sha="$(git -C "$flake" rev-parse --short=9 HEAD 2>/dev/null || echo unknown)"
+  cdate="$(git -C "$flake" show -s --format=%cs HEAD 2>/dev/null || echo '?')"
+  branch="$(git -C "$flake" rev-parse --abbrev-ref HEAD 2>/dev/null || echo '?')"
+  dirty=""
+  git -C "$flake" diff --quiet --ignore-submodules 2>/dev/null || dirty=" +local-changes"
+  headline="$sha ($cdate)"
+else
+  headline="unknown (no git checkout at $flake)"
+  branch="?"
+  dirty=""
+fi
+
+printf 'rsm-nix version: %s\n' "$headline"
+printf '  branch   : %s%s\n' "$branch" "$dirty"
+printf '  platform : %s %s\n' "$(uname -s)" "$(uname -m)"
+if [ -x "${RSM_UV_ENV:-/nonexistent}/bin/python" ]; then
+  printf '  python   : %s\n' "$("$RSM_UV_ENV/bin/python" --version 2>&1 | awk '{print $2}')"
+fi

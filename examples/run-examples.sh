@@ -19,6 +19,8 @@ run() {
 run "check_environment.py" python check_environment.py
 run "python_data_stack.py" python python_data_stack.py
 run "pyrsm_example.py" python pyrsm_example.py
+# Prints seeded-RNG fingerprints; compare the OVERALL line across platforms.
+run "random_check.py" python random_check.py
 
 printf '\n########## postgres_python.py ##########\n'
 if command -v rsm-pg-start >/dev/null 2>&1; then
@@ -37,7 +39,7 @@ if jupyter nbconvert --version >/dev/null 2>&1; then
   # every headless run. We're executing a trusted local notebook, so switch the
   # kernel to IPC (Unix-socket) transport — the fix the warning itself suggests.
   # Endpoint paths stay ~86 chars, well under the macOS 104-char socket limit.
-  for nb in notebook_intro.ipynb notebook_pyrsm.ipynb notebook_postgres.ipynb; do
+  for nb in notebook_intro.ipynb notebook_pyrsm.ipynb notebook_postgres.ipynb notebook_random_check.ipynb; do
     run "execute $nb" jupyter nbconvert --to notebook --execute --output-dir /tmp/rsm-nb \
       --KernelManager.transport=ipc "$nb"
   done

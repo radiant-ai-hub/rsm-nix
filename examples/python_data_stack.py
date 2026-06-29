@@ -58,6 +58,19 @@ out = (
 )
 print(out)
 
+# %% duckdb — run SQL directly over the Polars frame (in-process, zero-copy)
+# DuckDB sees local Polars/pandas frames by name, and `.pl()` returns Polars.
+import duckdb
+
+duck = duckdb.sql(
+    "WITH d AS (SELECT price, price > (SELECT median(price) FROM df) AS expensive "
+    "FROM df) "
+    "SELECT expensive, count(*) AS n, round(avg(price), 2) AS avg_price "
+    "FROM d GROUP BY expensive ORDER BY expensive"
+).pl()
+print(duck)
+print("duckdb", duckdb.__version__)
+
 # %% plotnine — build a plot object (works directly with a Polars frame)
 from plotnine import aes, geom_point, ggplot
 

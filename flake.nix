@@ -163,7 +163,7 @@
           # the assembled zsh assets + the ZDOTDIR template it installs.
           rsm-setup = pkgs.writeShellApplication {
             name = "rsm-setup";
-            runtimeInputs = [ pythonSync pkgs.uv pkgs.python313 pkgs.coreutils pkgs.git pkgs.nodejs_22 ];
+            runtimeInputs = [ pythonSync pkgs.uv pkgs.python313 pkgs.coreutils pkgs.git pkgs.nodejs_22 rsm-version ];
             excludeShellChecks = [ "SC1090" "SC1091" "SC2164" ];
             text = rsmEnvHeader + "\n" + nativeEnvHook pkgs + ''
               export RSM_OMZ_SRC="${zshOmz}"
@@ -178,6 +178,9 @@
           # to the latest). It sets RSM_CLAUDE_LATEST so Claude is bumped.
           rsm-update = mk "rsm-update" [ rsm-setup pkgs.coreutils ];
           rsm-new-course = mk "rsm-new-course" [ pkgs.coreutils pkgs.gnugrep ];
+          # Prints the rsm-nix version (the flake's git commit) + platform/python,
+          # so it is easy to confirm everyone is on the same environment.
+          rsm-version = mk "rsm-version" [ pkgs.git pkgs.coreutils pkgs.gawk ];
           rsm-pg-start = mk "rsm-pg-start" [ pgInit pkgs.postgresql_16 pkgs.coreutils pkgs.gnugrep ];
           rsm-pg-stop = mk "rsm-pg-stop" [ pkgs.postgresql_16 pkgs.coreutils ];
           rsm-pg-status = mk "rsm-pg-status" [ pkgs.postgresql_16 pkgs.coreutils ];

@@ -215,4 +215,9 @@ if command -v direnv >/dev/null 2>&1; then
 fi
 
 echo "==> Setup complete."
+# Show the version (the flake's git commit) so it is easy to confirm that every
+# student/TA/faculty member is on the same environment. Compare 'rsm-version'.
+if command -v rsm-version >/dev/null 2>&1; then
+  rsm-version | sed 's/^/    /'
+fi
 echo "    Open $RSM_WORKSPACE in VS Code. Try: rsm-pg-start, then python or quarto."
