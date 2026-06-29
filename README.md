@@ -1,18 +1,12 @@
-
-
 <!-- generated from docs/src/readme.qmd — edit the .qmd, then run docs/src/render-docs.sh -->
 
 # RSM-MSBA computing environment
 
 The computing environment for the Rady MSBA program — Python, Quarto,
-PostgreSQL, and the course packages — **the same on your laptop and on
-the Rady server**. No Docker to install.
+PostgreSQL, and the course packages — **the same computing environment
+on your laptop and on the Rady MSBA server**.
 
-There are two ways to use it. **New students: pick one and follow that
-one guide top to bottom — it does everything (including installing VS
-Code).**
-
-## A. On your own laptop (recommended for most students)
+## A. On your own laptop
 
 One command installs everything — VS Code, the environment, and your
 workspace at `~/rsm-msba`. Follow the guide for your computer:
@@ -22,30 +16,27 @@ workspace at `~/rsm-msba`. Follow the guide for your computer:
 - **Windows 11:** **[docs/student-wsl2.md](docs/student-wsl2.md)**
 
 You do **not** need to install VS Code, Nix, or anything else by hand —
-the installer in those guides does it for you. When it’s done, you open
+the all-in-one-installer does it for you. When it's done, you open
 the `~/rsm-msba` folder in VS Code and pick the **Python (nix-uv)**
 kernel for notebooks.
 
-## B. On the Rady server (nothing to install on your laptop except VS Code)
+## B. On the Rady server
 
-Use a shared Rady server through VS Code on your laptop — good for
-older/Intel Macs or low-powered machines. You connect over **Tailscale**
-(works from any network) or the campus VPN, then everything runs on the
-server.
+Use the Rady MSBA server through VS Code on your laptop. You connect
+over **Tailscale** and compute runs on the server.
 
-Full walkthrough (covers both **sc1** and **sc2**, Tailscale setup, and
-the campus VPN option):
+Full walkthrough covers Tailscale setup, and the campus VPN option:
 **[docs/connect-server.md](docs/connect-server.md)**
 
-------------------------------------------------------------------------
+---
 
 # Using the environment
 
 ## Layout
 
-``` text
+```text
 ~/rsm-nix/      the flake (a git repo) — update with: cd ~/rsm-nix && git pull
-~/rsm-msba/     your workspace (NOT a git repo)
+~/rsm-msba/     your workspace
 ├── .envrc      generated; loads the flake from ~/rsm-nix
 ├── .rsm-msba/  state: envs/nix-uv, postgres, jupyter (survives flake updates)
 ├── mgta403/    a course folder — can be its own git repo
@@ -58,7 +49,7 @@ is **not** a git repo, so each course folder can be its own. Nothing is
 written to host dotfiles (`~/.zshrc`, `~/.bashrc`). To fully reset,
 delete `~/rsm-msba/.rsm-msba`.
 
-## Using VS Code (the convenient way)
+## Using VS Code
 
 The smoothest workflow uses the **direnv** VS Code extension so the
 RSM-MSBA environment activates automatically — no manual interpreter
@@ -66,32 +57,29 @@ selection, no venv juggling. This repository ships a `.vscode/` config,
 so when you open `~/rsm-msba` VS Code offers to install the right
 extensions and points Python at the base environment for you.
 
-1.  **Open the workspace** — in VS Code use **File → Open Folder…** and
-    choose `~/rsm-msba` (the per-OS guides walk through this step). From
-    a terminal you can also run `code ~/rsm-msba`, or open a single
-    course folder, e.g. `code ~/rsm-msba/mgta403` — direnv finds the
-    environment by walking up to `~/rsm-msba/.envrc`.
-
-2.  **Extensions are already installed** by the all-in-one installer (on
-    a server, run `rsm-vscode-ext` once in the connected window). If VS
-    Code ever shows a prompt — “This workspace has extension
-    recommendations” — click **Install All**. The key ones are
-    **direnv** (`mkhl.direnv`), **Python** (`ms-python.python`),
-    **Jupyter** (`ms-toolsai.jupyter`), and **Quarto**
-    (`quarto.quarto`).
-
-3.  **Allow direnv** — the direnv extension asks to allow `.envrc` the
-    first time; click **Allow** (or run `direnv allow` once in the
-    integrated terminal). From then on, every integrated terminal and
-    the Python/Jupyter tooling use the RSM-MSBA environment
-    automatically — `python`, `quarto`, `rsm-pg-*`, etc. are already on
-    `PATH`.
-
-4.  **Pick the kernel for notebooks** — open a `.ipynb`, click the
-    kernel picker (top-right), and choose **Python (nix-uv)**. For `.py`
-    files the interpreter is already set to
-    `~/rsm-msba/.rsm-msba/envs/nix-uv/bin/python`; VS Code remembers
-    your choice per folder.
+1. **Open the workspace** — in VS Code use **File → Open Folder…** and
+   choose `~/rsm-msba` (the per-OS guides walk through this step). From
+   a terminal you can also run `code ~/rsm-msba`, or open a single
+   course folder, e.g. `code ~/rsm-msba/mgta403` — direnv finds the
+   environment by walking up to `~/rsm-msba/.envrc`.
+2. **Extensions are already installed** by the all-in-one installer (on
+   a server, run `rsm-vscode-ext` once in the connected window). If VS
+   Code ever shows a prompt — “This workspace has extension
+   recommendations” — click **Install All**. The key ones are
+   **direnv** (`mkhl.direnv`), **Python** (`ms-python.python`),
+   **Jupyter** (`ms-toolsai.jupyter`), and **Quarto**
+   (`quarto.quarto`).
+3. **Allow direnv** — the direnv extension asks to allow `.envrc` the
+   first time; click **Allow** (or run `direnv allow` once in the
+   integrated terminal). From then on, every integrated terminal and
+   the Python/Jupyter tooling use the RSM-MSBA environment
+   automatically — `python`, `quarto`, `rsm-pg-*`, etc. are already on
+   `PATH`.
+4. **Pick the kernel for notebooks** — open a `.ipynb`, click the
+   kernel picker (top-right), and choose **Python (nix-uv)**. For `.py`
+   files the interpreter is already set to
+   `~/rsm-msba/.rsm-msba/envs/nix-uv/bin/python`; VS Code remembers
+   your choice per folder.
 
 That’s it. Open a notebook or script in any course folder and run — no
 activation step needed.
@@ -141,7 +129,7 @@ Code **or** a plain SSH terminal.
 Put personal zsh settings in `~/.rsm-local.zsh` — it’s sourced last and
 survives a workspace reset. For example, to use vi keybindings:
 
-``` bash
+```bash
 echo 'bindkey -v' >> ~/.rsm-local.zsh
 ```
 
@@ -158,7 +146,7 @@ When a project needs an extra package, add it **to that project with
 `uv add`** (not `uv pip install`) so it is tracked in the project’s
 `pyproject.toml` and `uv.lock`:
 
-``` bash
+```bash
 cd ~/rsm-msba/my_project
 uv init .                 # once — creates pyproject.toml
 uv add polars             # add a package (tracked + locked)
@@ -176,7 +164,7 @@ The `nix-uv` package list is defined in the flake’s `pyproject.toml`
 (`~/rsm-nix/pyproject.toml`). To add or pin a package for **everyone**,
 edit that file and re-sync the environment:
 
-``` bash
+```bash
 # edit ~/rsm-nix/pyproject.toml (add the package under dependencies), then:
 rsm-python-sync           # rebuild the nix-uv env to match the list
 ```
@@ -186,7 +174,7 @@ rsm-python-sync           # rebuild the nix-uv env to match the list
 A workspace-local PostgreSQL instance is included — no system service,
 no Docker. Data lives under `~/rsm-msba/.rsm-msba/postgres`.
 
-``` bash
+```bash
 pg                                 # overview: status + all the commands below
 rsm-pg-start                       # start (initializes on first run)
 rsm-pg-psql                        # open psql on the rsm-msba database
@@ -210,7 +198,7 @@ port) — always read it from `$PGPORT` rather than hard-coding `8765`.
 Quarto (pinned to 1.9.13 for everyone) is included and configured to
 render with the base Python environment:
 
-``` bash
+```bash
 quarto --version
 quarto render report.qmd
 ```
@@ -234,7 +222,7 @@ VS Code.
 
 Run the non-interactive checks all at once:
 
-``` bash
+```bash
 bash examples/run-examples.sh
 ```
 
@@ -243,7 +231,7 @@ bash examples/run-examples.sh
 Scalable-analytics work uses a separate, larger profile. The first
 activation downloads Spark and Hadoop, so expect a wait.
 
-``` bash
+```bash
 cd ~/rsm-msba
 nix develop .#spark-hadoop
 rsm-spark-hadoop-proof             # Hadoop + Spark + a local PySpark session
@@ -254,7 +242,7 @@ rsm-spark-hadoop-proof             # Hadoop + Spark + a local PySpark session
 Everything (Python packages, tools, examples, the shell) is defined in
 the flake, so updating is one command:
 
-``` bash
+```bash
 rsm-update                         # pull the latest environment + rebuild
 ```
 
@@ -267,7 +255,7 @@ the workspace automatically.
 To see exactly which version you’re on — useful for confirming you and a
 classmate match before debugging — run:
 
-``` bash
+```bash
 rsm-version                        # e.g. "rsm-nix version: 7ff499b0c (2026-06-28)"
 ```
 
@@ -280,7 +268,7 @@ when they finish.
 To rebuild the environment **state** from scratch while **keeping your
 coursework** (the course folders under `~/rsm-msba`):
 
-``` bash
+```bash
 rsm-pg-stop 2>/dev/null
 rm -rf ~/rsm-msba/.rsm-msba        # removes only the RSM-owned state
 rsm-setup
@@ -289,20 +277,20 @@ rsm-setup
 To reset **everything** from nothing (⚠️ this also deletes the course
 folders in `~/rsm-msba` — back up any coursework first):
 
-``` bash
+```bash
 rm -rf ~/rsm-msba ~/rsm-nix
 rsm-setup                          # re-clones the flake and rebuilds
 ```
 
 To reclaim disk space from old Nix builds:
 
-``` bash
+```bash
 nix store gc
 ```
 
 To uninstall Nix entirely (Determinate installer):
 
-``` bash
+```bash
 /nix/nix-installer uninstall
 ```
 
@@ -326,7 +314,7 @@ To uninstall Nix entirely (Determinate installer):
 - **Still stuck?** — run the smoke check and share the output:
   `nix develop ~/rsm-msba -c bash ~/rsm-msba/tests/check-default.sh`
 
-------------------------------------------------------------------------
+---
 
 *Instructors / developers:* the flake interfaces, the full command list,
 and the server configuration are in **[README-tech.md](README-tech.md)**
