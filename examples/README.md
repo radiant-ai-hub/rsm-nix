@@ -64,9 +64,11 @@ bash examples/postgres-createdb.sh
 ```
 
 It starts PostgreSQL (if needed) and loads **Northwind** and
-**WestCoastImporters**. It's safe to re-run — existing databases are skipped. When
-it finishes, connect with `rsm-pg-psql -d Northwind` (or `-d WestCoastImporters`),
-browse them with `rsm-pgweb`, or open them from VS Code's SQL tools.
+**WestCoastImporters** from the SQL dumps in `examples/sql/` (they ship with the
+repo, so it works offline). It's safe to re-run — existing databases are skipped.
+When it finishes, connect with `rsm-pg-psql -d Northwind` (or
+`-d WestCoastImporters`), browse them with `rsm-pgweb`, or open them from VS Code's
+SQL tools.
 
 ## "Which environment am I in?"
 

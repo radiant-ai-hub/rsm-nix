@@ -41,12 +41,12 @@ END
 $do$;
 SQL
 
-# 3. Download + load each database (into a temp dir that is cleaned up after).
-work="$(mktemp -d)"
-trap 'rm -rf "$work"' EXIT
+# 3. Load each database from the SQL dumps shipped next to this script, in
+#    examples/sql/ (no download needed — they come with the repo).
+here="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 
 load_db() {
-  local name="$1" url="$2" dump="$work/$1.sql"
+  local name="$1" dump="$2"
   printf '\n==> %s\n' "$name"
 
   if psql -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '$name'" 2>/dev/null | grep -q 1; then
@@ -55,9 +55,9 @@ load_db() {
     return 0
   fi
 
-  echo "    downloading dump..."
-  if ! curl -fL --retry 3 -o "$dump" "$url"; then
-    echo "    download failed — check your internet connection; skipping $name." >&2
+  if [ ! -f "$dump" ]; then
+    echo "    data file not found: $dump" >&2
+    echo "    run 'rsm-update' to refresh the examples, then try again." >&2
     return 1
   fi
 
@@ -71,10 +71,8 @@ load_db() {
   echo "    done — '$name' has ${n:-?} tables.  Connect:  rsm-pg-psql -d $name"
 }
 
-load_db Northwind \
-  "https://www.dropbox.com/s/s3bn7mkmpo391s3/Northwind_DB_Dump.sql?dl=1"
-load_db WestCoastImporters \
-  "https://www.dropbox.com/s/gqnhvhhxyjrslmb/WestCoastImporters_Full_Dump.sql?dl=1"
+load_db Northwind          "$here/sql/Northwind.sql"
+load_db WestCoastImporters "$here/sql/WestCoastImporters.sql"
 
 printf '\nAll set. Your databases:\n'
 psql -d postgres -tAc \

@@ -1,0 +1,4 @@
+# Bundled example SQL dumps are generated data, not source we edit by hand.
+# Mark them so GitHub collapses them in diffs and excludes them from language
+# stats, and so git treats them as binary (no giant text diffs).
+examples/sql/*.sql linguist-generated=true -diff
