@@ -24,7 +24,7 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 
 # WSL's informational output (--list, --status, --help) is UTF-16 by default,
-# which corrupts text matching from PowerShell — e.g. an available distro like
+# which corrupts text matching from PowerShell -- e.g. an available distro like
 # Ubuntu-26.04 wrongly looking "absent", sending the installer down a fragile
 # fallback path. WSL_UTF8=1 makes WSL emit UTF-8 so parsing is reliable. It is
 # honored by WSL 0.64+ (every current Windows 11 build).
@@ -336,7 +336,7 @@ function Install-NerdFont {
     # powerlevel10k draws its icons with a Nerd Font. The terminal is rendered
     # by the Windows-side editor/terminal, so the font must be installed on
     # Windows (not in WSL). Installs MesloLGS NF (p10k's recommended font) for
-    # the current user — no admin needed. Non-fatal: a font hiccup must never
+    # the current user -- no admin needed. Non-fatal: a font hiccup must never
     # block the environment setup.
     Write-Section "Step 1b: Installing the MesloLGS Nerd Font..."
 
@@ -387,7 +387,7 @@ function Install-Tailscale {
     # Tailscale lets students reach the MSBA server from any network (incl.
     # UCSD-Protected) without the campus VPN. We install the app here; the
     # student still has to sign in (their own account) and accept the
-    # instructor's share link — those are interactive and can't be automated.
+    # instructor's share link -- those are interactive and can't be automated.
     Write-Section "Step 1c: Installing Tailscale..."
 
     if ($DryRun) {
@@ -417,7 +417,7 @@ function Install-Tailscale {
         & winget.exe install --exact --id Tailscale.Tailscale --source winget `
             --accept-package-agreements --accept-source-agreements --silent | Out-Host
         if ($LASTEXITCODE -ne 0) {
-            Write-Detail "Tailscale did not install automatically — install it from https://tailscale.com/download/windows"
+            Write-Detail "Tailscale did not install automatically -- install it from https://tailscale.com/download/windows"
         }
     }
 
@@ -537,7 +537,7 @@ function Install-UbuntuDistro {
         }
     }
 
-    # Try the plain `wsl --install -d <name>` first — it's what works
+    # Try the plain `wsl --install -d <name>` first -- it's what works
     # interactively (incl. Ubuntu-26.04 on Windows ARM) and lets WSL pick the
     # best source. If it fails, force a web download; only if that also fails do
     # we fetch the .wsl image directly (via curl, which is more robust than
@@ -608,8 +608,8 @@ function Initialize-WslDistro {
         return
     }
 
-    # A freshly registered distro — especially after an unregister/reinstall, or
-    # one installed with --no-launch — often can't run a command on the very
+    # A freshly registered distro -- especially after an unregister/reinstall, or
+    # one installed with --no-launch -- often can't run a command on the very
     # first try: "Wsl/Service/CreateInstance/E_UNEXPECTED". Reset the WSL service
     # and warm the distro up (as root, which bypasses the interactive first-run)
     # with a few retries before we configure it.
