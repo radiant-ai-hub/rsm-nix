@@ -10,6 +10,17 @@ if [ ! -f "$RSM_FLAKE/pyproject.toml" ] || [ ! -f "$RSM_FLAKE/uv.lock" ]; then
   exit 1
 fi
 
+# When the uv cache lives OUTSIDE your home — a shared cache on a multi-user
+# server, e.g. /srv/uv-cache owned by a shared group — new cache files must be
+# group-writable so other users can update the same cache. Relax the umask to
+# 002 in that case so uv's files inherit group write (the cache dir is already
+# setgid + group-owned). A per-user cache under $HOME keeps the default umask;
+# home dirs are 0700, so this never widens access to your own files.
+case "${UV_CACHE_DIR:-}" in
+  "$HOME"/* | "") : ;;
+  *) umask 002 ;;
+esac
+
 mkdir -p "$RSMBASE/envs" "$UV_CACHE_DIR"
 
 # Prefer the Nix-provided interpreter so native libraries stay consistent.
