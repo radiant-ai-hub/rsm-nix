@@ -10,34 +10,33 @@ The computing environment for the Rady MSBA program — Python, Quarto,
 PostgreSQL, and the course packages — **the same on your laptop and on the Rady
 server**. No Docker to install.
 
-There are two ways to use it. Most students use the **server** (nothing to
-install). Pick one, then see [Using the environment](#using-the-environment).
+There are two ways to use it. **New students: pick one and follow that one guide
+top to bottom — it does everything (including installing VS Code).**
 
-## A. On your own laptop
+## A. On your own laptop (recommended for most students)
 
-Install once, then everything lives in `~/rsm-msba`.
+One command installs everything — VS Code, the environment, and your workspace at
+`~/rsm-msba`. Follow the guide for your computer:
 
-1. Install **VS Code**: <https://code.visualstudio.com>
-2. Follow the one-page guide for your platform — it installs Nix + VS Code, then
-   has you run `rsm-setup`:
-   - **macOS (Apple Silicon):** [docs/student-macos.md](docs/student-macos.md)
-   - **Windows 11:** [docs/student-wsl2.md](docs/student-wsl2.md)
-3. Open the `~/rsm-msba` folder in VS Code. For notebooks, pick the
-   **Python (nix-uv)** kernel.
+- **macOS (Apple Silicon — M1/M2/M3/M4):**
+  **[docs/student-macos.md](docs/student-macos.md)**
+- **Windows 11:** **[docs/student-wsl2.md](docs/student-wsl2.md)**
 
-## B. On the Rady server (nothing to install)
+You do **not** need to install VS Code, Nix, or anything else by hand — the
+installer in those guides does it for you. When it's done, you open the
+`~/rsm-msba` folder in VS Code and pick the **Python (nix-uv)** kernel for
+notebooks.
 
-You use the server through VS Code on your laptop.
+## B. On the Rady server (nothing to install on your laptop except VS Code)
 
-1. Install **VS Code** and its **Remote - SSH** extension.
-2. Be on the campus network or the **UCSD VPN**, then connect to
-   `<your-campus-username>@rsm-compute-01.ucsd.edu` and enter your campus
-   password.
-3. In a terminal, run `rsm-setup`.
-4. Open the `~/rsm-msba` folder. For notebooks, pick the **Python (nix-uv)**
-   kernel.
+Use a shared Rady server through VS Code on your laptop — good for older/Intel
+Macs or low-powered machines. You connect over **Tailscale** (works from any
+network) or the campus VPN, then everything runs on the server.
 
-Full walkthrough: **[docs/connect-server.md](docs/connect-server.md)**
+Full walkthrough (covers both **sc1** and **sc2**, Tailscale setup, and the
+campus VPN option): **[docs/connect-server.md](docs/connect-server.md)**
+
+---
 
 # Using the environment
 
@@ -62,9 +61,12 @@ Full walkthrough: **[docs/connect-server.md](docs/connect-server.md)**
   - `notebook_intro.ipynb` — numpy, Polars, and an inline plot
   - `notebook_pyrsm.ipynb` — a `pyrsm` regression with a plot
   - `notebook_postgres.ipynb` — query PostgreSQL into a Polars frame
+  - `notebook_random_check.ipynb` — seeded random numbers + a fingerprint to
+    compare across macOS / Windows / Linux
 - **Scripts** (`.py` with `# %%` cells, also runnable as notebooks):
   `check_environment.py`, `python_data_stack.py`, `pyrsm_example.py`,
-  `postgres_python.py`, `spark_pyspark.py`, and `quarto_report.qmd`.
+  `random_check.py`, `postgres_python.py`, `spark_pyspark.py`, and
+  `quarto_report.qmd`.
 
 Run the non-interactive checks all at once:
 

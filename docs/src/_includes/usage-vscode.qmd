@@ -6,19 +6,18 @@ juggling. This repository ships a `.vscode/` config, so when you open
 `~/rsm-msba` VS Code offers to install the right extensions and points Python at
 the base environment for you.
 
-1. **Open the workspace** — from a terminal:
+1. **Open the workspace** — in VS Code use **File → Open Folder…** and choose
+   `~/rsm-msba` (the per-OS guides walk through this step). From a terminal you can
+   also run `code ~/rsm-msba`, or open a single course folder, e.g.
+   `code ~/rsm-msba/mgta403` — direnv finds the environment by walking up to
+   `~/rsm-msba/.envrc`.
 
-   ```bash
-   code ~/rsm-msba
-   ```
-
-   (You can also open a single course folder, e.g. `code ~/rsm-msba/mgta403` —
-   direnv finds the environment by walking up to `~/rsm-msba/.envrc`.)
-
-2. **Install the recommended extensions** — VS Code shows a prompt
-   ("This workspace has extension recommendations"); click **Install All**. They
-   are `mkhl.direnv`, `ms-python.python`, `ms-toolsai.jupyter`, and
-   `quarto.quarto`.
+2. **Extensions are already installed** by the all-in-one installer (on a server,
+   run `rsm-vscode-ext` once in the connected window). If VS Code ever shows a
+   prompt — "This workspace has extension recommendations" — click **Install
+   All**. The key ones are **direnv** (`mkhl.direnv`), **Python**
+   (`ms-python.python`), **Jupyter** (`ms-toolsai.jupyter`), and **Quarto**
+   (`quarto.quarto`).
 
 3. **Allow direnv** — the direnv extension asks to allow `.envrc` the first time;
    click **Allow** (or run `direnv allow` once in the integrated terminal). From

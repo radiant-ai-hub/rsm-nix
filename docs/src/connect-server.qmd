@@ -4,64 +4,103 @@ format: gfm
 
 <!-- generated from docs/src/connect-server.qmd — edit the .qmd, then run docs/src/render-docs.sh -->
 
-# Connecting to the RSM server with VS Code
+# Connecting to the Rady server with VS Code
 
-This guide is for students/TAs who use the shared **RSM compute server** instead
-of installing the environment on their own laptop. You connect from VS Code on
-your laptop over **Remote-SSH**, and everything (Python, Quarto, PostgreSQL, the
-`nix-uv` environment) runs on the server.
+This guide is for students/TAs who use a **shared Rady compute server** instead of
+installing the environment on their own laptop. Everything (Python, Quarto,
+PostgreSQL, the `nix-uv` environment) runs **on the server**; you just use VS Code
+on your laptop as a window into it. This works the same on macOS and Windows, and
+on any laptop — including older Intel Macs.
 
-> **Server address (MSBA alpha):** `rsm-compute-01.ucsd.edu`
-> Use the address your instructor gives you; this guide uses the one above.
+## Which server?
+
+Use the one your instructor gives you. There are two:
+
+| Server | Address on campus / VPN     | Tailscale name | Tailscale IP     |
+|--------|------------------------------|----------------|------------------|
+| **sc1** | `rsm-compute-01.ucsd.edu`   | `sc1-nixos`    | `100.120.22.116` |
+| **sc2** | `rsm-compute-02.ucsd.edu`   | `sc2-ubuntu`   | `100.120.8.242`  |
+
+Wherever this guide shows `<server>`, replace it with your assigned server's
+address (e.g. `sc2-ubuntu` over Tailscale, or `rsm-compute-02.ucsd.edu` on the
+campus VPN).
 
 ## What you need
 
-- A **UCSD AD account** — your campus username (e.g. `msaad`) and password. You
-  log in with the *same* credentials you use for campus services.
-- **VS Code** on your laptop: <https://code.visualstudio.com>
-- To be **on the campus network** — either physically on campus, or connected to
-  the **UCSD VPN** (the server is not reachable from the open internet).
+- A **UCSD AD account** — your campus username (e.g. `msaad`) and password, the
+  same ones you use for other campus services.
+- **VS Code** on your laptop. If you don't have it, get it from
+  <https://code.visualstudio.com> and install it (just click through the
+  installer).
+- A **network path to the server**. The server is not on the open internet, so you
+  reach it one of two ways:
+  - **Tailscale (recommended)** — works from any network, including home Wi-Fi and
+    **UCSD-Protected**. Set up once (Step 1).
+  - **Campus network or UCSD VPN** — if you're physically on campus or connected to
+    the UCSD VPN, you can use the `rsm-compute-0X.ucsd.edu` address directly and
+    skip Step 1.
 
-## 1. Install the VS Code extensions
+> If a course web page or the server won't load on the **UCSD-Protected** Wi-Fi,
+> that network conflicts with the campus VPN's addressing — **Tailscale is the
+> reliable fix**, so we recommend setting it up regardless.
 
-In VS Code, open the Extensions panel (`Cmd/Ctrl+Shift+X`) and install:
+## Step 1 — Set up Tailscale (once)
 
-- **Remote - SSH** (`ms-vscode-remote.remote-ssh`) — connects to the server.
+Tailscale is a small app that gives your laptop a private, secure path to the
+server. It does **not** give anyone access to your files — it's just the network
+"road" to the server; you still log in with your own account.
 
-The others (Python, Jupyter, Quarto, **direnv**) you install *after* you connect,
-**on the server side** — see step 3.
+1. **Install Tailscale.** If you ran the macOS or Windows all-in-one installer,
+   it's already installed. Otherwise download it from
+   <https://tailscale.com/download> and install it.
+2. **Sign in with your OWN account.** Open Tailscale, and sign in (a free personal
+   account — Google/Microsoft/GitHub login all work). This creates your own
+   private network; you are **not** joining anyone else's.
+3. **Accept the instructor's invite.** Open the invite link your instructor posts
+   at <https://rsm-django-02.ucsd.edu/ict/> and click **Accept**. The server now
+   appears in your Tailscale app. Make sure Tailscale shows **Connected**.
 
-## 2. Connect to the server
+That's the whole setup. You can now reach the server from any network. (You only
+see this one server — not other students, and not the instructor's other
+machines.)
 
-1. Press `F1` (or `Cmd/Ctrl+Shift+P`) and run **Remote-SSH: Connect to Host…**
-2. Choose **+ Add New SSH Host…** and enter:
+> **Windows + WSL note (only if you also want to `ssh` from inside WSL):** the
+> Windows Tailscale app is enough for VS Code Remote-SSH below. If you specifically
+> want `ssh <server>` to work from a WSL terminal, create
+> `C:\Users\<you>\.wslconfig` containing `[wsl2]` then `networkingMode=mirrored`,
+> and run `wsl --shutdown`. For normal use you can ignore this.
+
+## Step 2 — Install the Remote-SSH extension (once)
+
+In VS Code, open the **Extensions** panel (click the squares icon on the left, or
+press **Cmd/Ctrl + Shift + X**), search for **Remote - SSH**
+(`ms-vscode-remote.remote-ssh`), and click **Install**. This is what lets VS Code
+connect to the server.
+
+## Step 3 — Connect to the server
+
+1. Press **F1** (or **Cmd/Ctrl + Shift + P**) and type **Remote-SSH: Connect to
+   Host…**, then press Enter.
+2. Click **+ Add New SSH Host…** and type:
 
    ```
-   ssh <your-ad-username>@rsm-compute-01.ucsd.edu
+   ssh <your-ad-username>@<server>
    ```
 
-   (e.g. `ssh msaad@rsm-compute-01.ucsd.edu`)
-3. Pick the SSH config file when prompted, then **Connect**.
-4. When asked, enter your **campus AD password**. (First connect also asks to
-   trust the host fingerprint — accept it.)
+   For example, over Tailscale: `ssh msaad@sc2-ubuntu`
+   (or on the campus VPN: `ssh msaad@rsm-compute-02.ucsd.edu`).
+3. When asked which SSH config file to use, accept the first one. Then choose
+   **Connect** (you can also reconnect any time via **Remote-SSH: Connect to
+   Host…**, where the server is now listed).
+4. Enter your **campus AD password** when prompted. The first time, VS Code asks
+   to trust the server's fingerprint — accept it.
 
-A new VS Code window opens, connected to the server (bottom-left shows
-`SSH: rsm-compute-01.ucsd.edu`).
+A new VS Code window opens, connected to the server. The bottom-left corner shows
+**SSH: `<server>`**.
 
-## 3. Install the server-side extensions
+## Step 4 — First-time setup on the server (once)
 
-In the connected window, open Extensions again and click **Install in SSH:
-rsm-compute-01…** for:
-
-- **Python** (`ms-python.python`)
-- **Jupyter** (`ms-toolsai.jupyter`)
-- **Quarto** (`quarto.quarto`)
-- **direnv** (`mkhl.direnv`) — **important:** this is what auto-activates the
-  `nix-uv` environment in terminals and notebooks.
-
-## 4. First-time setup (once)
-
-Open a terminal in VS Code (**Terminal → New Terminal**) and run:
+Open a terminal in the connected window (**Terminal → New Terminal**) and run:
 
 ```bash
 rsm-setup
@@ -69,23 +108,41 @@ rsm-setup
 
 This builds your personal `nix-uv` Python environment, the **Python (nix-uv)**
 notebook kernel, and your workspace at `~/rsm-msba` (with course folders). The
-first run takes a few minutes; later runs are fast.
+first run takes a few minutes; later runs are fast (a shared cache means you
+benefit from what classmates already built). When it finishes it prints your
+`rsm-version` — a short code identifying your setup.
 
-> The shared download cache means later students build much faster than the first.
+Then install the course's VS Code extensions **on the server** with one command:
 
-## 5. Open your workspace
+```bash
+rsm-vscode-ext
+```
 
-**File → Open Folder…** and choose **`~/rsm-msba`** (this is where you work — see
-the layout below).
+(That installs the full curated set into this connected window. Alternatively you
+can install them by hand from the Extensions panel — at minimum **Python**,
+**Jupyter**, **Quarto**, and **direnv** (`mkhl.direnv`), clicking **"Install in
+SSH: `<server>`"** for each.)
 
-- The first time, the direnv extension shows a prompt to **allow** the
+## Step 5 — Open your workspace folder
+
+Now tell VS Code which folder to work in. *Opening a folder* sets the project
+VS Code shows on the left and where its terminal starts — it is **not** the same
+as typing in the terminal.
+
+1. **File → Open Folder…**
+2. In the path box, type **`~/rsm-msba`** (or `/home/<your-username>/rsm-msba`) and
+   click **OK**.
+
+- The first time, the **direnv** extension shows a prompt to **allow** the
   environment — click **Allow** (or run `direnv allow` in the terminal). You only
   do this once per folder. After that, every terminal in `~/rsm-msba` is
   automatically in the `nix-uv` environment.
-- For notebooks, pick the **Python (nix-uv)** kernel (top-right of the notebook).
+- For notebooks, click the **kernel picker** (top-right of the notebook) and choose
+  **Python (nix-uv)**.
 
-That's it — you're ready. Try the examples in `~/rsm-msba/examples` (e.g. open
-`check_environment.py` and run it; it should print **ALL GOOD**).
+That's it — you're ready. Try `examples/check_environment.py` (open it and run, or
+in a terminal `python examples/check_environment.py`); it should print
+**ALL GOOD**.
 
 ## Notes & troubleshooting
 
@@ -93,13 +150,15 @@ That's it — you're ready. Try the examples in `~/rsm-msba/examples` (e.g. open
   folder is just the environment's source code; **ignore it** and work in
   `~/rsm-msba`. Do *not* run `direnv allow` there.
 - **`import numpy` fails with a `libstdc++.so.6` error** → the environment isn't
-  active. Make sure the **direnv** extension is installed *on the server*, that
-  you ran `direnv allow` in `~/rsm-msba`, and that the terminal/kernel was opened
-  from inside `~/rsm-msba`.
+  active. Make sure the **direnv** extension is installed *on the server*, that you
+  ran `direnv allow` in `~/rsm-msba`, and that the terminal/kernel was opened from
+  inside `~/rsm-msba`.
+- **Can't connect at all?** Confirm Tailscale shows **Connected** (or that you're
+  on campus / the UCSD VPN), and that your campus username/password work elsewhere.
+- **Out of sync with a classmate?** Run `rsm-version` on both and compare; if they
+  differ, run `rsm-update`.
 - **Want passwordless login?** After your first connect, add your laptop's SSH
   public key to `~/.ssh/authorized_keys` on the server.
-- **Can't connect at all?** Confirm you're on campus or the UCSD VPN, and that
-  your campus username/password work elsewhere.
 
 {{< include _includes/directory-structure.qmd >}}
 

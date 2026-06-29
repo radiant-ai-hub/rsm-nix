@@ -4,8 +4,9 @@
 curl -fsSL https://raw.githubusercontent.com/radiant-ai-hub/rsm-nix/main/install/macos-arm-install-rsm-nix.sh | bash
 ```
 
-The installer sets up VS Code, Determinate Nix, `direnv` + `nix-direnv`, clones
-the workspace to `~/rsm-msba`, runs `rsm-setup`, and runs the smoke checks.
+The installer sets up VS Code (+ the curated extensions), the MesloLGS Nerd Font,
+Determinate Nix, `direnv` + `nix-direnv`, Tailscale, clones the workspace to
+`~/rsm-msba`, runs `rsm-setup`, and runs the smoke checks.
 
 ### Windows 11 (WSL2 + Ubuntu 26.04)
 
@@ -15,8 +16,9 @@ Run PowerShell **as Administrator** for the first WSL install:
 powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr -useb https://raw.githubusercontent.com/radiant-ai-hub/rsm-nix/main/install/windows-install-rsm-nix.ps1 | iex"
 ```
 
-The installer sets up VS Code on Windows, Ubuntu 26.04 on WSL2, Determinate Nix
-inside Ubuntu, `direnv` + `nix-direnv`, and the `~/rsm-msba` workspace.
+The installer sets up VS Code on Windows (+ extensions and the MesloLGS Nerd
+Font), Ubuntu 26.04 on WSL2 with zsh, Determinate Nix inside Ubuntu, `direnv` +
+`nix-direnv`, Tailscale, and the `~/rsm-msba` workspace.
 
 ### Linux / server (bare Ubuntu, or a Remote-SSH server)
 

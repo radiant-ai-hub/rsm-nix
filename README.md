@@ -8,36 +8,36 @@ The computing environment for the Rady MSBA program — Python, Quarto,
 PostgreSQL, and the course packages — **the same on your laptop and on
 the Rady server**. No Docker to install.
 
-There are two ways to use it. Most students use the **server** (nothing
-to install). Pick one, then see [Using the
-environment](#using-the-environment).
+There are two ways to use it. **New students: pick one and follow that
+one guide top to bottom — it does everything (including installing VS
+Code).**
 
-## A. On your own laptop
+## A. On your own laptop (recommended for most students)
 
-Install once, then everything lives in `~/rsm-msba`.
+One command installs everything — VS Code, the environment, and your
+workspace at `~/rsm-msba`. Follow the guide for your computer:
 
-1.  Install **VS Code**: <https://code.visualstudio.com>
-2.  Follow the one-page guide for your platform — it installs Nix + VS
-    Code, then has you run `rsm-setup`:
-    - **macOS (Apple Silicon):**
-      [docs/student-macos.md](docs/student-macos.md)
-    - **Windows 11:** [docs/student-wsl2.md](docs/student-wsl2.md)
-3.  Open the `~/rsm-msba` folder in VS Code. For notebooks, pick the
-    **Python (nix-uv)** kernel.
+- **macOS (Apple Silicon — M1/M2/M3/M4):**
+  **[docs/student-macos.md](docs/student-macos.md)**
+- **Windows 11:** **[docs/student-wsl2.md](docs/student-wsl2.md)**
 
-## B. On the Rady server (nothing to install)
+You do **not** need to install VS Code, Nix, or anything else by hand —
+the installer in those guides does it for you. When it’s done, you open
+the `~/rsm-msba` folder in VS Code and pick the **Python (nix-uv)**
+kernel for notebooks.
 
-You use the server through VS Code on your laptop.
+## B. On the Rady server (nothing to install on your laptop except VS Code)
 
-1.  Install **VS Code** and its **Remote - SSH** extension.
-2.  Be on the campus network or the **UCSD VPN**, then connect to
-    `<your-campus-username>@rsm-compute-01.ucsd.edu` and enter your
-    campus password.
-3.  In a terminal, run `rsm-setup`.
-4.  Open the `~/rsm-msba` folder. For notebooks, pick the **Python
-    (nix-uv)** kernel.
+Use a shared Rady server through VS Code on your laptop — good for
+older/Intel Macs or low-powered machines. You connect over **Tailscale**
+(works from any network) or the campus VPN, then everything runs on the
+server.
 
-Full walkthrough: **[docs/connect-server.md](docs/connect-server.md)**
+Full walkthrough (covers both **sc1** and **sc2**, Tailscale setup, and
+the campus VPN option):
+**[docs/connect-server.md](docs/connect-server.md)**
+
+------------------------------------------------------------------------
 
 # Using the environment
 
@@ -66,20 +66,19 @@ selection, no venv juggling. This repository ships a `.vscode/` config,
 so when you open `~/rsm-msba` VS Code offers to install the right
 extensions and points Python at the base environment for you.
 
-1.  **Open the workspace** — from a terminal:
+1.  **Open the workspace** — in VS Code use **File → Open Folder…** and
+    choose `~/rsm-msba` (the per-OS guides walk through this step). From
+    a terminal you can also run `code ~/rsm-msba`, or open a single
+    course folder, e.g. `code ~/rsm-msba/mgta403` — direnv finds the
+    environment by walking up to `~/rsm-msba/.envrc`.
 
-    ``` bash
-    code ~/rsm-msba
-    ```
-
-    (You can also open a single course folder,
-    e.g. `code ~/rsm-msba/mgta403` — direnv finds the environment by
-    walking up to `~/rsm-msba/.envrc`.)
-
-2.  **Install the recommended extensions** — VS Code shows a prompt
-    (“This workspace has extension recommendations”); click **Install
-    All**. They are `mkhl.direnv`, `ms-python.python`,
-    `ms-toolsai.jupyter`, and `quarto.quarto`.
+2.  **Extensions are already installed** by the all-in-one installer (on
+    a server, run `rsm-vscode-ext` once in the connected window). If VS
+    Code ever shows a prompt — “This workspace has extension
+    recommendations” — click **Install All**. The key ones are
+    **direnv** (`mkhl.direnv`), **Python** (`ms-python.python`),
+    **Jupyter** (`ms-toolsai.jupyter`), and **Quarto**
+    (`quarto.quarto`).
 
 3.  **Allow direnv** — the direnv extension asks to allow `.envrc` the
     first time; click **Allow** (or run `direnv allow` once in the
@@ -226,9 +225,12 @@ VS Code.
   - `notebook_intro.ipynb` — numpy, Polars, and an inline plot
   - `notebook_pyrsm.ipynb` — a `pyrsm` regression with a plot
   - `notebook_postgres.ipynb` — query PostgreSQL into a Polars frame
+  - `notebook_random_check.ipynb` — seeded random numbers + a
+    fingerprint to compare across macOS / Windows / Linux
 - **Scripts** (`.py` with `# %%` cells, also runnable as notebooks):
   `check_environment.py`, `python_data_stack.py`, `pyrsm_example.py`,
-  `postgres_python.py`, `spark_pyspark.py`, and `quarto_report.qmd`.
+  `random_check.py`, `postgres_python.py`, `spark_pyspark.py`, and
+  `quarto_report.qmd`.
 
 Run the non-interactive checks all at once:
 
@@ -253,13 +255,25 @@ Everything (Python packages, tools, examples, the shell) is defined in
 the flake, so updating is one command:
 
 ``` bash
-rsm-setup                          # pulls the latest flake + rebuilds the env
+rsm-update                         # pull the latest environment + rebuild
 ```
 
-`rsm-setup` fast-forwards `~/rsm-nix` to the latest and refreshes the
-Python environment, kernel, examples, and shell. It is safe to re-run
-any time and does **not** touch your coursework. direnv reloads the
-workspace automatically.
+`rsm-update` fast-forwards `~/rsm-nix` to the latest and refreshes the
+Python environment, kernel, examples, and shell (it’s the same as
+`rsm-setup`, and also bumps Claude Code to the latest). It is safe to
+re-run any time and does **not** touch your coursework. direnv reloads
+the workspace automatically.
+
+To see exactly which version you’re on — useful for confirming you and a
+classmate match before debugging — run:
+
+``` bash
+rsm-version                        # e.g. "rsm-nix version: 7ff499b0c (2026-06-28)"
+```
+
+The version is the flake’s git commit, so two machines reporting the
+same code have the same environment. `rsm-setup` / `rsm-update` print it
+when they finish.
 
 ## Cleanup / full reset
 

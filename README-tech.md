@@ -22,9 +22,10 @@ environment into every course subfolder. R is intentionally excluded.
 curl -fsSL https://raw.githubusercontent.com/radiant-ai-hub/rsm-nix/main/install/macos-arm-install-rsm-nix.sh | bash
 ```
 
-The installer sets up VS Code, Determinate Nix, `direnv` + `nix-direnv`,
-clones the workspace to `~/rsm-msba`, runs `rsm-setup`, and runs the
-smoke checks.
+The installer sets up VS Code (+ the curated extensions), the MesloLGS
+Nerd Font, Determinate Nix, `direnv` + `nix-direnv`, Tailscale, clones
+the workspace to `~/rsm-msba`, runs `rsm-setup`, and runs the smoke
+checks.
 
 ### Windows 11 (WSL2 + Ubuntu 26.04)
 
@@ -34,9 +35,10 @@ Run PowerShell **as Administrator** for the first WSL install:
 powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr -useb https://raw.githubusercontent.com/radiant-ai-hub/rsm-nix/main/install/windows-install-rsm-nix.ps1 | iex"
 ```
 
-The installer sets up VS Code on Windows, Ubuntu 26.04 on WSL2,
-Determinate Nix inside Ubuntu, `direnv` + `nix-direnv`, and the
-`~/rsm-msba` workspace.
+The installer sets up VS Code on Windows (+ extensions and the MesloLGS
+Nerd Font), Ubuntu 26.04 on WSL2 with zsh, Determinate Nix inside
+Ubuntu, `direnv` + `nix-direnv`, Tailscale, and the `~/rsm-msba`
+workspace.
 
 ### Linux / server (bare Ubuntu, or a Remote-SSH server)
 
@@ -67,8 +69,6 @@ your coursework + state live at `~/rsm-msba`.
 
 Per-platform guides:
 
-- Full getting-started guide:
-  [docs/getting-started.md](docs/getting-started.md)
 - macOS Apple Silicon: [docs/student-macos.md](docs/student-macos.md)
 - Windows 11 (WSL2 + Ubuntu 26.04):
   [docs/student-wsl2.md](docs/student-wsl2.md)
@@ -101,11 +101,16 @@ delete `~/rsm-msba/.rsm-msba`.
 | Command | What it does |
 |----|----|
 | `rsm-setup` | Bootstrap: uv base env, Jupyter kernel, course folders |
+| `rsm-update` | Same as `rsm-setup` + bump Claude Code to latest (the “update” name) |
+| `rsm-msba` | Bootstrap/reset: clone the flake if missing, then `rsm-setup` |
+| `rsm-version` | Print the environment version (the flake’s git commit) + platform |
 | `rsm-python-sync` | Refresh the base env from `uv.lock` |
 | `rsm-new-course NAME...` | Create course/project folder(s) + remember in `courses.txt` |
+| `rsm-vscode-ext` | Install the curated VS Code extensions into the connected (WSL/SSH) window |
 | `rsm-pg-init` / `-start` / `-stop` / `-status` | Workspace-local PostgreSQL lifecycle |
 | `rsm-pg-psql` | `psql` into the `rsm-msba` database |
 | `rsm-pgweb` | pgweb UI at <http://127.0.0.1:8282> |
+| `github` | One-time setup of your Git identity + a GitHub SSH key |
 
 ## Flake interfaces
 

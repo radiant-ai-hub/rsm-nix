@@ -6,64 +6,114 @@ format: gfm
 
 # Installing the RSM-MSBA computing environment on Windows 11
 
-Windows uses **WSL2 with Ubuntu 26.04**. The RSM-MSBA tools run inside Ubuntu
-with the same Determinate Nix setup used on macOS. Windows itself is used for
-VS Code and the WSL integration.
+This guide is for **Windows 11**. It assumes you have **not** used a terminal,
+VS Code, or Linux before. Follow the steps in order.
+
+On Windows, the RSM-MSBA tools run inside **WSL2** — a real Ubuntu Linux that
+Windows runs for you in the background, with **Ubuntu 26.04**. You'll still use
+the normal Windows VS Code window; it simply connects into Ubuntu. You don't need
+to learn Linux — the installer sets everything up.
 
 {{< include _includes/overview.qmd >}}
 
-## Automated installer
+## Step 1 — Open PowerShell as Administrator
 
-Open **PowerShell as Administrator** and run:
+**PowerShell** is Windows' command window. The installer needs Administrator
+rights the first time (to turn on WSL).
+
+1. Click the **Start** button.
+2. Type **PowerShell**.
+3. Under "Windows PowerShell", click **Run as Administrator** (or right-click it →
+   **Run as administrator**).
+4. Click **Yes** when Windows asks for permission.
+
+A blue window opens.
+
+## Step 2 — Run the installer
+
+Copy the line below, paste it into the PowerShell window (**right-click** pastes,
+or **Ctrl + V**), and press **Enter**:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr -useb https://raw.githubusercontent.com/radiant-ai-hub/rsm-nix/main/install/windows-install-rsm-nix.ps1 | iex"
 ```
 
-The installer does the full setup:
+This one command does **everything** — you do **not** need to install VS Code,
+Ubuntu, or anything else separately. It installs:
 
-- installs VS Code and the WSL/Python/Jupyter/Quarto/direnv extensions
-- enables WSL2 and installs `Ubuntu-26.04`
-- creates a normal Ubuntu user
-- installs Determinate Nix inside Ubuntu
-- installs and configures `direnv` + `nix-direnv`
-- clones the workspace to `~/rsm-msba`
-- runs `rsm-setup` and the smoke checks
+- **VS Code** on Windows, plus the extensions the course uses.
+- The **MesloLGS Nerd Font** (so the terminal prompt shows its icons).
+- **WSL2** with **Ubuntu 26.04** (a Linux system inside Windows), with **zsh** as
+  the shell.
+- **Determinate Nix** + **direnv** inside Ubuntu — the environment machinery.
+- **Tailscale** — used later to reach the Rady server from any network (you sign
+  in and accept the invite separately; see [connect-server.md](connect-server.md)).
+- Your **workspace** at `~/rsm-msba` (inside Ubuntu), then `rsm-setup` + a check.
 
-If Windows asks for a reboot while enabling WSL, reboot and run the same command
-again. The script is idempotent and continues from the completed steps.
+What to expect while it runs:
 
-## After install
+- **If Windows says it needs to restart** to finish turning on WSL: **restart**,
+  then open PowerShell as Administrator again and **re-run the same command**. The
+  installer remembers where it left off — this is normal and may happen once.
+- Ubuntu may ask you to **create a username and password** for the Linux system.
+  Pick something simple you'll remember (this is separate from your Windows
+  login).
+- The **first** run downloads a few GB and can take **15–30 minutes**. Leave it
+  until it finishes.
 
-Open VS Code, choose **Connect to WSL**, select `Ubuntu-26.04`, then open
-`~/rsm-msba`. Terminals and notebooks pick up the Nix environment through direnv.
-For notebooks, choose the **Python (nix-uv)** kernel.
+## Step 3 — Open VS Code, connect to Ubuntu, then open your folder
 
-## Manual fallback
+After it finishes, open **VS Code** (Start → type **Visual Studio Code** → Enter).
 
-In PowerShell (Administrator):
+Because your files live inside Ubuntu (not in regular Windows), you first tell
+VS Code to **connect into Ubuntu (WSL)**, and *then* open the folder:
 
-```powershell
-wsl --install -d Ubuntu-26.04
-wsl --set-default-version 2
-```
+1. Press **F1** (or **Ctrl + Shift + P**) to open the command box at the top.
+2. Type **WSL: Connect to WSL** and press **Enter**. A new VS Code window opens;
+   the bottom-left corner shows a green badge like **WSL: Ubuntu-26.04**.
+3. Now open your folder: **File → Open Folder…**. In the path box at the top of
+   the dialog, type **`/home/`**, open your username's folder, then select
+   **`rsm-msba`** and click **OK**.
 
-Then inside the Ubuntu terminal:
+> **"Open Folder" vs. the Terminal — what's the difference?**
+> *Open Folder* sets the project VS Code shows on the left and where its built-in
+> terminal starts. The *Terminal* (Step 4) is a command line **inside** VS Code.
+> You open a folder once per project; you use the terminal whenever you need a
+> command. (On Windows there's an extra first step — *Connect to WSL* — so the
+> folder you open is the one inside Ubuntu.)
+
+The first time, a popup may ask to **allow direnv** for this folder — click
+**Allow**. That's what turns the tools on automatically. You only do this once.
+
+> **Keep your files inside Ubuntu** (`~/rsm-msba`), **not** under `C:\` or
+> `/mnt/c/...`. Working in the Linux home folder is much faster and avoids odd
+> errors.
+
+## Step 4 — Run something
+
+- **A notebook:** open `examples/notebook_intro.ipynb`, click the **kernel
+  picker** (top-right), choose **Python (nix-uv)**, then **Run All**.
+- **A terminal:** open one with **Terminal → New Terminal**. You'll see `(nix-uv)`
+  in the prompt. Try:
+
+  ```bash
+  python examples/check_environment.py     # should print: ALL GOOD
+  ```
+
+That's it — put your coursework in the matching course folder (e.g. `mgta403`).
+
+## Keeping it up to date (and checking your version)
+
+From a terminal in `~/rsm-msba`:
 
 ```bash
-curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
-. /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
-nix profile install nixpkgs#direnv nixpkgs#nix-direnv
-mkdir -p ~/.config/direnv
-echo 'source ~/.nix-profile/share/nix-direnv/direnvrc' >> ~/.config/direnv/direnvrc
-echo 'eval "$(direnv hook bash)"' >> ~/.bashrc
-git clone https://github.com/radiant-ai-hub/rsm-nix.git ~/rsm-nix
-nix develop ~/rsm-nix -c rsm-setup   # creates ~/rsm-msba + .envrc + nix-uv env + folders
-direnv allow ~/rsm-msba
+rsm-update      # pull the latest environment + rebuild (safe to run any time)
+rsm-version     # print your version, e.g. "rsm-nix version: 7ff499b0c (2026-06-28)"
 ```
 
-Keep the repo under the Linux filesystem (`~/rsm-msba`), not under `/mnt/c/...`;
-WSL file access is much faster there.
+`rsm-version` prints a short code identifying your exact setup. If something works
+for a classmate but not for you, compare this code — you may just need to run
+`rsm-update`. Updating never touches your coursework.
 
 {{< include _includes/directory-structure.qmd >}}
 
@@ -78,3 +128,27 @@ WSL file access is much faster there.
 {{< include _includes/maintenance.qmd >}}
 
 {{< include _includes/troubleshooting.qmd >}}
+
+## Manual install (fallback / advanced)
+
+You should not need this — the installer above does it all. It is kept for
+troubleshooting. In PowerShell (Administrator):
+
+```powershell
+wsl --install -d Ubuntu-26.04
+wsl --set-default-version 2
+```
+
+Then, inside the **Ubuntu** terminal:
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
+. /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+nix profile add nixpkgs#direnv nixpkgs#nix-direnv
+mkdir -p ~/.config/direnv
+echo 'source ~/.nix-profile/share/nix-direnv/direnvrc' >> ~/.config/direnv/direnvrc
+echo 'eval "$(direnv hook bash)"' >> ~/.bashrc
+git clone https://github.com/radiant-ai-hub/rsm-nix.git ~/rsm-nix
+nix develop ~/rsm-nix -c rsm-setup   # creates ~/rsm-msba + .envrc + nix-uv env + folders
+direnv allow ~/rsm-msba
+```
