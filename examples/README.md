@@ -35,6 +35,7 @@ up correctly.
 | `random_check.py` | seeded RNG + a one-line fingerprint to compare across platforms | `python examples/random_check.py` |
 | `postgres_python.py` | PostgreSQL via SQLAlchemy + **Polars** | `rsm-pg-start` then run it |
 | `postgres_vscode.pgsql` | PostgreSQL via the VS Code SQL extension | see comments in the file |
+| `postgres-createdb.sh` | load two practice databases (**Northwind**, **WestCoastImporters**) into PostgreSQL | `bash examples/postgres-createdb.sh` |
 | `quarto_report.qmd` | Quarto renders with the RSM Python | `quarto render examples/quarto_report.qmd` |
 | `spark_pyspark.py` | optional Spark/Hadoop profile | `nix develop .#spark-hadoop` then run it |
 
@@ -53,6 +54,19 @@ Windows (WSL), and Linux and compare that one string. With the same package
 versions, NumPy's modern generators are platform-independent, so the fingerprints
 should match. (Historically, R's random numbers could differ across platforms —
 this check makes it easy to see whether that happens here.)
+
+## Practice SQL databases (Northwind + WestCoastImporters)
+
+To get two ready-made databases to practice SQL on, run:
+
+```bash
+bash examples/postgres-createdb.sh
+```
+
+It starts PostgreSQL (if needed) and loads **Northwind** and
+**WestCoastImporters**. It's safe to re-run — existing databases are skipped. When
+it finishes, connect with `rsm-pg-psql -d Northwind` (or `-d WestCoastImporters`),
+browse them with `rsm-pgweb`, or open them from VS Code's SQL tools.
 
 ## "Which environment am I in?"
 
