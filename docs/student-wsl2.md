@@ -1,5 +1,3 @@
-
-
 <!-- generated from docs/src/student-wsl2.qmd — edit the .qmd, then run docs/src/render-docs.sh -->
 
 # Installing the RSM-MSBA computing environment on Windows 11
@@ -39,7 +37,7 @@ A blue window opens.
 Copy the line below, paste it into the PowerShell window
 (**right-click** pastes, or **Ctrl + V**), and press **Enter**:
 
-``` powershell
+```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr -useb https://raw.githubusercontent.com/radiant-ai-hub/rsm-nix/main/install/windows-install-rsm-nix.ps1 | iex"
 ```
 
@@ -76,7 +74,7 @@ After it finishes, open **VS Code** (Start → type **Visual Studio Code**
 → Enter).
 
 Because your files live inside Ubuntu (not in regular Windows), you
-first tell VS Code to **connect into Ubuntu (WSL)**, and *then* open the
+first tell VS Code to **connect into Ubuntu (WSL)**, and _then_ open the
 folder:
 
 1.  Press **F1** (or **Ctrl + Shift + P**) to open the command box at
@@ -88,12 +86,12 @@ folder:
     the top of the dialog, type **`/home/`**, open your username’s
     folder, then select **`rsm-msba`** and click **OK**.
 
-> **“Open Folder” vs. the Terminal — what’s the difference?** *Open
-> Folder* sets the project VS Code shows on the left and where its
-> built-in terminal starts. The *Terminal* (Step 4) is a command line
+> **“Open Folder” vs. the Terminal — what’s the difference?** _Open
+> Folder_ sets the project VS Code shows on the left and where its
+> built-in terminal starts. The _Terminal_ (Step 4) is a command line
 > **inside** VS Code. You open a folder once per project; you use the
 > terminal whenever you need a command. (On Windows there’s an extra
-> first step — *Connect to WSL* — so the folder you open is the one
+> first step — _Connect to WSL_ — so the folder you open is the one
 > inside Ubuntu.)
 
 The first time, a popup may ask to **allow direnv** for this folder —
@@ -113,7 +111,7 @@ do this once.
 - **A terminal:** open one with **Terminal → New Terminal**. You’ll see
   `(nix-uv)` in the prompt. Try:
 
-  ``` bash
+  ```bash
   python examples/check_environment.py     # should print: ALL GOOD
   ```
 
@@ -124,7 +122,7 @@ That’s it — put your coursework in the matching course folder
 
 From a terminal in `~/rsm-msba`:
 
-``` bash
+```bash
 rsm-update      # pull the latest environment + rebuild (safe to run any time)
 rsm-version     # print your version, e.g. "rsm-nix version: 7ff499b0c (2026-06-28)"
 ```
@@ -140,7 +138,7 @@ Two separate places, so the environment can be updated with `git`
 without touching your work — and each course folder can be its own git
 repo:
 
-``` text
+```text
 ~/rsm-nix/                   the flake (a git repo) — RSM machinery only
                              update it with:  cd ~/rsm-nix && git pull
 
@@ -163,7 +161,7 @@ inside `mgta403` with no nesting conflict.
 
 Create more course/project folders any time:
 
-``` bash
+```bash
 rsm-new-course mgta455 mgta495
 ```
 
@@ -184,7 +182,7 @@ When a project needs an extra package, add it **to that project with
 `uv add`** (not `uv pip install`) so it is tracked in the project’s
 `pyproject.toml` and `uv.lock`:
 
-``` bash
+```bash
 cd ~/rsm-msba/my_project
 uv init .                 # once — creates pyproject.toml
 uv add polars             # add a package (tracked + locked)
@@ -202,7 +200,7 @@ The `nix-uv` package list is defined in the flake’s `pyproject.toml`
 (`~/rsm-nix/pyproject.toml`). To add or pin a package for **everyone**,
 edit that file and re-sync the environment:
 
-``` bash
+```bash
 # edit ~/rsm-nix/pyproject.toml (add the package under dependencies), then:
 rsm-python-sync           # rebuild the nix-uv env to match the list
 ```
@@ -212,7 +210,7 @@ rsm-python-sync           # rebuild the nix-uv env to match the list
 A workspace-local PostgreSQL instance is included — no system service,
 no Docker. Data lives under `~/rsm-msba/.rsm-msba/postgres`.
 
-``` bash
+```bash
 pg                                 # overview: status + all the commands below
 rsm-pg-start                       # start (initializes on first run)
 rsm-pg-psql                        # open psql on the rsm-msba database
@@ -236,7 +234,7 @@ port) — always read it from `$PGPORT` rather than hard-coding `8765`.
 Quarto (pinned to 1.9.13 for everyone) is included and configured to
 render with the base Python environment:
 
-``` bash
+```bash
 quarto --version
 quarto render report.qmd
 ```
@@ -246,7 +244,7 @@ quarto render report.qmd
 Scalable-analytics work uses a separate, larger profile. The first
 activation downloads Spark and Hadoop, so expect a wait.
 
-``` bash
+```bash
 cd ~/rsm-msba
 nix develop .#spark-hadoop
 rsm-spark-hadoop-proof             # Hadoop + Spark + a local PySpark session
@@ -257,7 +255,7 @@ rsm-spark-hadoop-proof             # Hadoop + Spark + a local PySpark session
 Everything (Python packages, tools, examples, the shell) is defined in
 the flake, so updating is one command:
 
-``` bash
+```bash
 rsm-update                         # pull the latest environment + rebuild
 ```
 
@@ -270,7 +268,7 @@ the workspace automatically.
 To see exactly which version you’re on — useful for confirming you and a
 classmate match before debugging — run:
 
-``` bash
+```bash
 rsm-version                        # e.g. "rsm-nix version: 7ff499b0c (2026-06-28)"
 ```
 
@@ -283,7 +281,7 @@ when they finish.
 To rebuild the environment **state** from scratch while **keeping your
 coursework** (the course folders under `~/rsm-msba`):
 
-``` bash
+```bash
 rsm-pg-stop 2>/dev/null
 rm -rf ~/rsm-msba/.rsm-msba        # removes only the RSM-owned state
 rsm-setup
@@ -292,20 +290,20 @@ rsm-setup
 To reset **everything** from nothing (⚠️ this also deletes the course
 folders in `~/rsm-msba` — back up any coursework first):
 
-``` bash
+```bash
 rm -rf ~/rsm-msba ~/rsm-nix
 rsm-setup                          # re-clones the flake and rebuilds
 ```
 
 To reclaim disk space from old Nix builds:
 
-``` bash
+```bash
 nix store gc
 ```
 
 To uninstall Nix entirely (Determinate installer):
 
-``` bash
+```bash
 /nix/nix-installer uninstall
 ```
 
@@ -334,14 +332,14 @@ To uninstall Nix entirely (Determinate installer):
 You should not need this — the installer above does it all. It is kept
 for troubleshooting. In PowerShell (Administrator):
 
-``` powershell
+```powershell
 wsl --install -d Ubuntu-26.04
 wsl --set-default-version 2
 ```
 
 Then, inside the **Ubuntu** terminal:
 
-``` bash
+```bash
 curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
 . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
 nix profile add nixpkgs#direnv nixpkgs#nix-direnv

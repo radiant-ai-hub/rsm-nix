@@ -35,5 +35,19 @@ done
 mv -f readme.md ../../README.md
 mv -f readme-tech.md ../../README-tech.md
 
+# Normalize the generated markdown with prettier so the committed files match
+# what the prettier VS Code extension produces on save (consistent code fences,
+# list markers, thematic breaks, no leading blank lines). Prettier's default
+# config preserves prose wrapping, so the Quarto line-wrapping is left intact.
+# Only the rendered .md are formatted — never the .qmd sources (prettier would
+# mangle Quarto shortcodes like {{< include >}}).
+if command -v prettier >/dev/null 2>&1; then
+  prettier --log-level warn --write \
+    ../../README.md ../../README-tech.md ../*.md >/dev/null
+  echo "prettier: normalized README.md, README-tech.md, docs/*.md"
+else
+  echo "prettier not found; skipping markdown normalization" >&2
+fi
+
 echo "rendered: ${guides[*]}"
 echo "  -> docs/*.md, README.md, README-tech.md"

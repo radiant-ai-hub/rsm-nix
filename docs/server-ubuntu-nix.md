@@ -1,5 +1,3 @@
-
-
 <!-- generated from docs/src/server-ubuntu-nix.qmd — edit the .qmd, then run docs/src/render-docs.sh -->
 
 # RSM-MSBA on an Ubuntu 24.04 server (multi-user Nix)
@@ -13,13 +11,13 @@ This is the fastest way to stand up a shared environment with IT’s
 “safe” distro. The declarative NixOS blueprint is
 **[server-nixos.md](server-nixos.md)** (Path B) for later.
 
-------------------------------------------------------------------------
+---
 
 ## 1. Install multi-user Nix
 
 As an admin (sudo) on the Ubuntu 24.04 host:
 
-``` bash
+```bash
 curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install --determinate
 ```
 
@@ -29,7 +27,7 @@ Flakes are enabled by default.
 
 Verify (open a fresh shell first):
 
-``` bash
+```bash
 nix --version
 nix run nixpkgs#hello
 ```
@@ -39,7 +37,7 @@ nix run nixpkgs#hello
 > `experimental-features = nix-command flakes` to `/etc/nix/nix.conf`
 > and `sudo systemctl restart nix-daemon`.
 
-------------------------------------------------------------------------
+---
 
 ## 2. Choose a workspace model
 
@@ -56,13 +54,13 @@ student keep only their coursework and `.rsm-msba` state in their home.
 Lower duplication, more moving parts. Start with Option A unless disk is
 tight.
 
-------------------------------------------------------------------------
+---
 
 ## 3. Provision student accounts
 
 A minimal admin loop (adjust to your roster / SSO):
 
-``` bash
+```bash
 # /usr/local/sbin/rsm-provision.sh  (run as root)
 REPO=https://github.com/radiant-ai-hub/rsm-nix.git
 while read -r user; do
@@ -80,7 +78,7 @@ each student’s workspace `~/rsm-msba` is created by `rsm-setup` (below).
 > wait: `nix develop /home/<any-user>/rsm-nix -c true` and
 > `nix develop /home/<any-user>/rsm-nix#spark-hadoop -c true`.
 
-------------------------------------------------------------------------
+---
 
 ## 4. First-run per student
 
@@ -89,20 +87,20 @@ shared Nix, configures **direnv + nix-direnv** for the student’s login
 shell (so VS Code Remote-SSH activates the env automatically), clones
 the workspace, and runs `rsm-setup`:
 
-``` bash
+```bash
 curl -fsSL https://raw.githubusercontent.com/radiant-ai-hub/rsm-nix/main/install/linux-install-rsm-nix.sh | bash
 ```
 
 The manual equivalent, after SSH-ing in:
 
-``` bash
+```bash
 nix develop ~/rsm-nix -c rsm-setup   # creates ~/rsm-msba + .envrc + nix-uv env + folders
 direnv allow ~/rsm-msba              # if using direnv
 ```
 
 Enable direnv per account (optional, smoother for VS Code):
 
-``` bash
+```bash
 nix profile install nixpkgs#direnv nixpkgs#nix-direnv
 mkdir -p ~/.config/direnv
 echo 'source ~/.nix-profile/share/nix-direnv/direnvrc' >> ~/.config/direnv/direnvrc
@@ -116,7 +114,7 @@ cd ~/rsm-msba && direnv allow
 > `/etc/profile.d/rsm-msba.sh` **only with IT approval** — but per-user
 > direnv keeps the host clean and is preferred.
 
-------------------------------------------------------------------------
+---
 
 ## 5. VS Code Remote-SSH
 
@@ -126,7 +124,7 @@ add the server as an SSH host, connect, and **Open Folder →
 the remote, terminals and notebook kernels (`Python (nix-uv)`) activate
 automatically.
 
-------------------------------------------------------------------------
+---
 
 ## 6. PostgreSQL on a shared host
 
@@ -143,7 +141,7 @@ configure.
 - `pgweb` binds a web port; give it a unique `--listen` per user (or
   forward it per-user over SSH) if several students run it at once.
 
-------------------------------------------------------------------------
+---
 
 ## 7. Capacity & maintenance
 
@@ -155,13 +153,13 @@ configure.
   here. For a large cohort consider a local cache/substituter to save
   bandwidth.
 
-------------------------------------------------------------------------
+---
 
 ## 8. Smoke test the server
 
 As any provisioned user:
 
-``` bash
+```bash
 cd ~/rsm-msba
 nix flake check                         # builds/validates all outputs
 nix develop -c bash tests/check-default.sh

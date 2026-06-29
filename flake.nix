@@ -229,6 +229,7 @@
             git-lfs
             gh
             nodejs_22 # Node runtime for Claude Code (installed per-user via npm)
+            prettier # markdown/JS/JSON formatter (also normalizes rendered docs)
             graphviz
             zsh
             eza # modern `ls` (ls/lsa/lt aliases in the rsm shell)

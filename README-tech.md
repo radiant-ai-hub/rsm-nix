@@ -1,5 +1,3 @@
-
-
 <!-- generated from docs/src/readme-tech.qmd — edit the .qmd, then run docs/src/render-docs.sh -->
 
 # rsm-nix — technical reference
@@ -18,7 +16,7 @@ environment into every course subfolder. R is intentionally excluded.
 
 ### macOS (Apple Silicon)
 
-``` bash
+```bash
 curl -fsSL https://raw.githubusercontent.com/radiant-ai-hub/rsm-nix/main/install/macos-arm-install-rsm-nix.sh | bash
 ```
 
@@ -31,7 +29,7 @@ checks.
 
 Run PowerShell **as Administrator** for the first WSL install:
 
-``` powershell
+```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr -useb https://raw.githubusercontent.com/radiant-ai-hub/rsm-nix/main/install/windows-install-rsm-nix.ps1 | iex"
 ```
 
@@ -42,7 +40,7 @@ workspace.
 
 ### Linux laptop (Ubuntu/Debian or NixOS)
 
-``` bash
+```bash
 curl -fsSL https://raw.githubusercontent.com/radiant-ai-hub/rsm-nix/main/install/linux-install-rsm-nix.sh | bash
 ```
 
@@ -61,7 +59,7 @@ extensions.
 
 ### Manual path (any platform)
 
-``` bash
+```bash
 # 1. install Nix (Determinate Systems installer)
 curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
 
@@ -90,7 +88,7 @@ Per-platform guides:
 
 ## Layout
 
-``` text
+```text
 ~/rsm-nix/      the flake (a git repo) — update with: cd ~/rsm-nix && git pull
 ~/rsm-msba/     your workspace
 ├── .envrc      generated; loads the flake from ~/rsm-nix
@@ -107,19 +105,19 @@ delete `~/rsm-msba/.rsm-msba`.
 
 ## Commands
 
-| Command | What it does |
-|----|----|
-| `rsm-setup` | Bootstrap: uv base env, Jupyter kernel, course folders |
-| `rsm-update` | Same as `rsm-setup` + bump Claude Code to latest (the “update” name) |
-| `rsm-msba` | Bootstrap/reset: clone the flake if missing, then `rsm-setup` |
-| `rsm-version` | Print the environment version (the flake’s git commit) + platform |
-| `rsm-python-sync` | Refresh the base env from `uv.lock` |
-| `rsm-new-course NAME...` | Create course/project folder(s) + remember in `courses.txt` |
-| `rsm-vscode-ext` | Install the curated VS Code extensions into the connected (WSL/SSH) window |
-| `rsm-pg-init` / `-start` / `-stop` / `-status` | Workspace-local PostgreSQL lifecycle |
-| `rsm-pg-psql` | `psql` into the `rsm-msba` database |
-| `rsm-pgweb` | pgweb UI at <http://127.0.0.1:8282> |
-| `github` | One-time setup of your Git identity + a GitHub SSH key |
+| Command                                        | What it does                                                               |
+| ---------------------------------------------- | -------------------------------------------------------------------------- |
+| `rsm-setup`                                    | Bootstrap: uv base env, Jupyter kernel, course folders                     |
+| `rsm-update`                                   | Same as `rsm-setup` + bump Claude Code to latest (the “update” name)       |
+| `rsm-msba`                                     | Bootstrap/reset: clone the flake if missing, then `rsm-setup`              |
+| `rsm-version`                                  | Print the environment version (the flake’s git commit) + platform          |
+| `rsm-python-sync`                              | Refresh the base env from `uv.lock`                                        |
+| `rsm-new-course NAME...`                       | Create course/project folder(s) + remember in `courses.txt`                |
+| `rsm-vscode-ext`                               | Install the curated VS Code extensions into the connected (WSL/SSH) window |
+| `rsm-pg-init` / `-start` / `-stop` / `-status` | Workspace-local PostgreSQL lifecycle                                       |
+| `rsm-pg-psql`                                  | `psql` into the `rsm-msba` database                                        |
+| `rsm-pgweb`                                    | pgweb UI at <http://127.0.0.1:8282>                                        |
+| `github`                                       | One-time setup of your Git identity + a GitHub SSH key                     |
 
 ## Flake interfaces
 
@@ -135,7 +133,7 @@ Supported systems: `aarch64-darwin`, `x86_64-darwin`, `aarch64-linux`,
 
 ## Testing
 
-``` bash
+```bash
 nix flake check
 nix develop -c bash tests/check-default.sh        # toolchain + 35 course-core imports
 nix develop -c bash tests/check-postgres.sh       # PostgreSQL lifecycle
@@ -181,10 +179,10 @@ preference:
 
 1.  **Restrict the tailnet to a non‑overlapping IP pool.** In the
     tailnet policy file, pin nodes (including the server) to a `/16`
-    inside `100.64.0.0/10` that UCSD‑Protected does *not* use, e.g.:
+    inside `100.64.0.0/10` that UCSD‑Protected does _not_ use, e.g.:
 
-    ``` json
-    { "nodeAttrs": [ { "target": ["*"], "ipPool": ["100.81.0.0/16"] } ] }
+    ```json
+    { "nodeAttrs": [{ "target": ["*"], "ipPool": ["100.81.0.0/16"] }] }
     ```
 
     The server’s tailnet IP then no longer falls in the client’s local
@@ -212,7 +210,7 @@ The server side needs nothing special for this —
 Two layers that are easy to conflate:
 
 - **Tailscale is a private network path to a machine — not file
-  access.** It lets a laptop *reach* the server; it does not log anyone
+  access.** It lets a laptop _reach_ the server; it does not log anyone
   in or open any files. On the server every student is a separate
   account with a private home directory (same as today), so reaching the
   server over Tailscale never lets one student read another’s files —
@@ -220,23 +218,23 @@ Two layers that are easy to conflate:
 - **Student-to-student network isolation** is a separate control: either
   an ACL (single-tailnet model) or simply keeping students in separate
   tailnets (node-sharing model). Students never need to be on the
-  instructor’s *personal* tailnet either way.
+  instructor’s _personal_ tailnet either way.
 
 ### Onboarding students — node sharing (reusable link) vs. dedicated tailnet
 
 - **Node sharing with a reusable link (recommended — simple and it
-  scales).** “Sharing” a node gives someone access to *only* the server;
+  scales).** “Sharing” a node gives someone access to _only_ the server;
   they stay in **their own** tailnet (never join yours, never see your
   other machines, and can’t see each other). A single **reusable share
   link can be accepted by up to 1,000 people**, so one link covers the
   whole class — no per-person step. Recipients are external guests: they
   do **not** consume your tailnet’s user seats (sharing actually
-  *raises* your device allowance), and it works on the **free** plan.
+  _raises_ your device allowance), and it works on the **free** plan.
   The link expires after 30 days if unused, so regenerate it each term.
   Optionally restrict shared users to just SSH/HTTPS with an ACL for
   `autogroup:shared` (below).
 - **Dedicated MSBA tailnet + SSO + ACLs (for central management).**
-  Create a *separate* tailnet for the course (not your personal one);
+  Create a _separate_ tailnet for the course (not your personal one);
   students sign in with UCSD identity and an ACL limits them to the
   server’s ports and blocks student-to-student traffic. More control
   (central SSO, audit), but heavier setup and the free tier is limited
@@ -270,8 +268,8 @@ home directories are always protected by the server, not by Tailscale.
 **Connecting to the server (the two paths Windows students use):**
 
 - **VS Code on Windows, Remote-SSH — simplest.** With the Tailscale
-  Windows app running, the server is reachable. In VS Code: *Remote-SSH
-  -\> Connect to Host* using `<their-username>@<server>`, where
+  Windows app running, the server is reachable. In VS Code: _Remote-SSH
+  -\> Connect to Host_ using `<their-username>@<server>`, where
   `<server>` is the address shown for it in their Tailscale app (its
   `100.x` IP always works; the MagicDNS name works once the share is
   accepted). No WSL is needed for server access.
@@ -281,13 +279,13 @@ home directories are always protected by the server, not by Tailscale.
   networking** so WSL shares the Windows network (including Tailscale):
   create/edit `C:\Users\<you>\.wslconfig` with
 
-  ``` ini
+  ```ini
   [wsl2]
   networkingMode=mirrored
   ```
 
   then run `wsl --shutdown` and reopen. After that, `ssh <server>` from
-  WSL works. (Alternative: install Tailscale *inside* WSL as its own
+  WSL works. (Alternative: install Tailscale _inside_ WSL as its own
   node — more setup, and it reintroduces the CGNAT issue above, so
   prefer mirrored networking.)
 
@@ -302,11 +300,11 @@ users too. To limit them to **SSH only** (which still covers VS Code
 Remote-SSH), edit the tailnet policy so your own devices keep full
 access while shared users get **only TCP 22**:
 
-``` json
+```json
 {
   "acls": [
     { "action": "accept", "src": ["autogroup:members"], "dst": ["*:*"] },
-    { "action": "accept", "src": ["autogroup:shared"],  "dst": ["*:22"] }
+    { "action": "accept", "src": ["autogroup:shared"], "dst": ["*:22"] }
   ]
 }
 ```
@@ -315,14 +313,14 @@ Why this is correct and reusable for every server:
 
 - The first rule replaces the default `"src": ["*"]` with
   `autogroup:members`, so the blanket allow applies to **you and your
-  own devices only**, not to shared users. (If you also have *tagged*
+  own devices only**, not to shared users. (If you also have _tagged_
   devices that initiate connections, add rules for them.)
-- The second rule is then the *only* thing matching shared users, so
+- The second rule is then the _only_ thing matching shared users, so
   they get **port 22 and nothing else**.
 - `dst` is `*:22` on purpose — not a hostname or tag. **Sharing already
   limits a recipient to the one machine you shared with them**, and
   **tags/hostnames are stripped from shared nodes**, so the rule keys on
-  the *port*. That means it covers **sc1 today and sc2 the moment you
+  the _port_. That means it covers **sc1 today and sc2 the moment you
   share it** — no per-server edit.
 
 To apply: Tailscale admin console -\> **Access controls** -\> merge in

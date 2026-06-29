@@ -1,5 +1,3 @@
-
-
 <!-- generated from docs/src/student-linux.qmd — edit the .qmd, then run docs/src/render-docs.sh -->
 
 # Installing the RSM-MSBA computing environment on Linux
@@ -32,7 +30,7 @@ desktops:
 
 Copy the line below, paste it into the terminal, and press **Enter**:
 
-``` bash
+```bash
 curl -fsSL https://raw.githubusercontent.com/radiant-ai-hub/rsm-nix/main/install/linux-install-rsm-nix.sh | bash
 ```
 
@@ -42,10 +40,10 @@ Nix, or anything else by hand. It installs:
 - **VS Code** + the course extensions (on Ubuntu/Debian via the official
   Microsoft package; on NixOS via `nix profile`).
 - The **MesloLGS Nerd Font** (so the terminal prompt shows its icons).
-- **Determinate Nix** + **direnv** — the environment machinery. *(On
-  NixOS Nix is already there, so this step is skipped.)*
-- **Tailscale** — to reach the Rady server from any network. *(See the
-  NixOS note below.)*
+- **Determinate Nix** + **direnv** — the environment machinery. _(On
+  NixOS Nix is already there, so this step is skipped.)_
+- **Tailscale** — to reach the Rady server from any network. _(See the
+  NixOS note below.)_
 - Your **workspace** at `~/rsm-msba`, then it runs `rsm-setup` and a
   quick check.
 
@@ -57,7 +55,7 @@ What to expect:
   **10–20 minutes**. Later runs are fast. Wait for **“Installation
   complete.”**
 
-> **NixOS users:** the installer can’t enable the Tailscale *service*
+> **NixOS users:** the installer can’t enable the Tailscale _service_
 > declaratively for you. It prints the one line to add to your
 > `configuration.nix`: `services.tailscale.enable = true;` — then run
 > `sudo nixos-rebuild switch` and `sudo tailscale up`. Everything else
@@ -69,7 +67,7 @@ Open **VS Code** (from your applications menu, or run `code` in the
 terminal).
 
 Now **open your workspace folder** — this is the key VS Code idea:
-*opening a folder* tells VS Code which project you’re working on; it is
+_opening a folder_ tells VS Code which project you’re working on; it is
 **not** the same as typing in a terminal.
 
 1.  In the top menu, click **File → Open Folder…** (keyboard: **Ctrl + K
@@ -80,9 +78,9 @@ Now **open your workspace folder** — this is the key VS Code idea:
 VS Code reloads with `rsm-msba` as your project; your course folders and
 an `examples` folder appear in the **Explorer** on the left.
 
-> **“Open Folder” vs. the Terminal — what’s the difference?** *Open
-> Folder* sets the project VS Code shows on the left and where its
-> built-in terminal starts. The *Terminal* is a command line **inside**
+> **“Open Folder” vs. the Terminal — what’s the difference?** _Open
+> Folder_ sets the project VS Code shows on the left and where its
+> built-in terminal starts. The _Terminal_ is a command line **inside**
 > VS Code. You open a folder once per project; you use the terminal
 > whenever you need a command.
 
@@ -99,7 +97,7 @@ do this once.
 - **A terminal:** open one with **Terminal → New Terminal**. You’ll see
   `(nix-uv)` in the prompt. Try:
 
-  ``` bash
+  ```bash
   python examples/check_environment.py     # should print: ALL GOOD
   ```
 
@@ -110,7 +108,7 @@ That’s it — put your coursework in the matching course folder
 
 From a terminal in `~/rsm-msba`:
 
-``` bash
+```bash
 rsm-update      # pull the latest environment + rebuild (safe to run any time)
 rsm-version     # print your version, e.g. "rsm-nix version: 7ff499b0c (2026-06-28)"
 ```
@@ -126,7 +124,7 @@ Two separate places, so the environment can be updated with `git`
 without touching your work — and each course folder can be its own git
 repo:
 
-``` text
+```text
 ~/rsm-nix/                   the flake (a git repo) — RSM machinery only
                              update it with:  cd ~/rsm-nix && git pull
 
@@ -149,7 +147,7 @@ inside `mgta403` with no nesting conflict.
 
 Create more course/project folders any time:
 
-``` bash
+```bash
 rsm-new-course mgta455 mgta495
 ```
 
@@ -213,7 +211,7 @@ When a project needs an extra package, add it **to that project with
 `uv add`** (not `uv pip install`) so it is tracked in the project’s
 `pyproject.toml` and `uv.lock`:
 
-``` bash
+```bash
 cd ~/rsm-msba/my_project
 uv init .                 # once — creates pyproject.toml
 uv add polars             # add a package (tracked + locked)
@@ -231,7 +229,7 @@ The `nix-uv` package list is defined in the flake’s `pyproject.toml`
 (`~/rsm-nix/pyproject.toml`). To add or pin a package for **everyone**,
 edit that file and re-sync the environment:
 
-``` bash
+```bash
 # edit ~/rsm-nix/pyproject.toml (add the package under dependencies), then:
 rsm-python-sync           # rebuild the nix-uv env to match the list
 ```
@@ -241,7 +239,7 @@ rsm-python-sync           # rebuild the nix-uv env to match the list
 A workspace-local PostgreSQL instance is included — no system service,
 no Docker. Data lives under `~/rsm-msba/.rsm-msba/postgres`.
 
-``` bash
+```bash
 pg                                 # overview: status + all the commands below
 rsm-pg-start                       # start (initializes on first run)
 rsm-pg-psql                        # open psql on the rsm-msba database
@@ -265,7 +263,7 @@ port) — always read it from `$PGPORT` rather than hard-coding `8765`.
 Quarto (pinned to 1.9.13 for everyone) is included and configured to
 render with the base Python environment:
 
-``` bash
+```bash
 quarto --version
 quarto render report.qmd
 ```
@@ -275,7 +273,7 @@ quarto render report.qmd
 Scalable-analytics work uses a separate, larger profile. The first
 activation downloads Spark and Hadoop, so expect a wait.
 
-``` bash
+```bash
 cd ~/rsm-msba
 nix develop .#spark-hadoop
 rsm-spark-hadoop-proof             # Hadoop + Spark + a local PySpark session
@@ -286,7 +284,7 @@ rsm-spark-hadoop-proof             # Hadoop + Spark + a local PySpark session
 Everything (Python packages, tools, examples, the shell) is defined in
 the flake, so updating is one command:
 
-``` bash
+```bash
 rsm-update                         # pull the latest environment + rebuild
 ```
 
@@ -299,7 +297,7 @@ the workspace automatically.
 To see exactly which version you’re on — useful for confirming you and a
 classmate match before debugging — run:
 
-``` bash
+```bash
 rsm-version                        # e.g. "rsm-nix version: 7ff499b0c (2026-06-28)"
 ```
 
@@ -312,7 +310,7 @@ when they finish.
 To rebuild the environment **state** from scratch while **keeping your
 coursework** (the course folders under `~/rsm-msba`):
 
-``` bash
+```bash
 rsm-pg-stop 2>/dev/null
 rm -rf ~/rsm-msba/.rsm-msba        # removes only the RSM-owned state
 rsm-setup
@@ -321,20 +319,20 @@ rsm-setup
 To reset **everything** from nothing (⚠️ this also deletes the course
 folders in `~/rsm-msba` — back up any coursework first):
 
-``` bash
+```bash
 rm -rf ~/rsm-msba ~/rsm-nix
 rsm-setup                          # re-clones the flake and rebuilds
 ```
 
 To reclaim disk space from old Nix builds:
 
-``` bash
+```bash
 nix store gc
 ```
 
 To uninstall Nix entirely (Determinate installer):
 
-``` bash
+```bash
 /nix/nix-installer uninstall
 ```
 
@@ -363,7 +361,7 @@ To uninstall Nix entirely (Determinate installer):
 You should not need this — the installer above does it all. It is kept
 for troubleshooting or non-Ubuntu/non-NixOS distributions.
 
-``` bash
+```bash
 # 1. Determinate Nix (SKIP on NixOS — Nix is already installed). Reopen the shell after.
 curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
 

@@ -1,5 +1,3 @@
-
-
 <!-- generated from docs/src/connect-server.qmd — edit the .qmd, then run docs/src/render-docs.sh -->
 
 # Connecting to the Rady server with VS Code
@@ -16,7 +14,7 @@ Intel Macs.
 Use the one your instructor gives you. There are two:
 
 | Server  | Address on campus / VPN   | Tailscale name | Tailscale IP     |
-|---------|---------------------------|----------------|------------------|
+| ------- | ------------------------- | -------------- | ---------------- |
 | **sc1** | `rsm-compute-01.ucsd.edu` | `sc1-nixos`    | `100.120.22.116` |
 | **sc2** | `rsm-compute-02.ucsd.edu` | `sc2-ubuntu`   | `100.120.8.242`  |
 
@@ -108,7 +106,7 @@ corner shows **SSH: `<server>`**.
 Open a terminal in the connected window (**Terminal → New Terminal**)
 and run:
 
-``` bash
+```bash
 rsm-setup
 ```
 
@@ -122,7 +120,7 @@ your setup.
 Then install the course’s VS Code extensions **on the server** with one
 command:
 
-``` bash
+```bash
 rsm-vscode-ext
 ```
 
@@ -133,7 +131,7 @@ at minimum **Python**, **Jupyter**, **Quarto**, and **direnv**
 
 ## Step 5 — Open your workspace folder
 
-Now tell VS Code which folder to work in. *Opening a folder* sets the
+Now tell VS Code which folder to work in. _Opening a folder_ sets the
 project VS Code shows on the left and where its terminal starts — it is
 **not** the same as typing in the terminal.
 
@@ -156,10 +154,10 @@ should print **ALL GOOD**.
 
 - **You’ll see a direnv message in `~/rsm-nix`** (`".envrc is blocked"`)
   — that folder is just the environment’s source code; **ignore it** and
-  work in `~/rsm-msba`. Do *not* run `direnv allow` there.
+  work in `~/rsm-msba`. Do _not_ run `direnv allow` there.
 - **`import numpy` fails with a `libstdc++.so.6` error** → the
   environment isn’t active. Make sure the **direnv** extension is
-  installed *on the server*, that you ran `direnv allow` in
+  installed _on the server_, that you ran `direnv allow` in
   `~/rsm-msba`, and that the terminal/kernel was opened from inside
   `~/rsm-msba`.
 - **Can’t connect at all?** Confirm Tailscale shows **Connected** (or
@@ -176,7 +174,7 @@ Two separate places, so the environment can be updated with `git`
 without touching your work — and each course folder can be its own git
 repo:
 
-``` text
+```text
 ~/rsm-nix/                   the flake (a git repo) — RSM machinery only
                              update it with:  cd ~/rsm-nix && git pull
 
@@ -199,7 +197,7 @@ inside `mgta403` with no nesting conflict.
 
 Create more course/project folders any time:
 
-``` bash
+```bash
 rsm-new-course mgta455 mgta495
 ```
 
@@ -220,7 +218,7 @@ When a project needs an extra package, add it **to that project with
 `uv add`** (not `uv pip install`) so it is tracked in the project’s
 `pyproject.toml` and `uv.lock`:
 
-``` bash
+```bash
 cd ~/rsm-msba/my_project
 uv init .                 # once — creates pyproject.toml
 uv add polars             # add a package (tracked + locked)
@@ -238,7 +236,7 @@ The `nix-uv` package list is defined in the flake’s `pyproject.toml`
 (`~/rsm-nix/pyproject.toml`). To add or pin a package for **everyone**,
 edit that file and re-sync the environment:
 
-``` bash
+```bash
 # edit ~/rsm-nix/pyproject.toml (add the package under dependencies), then:
 rsm-python-sync           # rebuild the nix-uv env to match the list
 ```
@@ -248,7 +246,7 @@ rsm-python-sync           # rebuild the nix-uv env to match the list
 A workspace-local PostgreSQL instance is included — no system service,
 no Docker. Data lives under `~/rsm-msba/.rsm-msba/postgres`.
 
-``` bash
+```bash
 pg                                 # overview: status + all the commands below
 rsm-pg-start                       # start (initializes on first run)
 rsm-pg-psql                        # open psql on the rsm-msba database
@@ -272,7 +270,7 @@ port) — always read it from `$PGPORT` rather than hard-coding `8765`.
 Quarto (pinned to 1.9.13 for everyone) is included and configured to
 render with the base Python environment:
 
-``` bash
+```bash
 quarto --version
 quarto render report.qmd
 ```

@@ -1,5 +1,3 @@
-
-
 <!-- generated from docs/src/readme.qmd — edit the .qmd, then run docs/src/render-docs.sh -->
 
 # RSM-MSBA computing environment
@@ -32,13 +30,13 @@ over **Tailscale** and compute runs on the server.
 Full walkthrough covers Tailscale setup, and the campus VPN option:
 **[docs/connect-server.md](docs/connect-server.md)**
 
-------------------------------------------------------------------------
+---
 
 # Using the environment
 
 ## Layout
 
-``` text
+```text
 ~/rsm-nix/      the flake (a git repo) — update with: cd ~/rsm-nix && git pull
 ~/rsm-msba/     your workspace
 ├── .envrc      generated; loads the flake from ~/rsm-nix
@@ -136,7 +134,7 @@ Code **or** a plain SSH terminal.
 Put personal zsh settings in `~/.rsm-local.zsh` — it’s sourced last and
 survives a workspace reset. For example, to use vi keybindings:
 
-``` bash
+```bash
 echo 'bindkey -v' >> ~/.rsm-local.zsh
 ```
 
@@ -153,7 +151,7 @@ When a project needs an extra package, add it **to that project with
 `uv add`** (not `uv pip install`) so it is tracked in the project’s
 `pyproject.toml` and `uv.lock`:
 
-``` bash
+```bash
 cd ~/rsm-msba/my_project
 uv init .                 # once — creates pyproject.toml
 uv add polars             # add a package (tracked + locked)
@@ -171,7 +169,7 @@ The `nix-uv` package list is defined in the flake’s `pyproject.toml`
 (`~/rsm-nix/pyproject.toml`). To add or pin a package for **everyone**,
 edit that file and re-sync the environment:
 
-``` bash
+```bash
 # edit ~/rsm-nix/pyproject.toml (add the package under dependencies), then:
 rsm-python-sync           # rebuild the nix-uv env to match the list
 ```
@@ -181,7 +179,7 @@ rsm-python-sync           # rebuild the nix-uv env to match the list
 A workspace-local PostgreSQL instance is included — no system service,
 no Docker. Data lives under `~/rsm-msba/.rsm-msba/postgres`.
 
-``` bash
+```bash
 pg                                 # overview: status + all the commands below
 rsm-pg-start                       # start (initializes on first run)
 rsm-pg-psql                        # open psql on the rsm-msba database
@@ -205,7 +203,7 @@ port) — always read it from `$PGPORT` rather than hard-coding `8765`.
 Quarto (pinned to 1.9.13 for everyone) is included and configured to
 render with the base Python environment:
 
-``` bash
+```bash
 quarto --version
 quarto render report.qmd
 ```
@@ -229,7 +227,7 @@ VS Code.
 
 Run the non-interactive checks all at once:
 
-``` bash
+```bash
 bash examples/run-examples.sh
 ```
 
@@ -238,7 +236,7 @@ bash examples/run-examples.sh
 Scalable-analytics work uses a separate, larger profile. The first
 activation downloads Spark and Hadoop, so expect a wait.
 
-``` bash
+```bash
 cd ~/rsm-msba
 nix develop .#spark-hadoop
 rsm-spark-hadoop-proof             # Hadoop + Spark + a local PySpark session
@@ -249,7 +247,7 @@ rsm-spark-hadoop-proof             # Hadoop + Spark + a local PySpark session
 Everything (Python packages, tools, examples, the shell) is defined in
 the flake, so updating is one command:
 
-``` bash
+```bash
 rsm-update                         # pull the latest environment + rebuild
 ```
 
@@ -262,7 +260,7 @@ the workspace automatically.
 To see exactly which version you’re on — useful for confirming you and a
 classmate match before debugging — run:
 
-``` bash
+```bash
 rsm-version                        # e.g. "rsm-nix version: 7ff499b0c (2026-06-28)"
 ```
 
@@ -275,7 +273,7 @@ when they finish.
 To rebuild the environment **state** from scratch while **keeping your
 coursework** (the course folders under `~/rsm-msba`):
 
-``` bash
+```bash
 rsm-pg-stop 2>/dev/null
 rm -rf ~/rsm-msba/.rsm-msba        # removes only the RSM-owned state
 rsm-setup
@@ -284,20 +282,20 @@ rsm-setup
 To reset **everything** from nothing (⚠️ this also deletes the course
 folders in `~/rsm-msba` — back up any coursework first):
 
-``` bash
+```bash
 rm -rf ~/rsm-msba ~/rsm-nix
 rsm-setup                          # re-clones the flake and rebuilds
 ```
 
 To reclaim disk space from old Nix builds:
 
-``` bash
+```bash
 nix store gc
 ```
 
 To uninstall Nix entirely (Determinate installer):
 
-``` bash
+```bash
 /nix/nix-installer uninstall
 ```
 
@@ -321,8 +319,8 @@ To uninstall Nix entirely (Determinate installer):
 - **Still stuck?** — run the smoke check and share the output:
   `nix develop ~/rsm-msba -c bash ~/rsm-msba/tests/check-default.sh`
 
-------------------------------------------------------------------------
+---
 
-*Instructors / developers:* the flake interfaces, the full command list,
+_Instructors / developers:_ the flake interfaces, the full command list,
 and the server configuration are in **[README-tech.md](README-tech.md)**
 and the [`docs/`](docs/) guides.
