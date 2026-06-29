@@ -2,7 +2,7 @@
 
 ```text
 ~/rsm-nix/      the flake (a git repo) — update with: cd ~/rsm-nix && git pull
-~/rsm-msba/     your workspace (NOT a git repo)
+~/rsm-msba/     your workspace
 ├── .envrc      generated; loads the flake from ~/rsm-nix
 ├── .rsm-msba/  state: envs/nix-uv, postgres, jupyter (survives flake updates)
 ├── mgta403/    a course folder — can be its own git repo

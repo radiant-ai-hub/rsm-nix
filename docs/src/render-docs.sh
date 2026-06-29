@@ -17,6 +17,7 @@ guides=(
   readme-tech.qmd
   student-macos.qmd
   student-wsl2.qmd
+  student-linux.qmd
   connect-server.qmd
   server-ubuntu-nix.qmd
   server-nixos.qmd
@@ -28,7 +29,7 @@ for g in "${guides[@]}"; do
 done
 
 # Place outputs: guides -> ../ (docs/), readme -> ../../README.md (repo root).
-for g in student-macos student-wsl2 connect-server server-ubuntu-nix server-nixos; do
+for g in student-macos student-wsl2 student-linux connect-server server-ubuntu-nix server-nixos; do
   mv -f "$g.md" "../$g.md"
 done
 mv -f readme.md ../../README.md

@@ -1,4 +1,4 @@
-## Using VS Code (the convenient way)
+## Using VS Code
 
 The smoothest workflow uses the **direnv** VS Code extension so the RSM-MSBA
 environment activates automatically — no manual interpreter selection, no venv

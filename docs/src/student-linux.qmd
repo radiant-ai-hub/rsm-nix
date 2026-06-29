@@ -1,0 +1,147 @@
+---
+format: gfm
+---
+
+<!-- generated from docs/src/student-linux.qmd — edit the .qmd, then run docs/src/render-docs.sh -->
+
+# Installing the RSM-MSBA computing environment on Linux
+
+This guide is for students running **Linux** as their laptop operating system. It
+assumes you have **not** used these tools before. The installer is first-class on
+**Ubuntu / Debian** and **NixOS**; other Linux distributions work for the Nix and
+workspace parts, but you'll install VS Code and Tailscale yourself.
+
+{{< include _includes/overview.qmd >}}
+
+## Step 1 — Open a terminal
+
+The **terminal** is a window where you type commands. On most Linux desktops:
+
+- **Ubuntu / Debian:** press **Ctrl + Alt + T**, or open **Terminal** from the
+  applications menu.
+- **NixOS / other:** open your terminal app (e.g. GNOME Terminal, Konsole,
+  Alacritty, kitty) from the applications menu.
+
+## Step 2 — Run the installer
+
+Copy the line below, paste it into the terminal, and press **Enter**:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/radiant-ai-hub/rsm-nix/main/install/linux-install-rsm-nix.sh | bash
+```
+
+This one command does the whole setup — you do **not** install VS Code, Nix, or
+anything else by hand. It installs:
+
+- **VS Code** + the course extensions (on Ubuntu/Debian via the official Microsoft
+  package; on NixOS via `nix profile`).
+- The **MesloLGS Nerd Font** (so the terminal prompt shows its icons).
+- **Determinate Nix** + **direnv** — the environment machinery. *(On NixOS Nix is
+  already there, so this step is skipped.)*
+- **Tailscale** — to reach the Rady server from any network. *(See the NixOS note
+  below.)*
+- Your **workspace** at `~/rsm-msba`, then it runs `rsm-setup` and a quick check.
+
+What to expect:
+
+- On **Ubuntu/Debian** it will ask for **your password** (for `sudo`, to install
+  VS Code). Typing shows nothing on screen — that's normal.
+- The **first** run downloads a few GB of Python packages and can take
+  **10–20 minutes**. Later runs are fast. Wait for **"Installation complete."**
+
+> **NixOS users:** the installer can't enable the Tailscale *service*
+> declaratively for you. It prints the one line to add to your
+> `configuration.nix`:
+> `services.tailscale.enable = true;` — then run `sudo nixos-rebuild switch` and
+> `sudo tailscale up`. Everything else (VS Code, fonts, direnv, the workspace) is
+> handled.
+
+## Step 3 — Open VS Code and then open your workspace folder
+
+Open **VS Code** (from your applications menu, or run `code` in the terminal).
+
+Now **open your workspace folder** — this is the key VS Code idea: *opening a
+folder* tells VS Code which project you're working on; it is **not** the same as
+typing in a terminal.
+
+1. In the top menu, click **File → Open Folder…** (keyboard: **Ctrl + K Ctrl + O**).
+2. Navigate to your home folder and select **`rsm-msba`**, then click **Open**.
+
+VS Code reloads with `rsm-msba` as your project; your course folders and an
+`examples` folder appear in the **Explorer** on the left.
+
+> **"Open Folder" vs. the Terminal — what's the difference?** *Open Folder* sets
+> the project VS Code shows on the left and where its built-in terminal starts.
+> The *Terminal* is a command line **inside** VS Code. You open a folder once per
+> project; you use the terminal whenever you need a command.
+
+The first time, a popup may ask to **allow direnv** for this folder — click
+**Allow**. That's what turns the tools on automatically. You only do this once.
+
+## Step 4 — Run something
+
+- **A notebook:** open `examples/notebook_intro.ipynb`, click the **kernel picker**
+  (top-right), choose **Python (nix-uv)**, then **Run All**.
+- **A terminal:** open one with **Terminal → New Terminal**. You'll see `(nix-uv)`
+  in the prompt. Try:
+
+  ```bash
+  python examples/check_environment.py     # should print: ALL GOOD
+  ```
+
+That's it — put your coursework in the matching course folder (e.g. `mgta403`).
+
+## Keeping it up to date (and checking your version)
+
+From a terminal in `~/rsm-msba`:
+
+```bash
+rsm-update      # pull the latest environment + rebuild (safe to run any time)
+rsm-version     # print your version, e.g. "rsm-nix version: 7ff499b0c (2026-06-28)"
+```
+
+`rsm-version` prints a short code identifying your exact setup. If something works
+for a classmate but not for you, compare this code — you may just need to run
+`rsm-update`. Updating never touches your coursework.
+
+{{< include _includes/directory-structure.qmd >}}
+
+{{< include _includes/usage-vscode.qmd >}}
+
+{{< include _includes/usage-uv.qmd >}}
+
+{{< include _includes/usage-postgres.qmd >}}
+
+{{< include _includes/usage-quarto.qmd >}}
+
+{{< include _includes/usage-spark.qmd >}}
+
+{{< include _includes/maintenance.qmd >}}
+
+{{< include _includes/troubleshooting.qmd >}}
+
+## Manual install (fallback / advanced)
+
+You should not need this — the installer above does it all. It is kept for
+troubleshooting or non-Ubuntu/non-NixOS distributions.
+
+```bash
+# 1. Determinate Nix (SKIP on NixOS — Nix is already installed). Reopen the shell after.
+curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
+
+# 2. direnv + nix-direnv (auto-activate the environment in ~/rsm-msba)
+nix profile add nixpkgs#direnv nixpkgs#nix-direnv
+mkdir -p ~/.config/direnv
+echo 'source ~/.nix-profile/share/nix-direnv/direnvrc' >> ~/.config/direnv/direnvrc
+echo 'eval "$(direnv hook bash)"' >> ~/.bashrc   # or 'direnv hook zsh' >> ~/.zshrc
+
+# 3. clone the flake and build the workspace
+git clone https://github.com/radiant-ai-hub/rsm-nix.git ~/rsm-nix
+nix develop ~/rsm-nix -c rsm-setup   # creates ~/rsm-msba + .envrc + nix-uv env + folders
+direnv allow ~/rsm-msba
+```
+
+Install **VS Code** from <https://code.visualstudio.com> (Ubuntu/Debian: the
+`.deb`; NixOS: `nix profile add nixpkgs#vscode-fhs`), then install the extensions
+from `~/rsm-nix/vscode/extensions.txt` with
+`while read e; do code --install-extension "$e"; done < ~/rsm-nix/vscode/extensions.txt`.

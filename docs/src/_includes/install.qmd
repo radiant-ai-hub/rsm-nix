@@ -20,16 +20,22 @@ The installer sets up VS Code on Windows (+ extensions and the MesloLGS Nerd
 Font), Ubuntu 26.04 on WSL2 with zsh, Determinate Nix inside Ubuntu, `direnv` +
 `nix-direnv`, Tailscale, and the `~/rsm-msba` workspace.
 
-### Linux / server (bare Ubuntu, or a Remote-SSH server)
+### Linux laptop (Ubuntu/Debian or NixOS)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/radiant-ai-hub/rsm-nix/main/install/linux-install-rsm-nix.sh | bash
 ```
 
-Installs Determinate Nix (if missing), configures `direnv` + `nix-direnv` for
-your login shell (zsh or bash), clones the workspace to `~/rsm-msba`, and runs
-`rsm-setup`. It does not install VS Code — connect from your laptop with the
-**Remote - SSH** + **mkhl.direnv** extensions.
+One-command laptop setup: VS Code (+ the curated extensions), the MesloLGS Nerd
+Font, `direnv` + `nix-direnv`, Tailscale, and the `~/rsm-msba` workspace. On
+Ubuntu/Debian it also installs Determinate Nix; on NixOS Nix is already present
+and Tailscale is enabled declaratively (the installer prints the line). Other
+distros work for the Nix/workspace parts; install VS Code/Tailscale yourself.
+
+### Bare server (Remote-SSH, no VS Code)
+
+Run the same script with `--skip-vscode` on a headless server, then connect from
+your laptop with the **Remote - SSH** + **mkhl.direnv** extensions.
 
 ### Manual path (any platform)
 

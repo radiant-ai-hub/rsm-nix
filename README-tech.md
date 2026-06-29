@@ -40,15 +40,22 @@ Nerd Font), Ubuntu 26.04 on WSL2 with zsh, Determinate Nix inside
 Ubuntu, `direnv` + `nix-direnv`, Tailscale, and the `~/rsm-msba`
 workspace.
 
-### Linux / server (bare Ubuntu, or a Remote-SSH server)
+### Linux laptop (Ubuntu/Debian or NixOS)
 
 ``` bash
 curl -fsSL https://raw.githubusercontent.com/radiant-ai-hub/rsm-nix/main/install/linux-install-rsm-nix.sh | bash
 ```
 
-Installs Determinate Nix (if missing), configures `direnv` +
-`nix-direnv` for your login shell (zsh or bash), clones the workspace to
-`~/rsm-msba`, and runs `rsm-setup`. It does not install VS Code —
+One-command laptop setup: VS Code (+ the curated extensions), the
+MesloLGS Nerd Font, `direnv` + `nix-direnv`, Tailscale, and the
+`~/rsm-msba` workspace. On Ubuntu/Debian it also installs Determinate
+Nix; on NixOS Nix is already present and Tailscale is enabled
+declaratively (the installer prints the line). Other distros work for
+the Nix/workspace parts; install VS Code/Tailscale yourself.
+
+### Bare server (Remote-SSH, no VS Code)
+
+Run the same script with `--skip-vscode` on a headless server, then
 connect from your laptop with the **Remote - SSH** + **mkhl.direnv**
 extensions.
 
@@ -72,6 +79,8 @@ Per-platform guides:
 - macOS Apple Silicon: [docs/student-macos.md](docs/student-macos.md)
 - Windows 11 (WSL2 + Ubuntu 26.04):
   [docs/student-wsl2.md](docs/student-wsl2.md)
+- Linux laptop (Ubuntu/Debian or NixOS):
+  [docs/student-linux.md](docs/student-linux.md)
 - **Connect to the shared server with VS Code** (students/TAs):
   [docs/connect-server.md](docs/connect-server.md)
 - Ubuntu 24.04 server (multi-user Nix):
@@ -83,7 +92,7 @@ Per-platform guides:
 
 ``` text
 ~/rsm-nix/      the flake (a git repo) — update with: cd ~/rsm-nix && git pull
-~/rsm-msba/     your workspace (NOT a git repo)
+~/rsm-msba/     your workspace
 ├── .envrc      generated; loads the flake from ~/rsm-nix
 ├── .rsm-msba/  state: envs/nix-uv, postgres, jupyter (survives flake updates)
 ├── mgta403/    a course folder — can be its own git repo

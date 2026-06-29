@@ -7,13 +7,10 @@ format: gfm
 # RSM-MSBA computing environment
 
 The computing environment for the Rady MSBA program — Python, Quarto,
-PostgreSQL, and the course packages — **the same on your laptop and on the Rady
-server**. No Docker to install.
+PostgreSQL, and the course packages — **the same computing environment on your
+laptop and on the Rady MSBA server**.
 
-There are two ways to use it. **New students: pick one and follow that one guide
-top to bottom — it does everything (including installing VS Code).**
-
-## A. On your own laptop (recommended for most students)
+## A. On your own laptop
 
 One command installs everything — VS Code, the environment, and your workspace at
 `~/rsm-msba`. Follow the guide for your computer:
@@ -21,20 +18,20 @@ One command installs everything — VS Code, the environment, and your workspace
 - **macOS (Apple Silicon — M1/M2/M3/M4):**
   **[docs/student-macos.md](docs/student-macos.md)**
 - **Windows 11:** **[docs/student-wsl2.md](docs/student-wsl2.md)**
+- **Linux (Ubuntu/Debian or NixOS):**
+  **[docs/student-linux.md](docs/student-linux.md)**
 
 You do **not** need to install VS Code, Nix, or anything else by hand — the
-installer in those guides does it for you. When it's done, you open the
-`~/rsm-msba` folder in VS Code and pick the **Python (nix-uv)** kernel for
-notebooks.
+all-in-one-installer does it for you. When it's done, you open the `~/rsm-msba`
+folder in VS Code and pick the **Python (nix-uv)** kernel for notebooks.
 
-## B. On the Rady server (nothing to install on your laptop except VS Code)
+## B. On the Rady server
 
-Use a shared Rady server through VS Code on your laptop — good for older/Intel
-Macs or low-powered machines. You connect over **Tailscale** (works from any
-network) or the campus VPN, then everything runs on the server.
+Use the Rady MSBA server through VS Code on your laptop. You connect over
+**Tailscale** and compute runs on the server.
 
-Full walkthrough (covers both **sc1** and **sc2**, Tailscale setup, and the
-campus VPN option): **[docs/connect-server.md](docs/connect-server.md)**
+Full walkthrough covers Tailscale setup, and the campus VPN option:
+**[docs/connect-server.md](docs/connect-server.md)**
 
 ---
 
