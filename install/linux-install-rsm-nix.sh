@@ -327,6 +327,19 @@ configure_direnv() {
     printf '%s\n' 'source ~/.nix-profile/share/nix-direnv/direnvrc' >>"$HOME/.config/direnv/direnvrc"
   fi
 
+  # On NixOS / home-manager the login rc is a read-only symlink into the Nix
+  # store, so writing it fails (and `set -e` would otherwise abort the whole
+  # install before the workspace is ever set up). Detect that, print the
+  # declarative snippet to add instead, and carry on to setup_workspace (the
+  # part that actually clones rsm-nix and runs rsm-setup).
+  if [ -e "$rc" ] && [ ! -w "$rc" ]; then
+    log_detail "$rc is read-only (managed by NixOS/home-manager); leaving it untouched."
+    log_detail "Add direnv + the rsm-msba shell hook to your Nix config instead —"
+    log_detail "  programs.direnv = { enable = true; nix-direnv.enable = true; };"
+    log_detail "  plus the _rsm_zsh_load chpwd hook from nixos/rsm-server.nix."
+    return
+  fi
+
   touch "$rc"
   if [ "$login_shell" = "zsh" ]; then
     if ! grep -Fq '# >>> rsm-msba (managed) >>>' "$rc"; then

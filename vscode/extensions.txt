@@ -28,4 +28,3 @@ cweijan.vscode-office
 nefrob.vscode-just-syntax
 davidanson.vscode-markdownlint
 chuckjonas.duckdb
-vnijs.rsm-vscode-nix
