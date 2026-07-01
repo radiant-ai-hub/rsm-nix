@@ -19,20 +19,26 @@ echo "  Email: $(git config --global user.email)"
 #   rsm-<the part of your email before @ucsd.edu>
 # Check whether that account exists; if not, rename your GitHub account to it.
 gh_user="rsm-${git_email%@ucsd.edu}"
+gh_url="https://github.com/$gh_user"
 echo
-echo "Checking GitHub username '$gh_user' ..."
+echo "Your GitHub account should be named:  $gh_user"
+echo "It should open in a browser at:"
+echo "    $gh_url"
+echo "(that exact URL is the easy way to confirm your account is set up correctly)"
+echo
+echo "Checking $gh_url ..."
 gh_status=""
 if command -v curl >/dev/null 2>&1; then
   gh_status="$(curl -s -o /dev/null -w '%{http_code}' "https://api.github.com/users/$gh_user" 2>/dev/null || true)"
 fi
 case "$gh_status" in
   200)
-    echo "  ✅ A GitHub account named '$gh_user' exists — make sure you are signed in to it."
+    echo "  ✅ $gh_url exists — make sure you are signed in to that account."
     ;;
   404)
     echo
-    echo "  ⚠️  ACTION NEEDED: there is no GitHub account named '$gh_user' yet."
-    echo "      Rename your GitHub account to claim it:"
+    echo "  ⚠️  ACTION NEEDED: $gh_url does not exist yet."
+    echo "      Rename your GitHub account so that URL works:"
     echo "        1. Open:  https://github.com/settings/admin"
     echo "        2. Click the 'Change username' button"
     echo "        3. Enter your new username:  $gh_user"
@@ -40,7 +46,7 @@ case "$gh_status" in
     read -r -p "  Press Enter once your GitHub username is '$gh_user' (or to continue anyway): "
     ;;
   *)
-    echo "  (Could not check GitHub right now — confirm your username is '$gh_user' yourself.)"
+    echo "  (Could not reach GitHub right now — open $gh_url yourself to confirm it works.)"
     ;;
 esac
 
