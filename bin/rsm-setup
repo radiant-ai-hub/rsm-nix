@@ -102,6 +102,31 @@ if [ -x "$RSM_UV_ENV/bin/python" ] && "$RSM_UV_ENV/bin/python" -c "import ipyker
     rm -rf "$JUPYTER_DATA_DIR/kernels/nix-uv"
     cp -R "$src" "$JUPYTER_DATA_DIR/kernels/nix-uv"
     rm -rf "$RSMBASE/jupyter/_prefix"
+    # Bake native-library search paths into the kernelspec. A Jupyter kernel
+    # launched by VS Code never sources the dev-shell hook, and on macOS SIP
+    # strips DYLD_* before the kernel starts -- so wheels that dlopen a native
+    # lib fail there: libstdc++ for many manylinux wheels on NixOS, and libomp
+    # for xgboost on macOS (its wheel links @rpath/libomp.dylib and only rpaths
+    # Homebrew, so students would otherwise need `brew install libomp`). Inject
+    # the LITERAL paths from this dev-shell env (nativeEnvHook sets
+    # LD_LIBRARY_PATH on Linux, DYLD_FALLBACK_LIBRARY_PATH on macOS) so the kernel
+    # is self-contained no matter how it is launched.
+    "$RSM_UV_ENV/bin/python" - "$JUPYTER_DATA_DIR/kernels/nix-uv/kernel.json" <<'PY'
+import json, os, sys
+path = sys.argv[1]
+with open(path) as f:
+    spec = json.load(f)
+env = dict(spec.get("env", {}))
+for var in ("LD_LIBRARY_PATH", "DYLD_FALLBACK_LIBRARY_PATH"):
+    val = os.environ.get(var)
+    if val:
+        env[var] = val
+if env:
+    spec["env"] = env
+    with open(path, "w") as f:
+        json.dump(spec, f, indent=1)
+        f.write("\n")
+PY
   fi
   echo "    kernel    : Python (nix-uv) -> $JUPYTER_DATA_DIR/kernels/nix-uv"
 else
