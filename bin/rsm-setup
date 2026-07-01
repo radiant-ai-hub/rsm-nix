@@ -30,9 +30,12 @@ fi
 
 mkdir -p "$RSM_WORKSPACE"
 
-# 0a. Generate the workspace .envrc (loads the flake; cascades into subfolders).
-if [ ! -f "$RSM_WORKSPACE/.envrc" ]; then
-  cat > "$RSM_WORKSPACE/.envrc" <<EOF
+# 0a. Generate/refresh the workspace .envrc (loads the flake; cascades into
+#     subfolders). Refreshed every run (like .vscode below) so watch_file
+#     changes reach existing workspaces; the direnv re-allow that a content
+#     change triggers is handled at the end of this script (direnv keys "allow"
+#     on the .envrc content hash, so an unchanged rewrite is a no-op).
+cat > "$RSM_WORKSPACE/.envrc" <<EOF
 # RSM-MSBA workspace — loads the environment from the flake at $RSM_FLAKE.
 # Update the environment with:   cd $RSM_FLAKE && git pull
 #
@@ -40,11 +43,13 @@ if [ ! -f "$RSM_WORKSPACE/.envrc" ]; then
 # here (mgta403, ...) can be its own git repo without nesting conflicts.
 export RSM_FLAKE="$RSM_FLAKE"
 export RSM_WORKSPACE="$RSM_WORKSPACE"
-watch_file "$RSM_FLAKE/flake.nix" "$RSM_FLAKE/flake.lock" "$RSM_FLAKE/pyproject.toml" "$RSM_FLAKE/uv.lock" "$RSM_FLAKE/shell/rsm-shell-hook.sh" "$RSM_FLAKE/bin/rsm-env.sh"
+# A change to any watched file makes direnv reload (rebuild the dev shell) on the
+# next cd, so a git pull in the flake propagates without a manual rebuild;
+# bin/rsm-setup is included so its own changes take effect too.
+watch_file "$RSM_FLAKE/flake.nix" "$RSM_FLAKE/flake.lock" "$RSM_FLAKE/pyproject.toml" "$RSM_FLAKE/uv.lock" "$RSM_FLAKE/shell/rsm-shell-hook.sh" "$RSM_FLAKE/bin/rsm-env.sh" "$RSM_FLAKE/bin/rsm-setup"
 use flake "$RSM_FLAKE"
 EOF
-  echo "    .envrc    : generated $RSM_WORKSPACE/.envrc  (run 'direnv allow $RSM_WORKSPACE')"
-fi
+echo "    .envrc    : refreshed $RSM_WORKSPACE/.envrc"
 
 # 0b. Generate workspace VS Code settings (interpreter + recommended extensions).
 mkdir -p "$RSM_WORKSPACE/.vscode"
