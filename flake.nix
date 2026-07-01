@@ -163,7 +163,7 @@
           # the assembled zsh assets + the ZDOTDIR template it installs.
           rsm-setup = pkgs.writeShellApplication {
             name = "rsm-setup";
-            runtimeInputs = [ pythonSync pkgs.uv pkgs.python313 pkgs.coreutils pkgs.git pkgs.nodejs_22 rsm-version ];
+            runtimeInputs = [ pythonSync pkgs.uv pkgs.python313 pkgs.coreutils pkgs.git pkgs.nodejs_22 rsm-version rsm-vscode-settings ];
             excludeShellChecks = [ "SC1090" "SC1091" "SC2164" ];
             text = rsmEnvHeader + "\n" + nativeEnvHook pkgs + ''
               export RSM_OMZ_SRC="${zshOmz}"
@@ -192,6 +192,14 @@
           # the remote `code` is connected to — run from the VS Code WSL/SSH
           # integrated terminal so they land in the remote, not just the laptop.
           rsm-vscode-ext = mk "rsm-vscode-ext" [ pkgs.coreutils ];
+          # Writes a folder's .vscode/{settings,extensions}.json (interpreter,
+          # RSM terminal shell, curated settings). Shared by rsm-setup + rsm-here.
+          rsm-vscode-settings = mk "rsm-vscode-settings" [ pkgs.coreutils pkgs.gnused pkgs.gnugrep ];
+          # Makes the CURRENT nested folder a first-class RSM subproject: writes
+          # .envrc (source_up -> the ~/rsm-msba flake env) + .vscode config and
+          # `direnv allow`s it, so opening it directly in VS Code keeps every Nix
+          # tool + the right Python. `--venv` also creates a local ./.venv.
+          rsm-here = mk "rsm-here" [ rsm-vscode-settings pkgs.uv pkgs.direnv pkgs.coreutils ];
         };
     in
     {

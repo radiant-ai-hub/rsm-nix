@@ -51,39 +51,7 @@ use flake "$RSM_FLAKE"
 EOF
 echo "    .envrc    : refreshed $RSM_WORKSPACE/.envrc"
 
-# 0b. Generate workspace VS Code settings (interpreter + recommended extensions).
-mkdir -p "$RSM_WORKSPACE/.vscode"
-# Generated file (always refreshed). terminal.integrated.env.* points VS Code
-# terminals at the rsm-msba ZDOTDIR so they get the full oh-my-zsh/p10k shell;
-# this scopes that shell to the rsm-msba workspace and leaves login shells alone.
-cat > "$RSM_WORKSPACE/.vscode/settings.json" <<EOF
-{
-  "direnv.restart.automatic": true,
-  "python.defaultInterpreterPath": "$RSM_UV_ENV/bin/python",
-  "python.terminal.activateEnvironment": false,
-  "files.exclude": { "**/.rsm-msba": true, "**/.direnv": true },
-  "terminal.integrated.env.linux": { "ZDOTDIR": "$RSMBASE/zsh" },
-  "terminal.integrated.env.osx": { "ZDOTDIR": "$RSMBASE/zsh" },
-  "terminal.integrated.defaultProfile.linux": "zsh",
-  "terminal.integrated.fontFamily": "MesloLGS NF"
-}
-EOF
-# Recommended extensions come from the curated vscode/extensions.txt in the
-# flake, so the workspace recommends the same set the installer installs (these
-# also drive extension install in the Remote-WSL / Remote-SSH host). Refreshed
-# every run; falls back to the essentials if the list is missing.
-_ext_file="$RSM_FLAKE/vscode/extensions.txt"
-if [ -f "$_ext_file" ]; then
-  _recs="$(sed -e 's/#.*//' -e 's/[[:space:]]//g' "$_ext_file" | grep -v '^$' | sed 's/.*/"&"/' | paste -sd, -)"
-else
-  _recs='"mkhl.direnv", "ms-python.python", "ms-toolsai.jupyter", "quarto.quarto"'
-fi
-cat > "$RSM_WORKSPACE/.vscode/extensions.json" <<EOF
-{
-  "recommendations": [$_recs]
-}
-EOF
-
+# 0b. RSM-owned state directories (needed before the Python sync below).
 mkdir -p \
   "$RSMBASE/envs" \
   "$RSMBASE/uv-cache" \
@@ -94,6 +62,80 @@ mkdir -p \
 
 # 1. Python environment (creates the nix-uv venv + installs course-core packages).
 rsm-python-sync
+
+# 1b. Workspace VS Code config (.vscode/settings.json + extensions.json), via the
+#     shared helper that `rsm-here` also uses to scaffold nested folders -- so the
+#     config is generated in one place. ${workspaceFolder} keeps the file identical
+#     for every student/OS; running after the sync gives the curated-settings merge
+#     the nix-uv python. (VS Code reads workspace settings.json on the remote;
+#     keybindings are user-scoped and installed on the laptop by the installer.)
+rsm-vscode-settings "$RSM_WORKSPACE" \
+  --interp "\${workspaceFolder}/.rsm-msba/envs/nix-uv/bin/python" \
+  --zdotdir "\${workspaceFolder}/.rsm-msba/zsh"
+echo "    vscode    : wrote $RSM_WORKSPACE/.vscode/{settings,extensions}.json"
+
+# 1c. Point VS Code's Remote-SSH machine settings at the nix-uv interpreter, so
+#     ANY folder opened on this server -- even a nested one with no .vscode/ of
+#     its own -- defaults to the RSM Python instead of a stray /usr/bin/python or
+#     a leftover base-uv env. VS Code (Remote-SSH) reads this file on the server.
+#     Merge, never clobber: keep any other machine settings the student has set.
+#     Harmless if they never connect with Remote-SSH. A workspace .vscode/ (root
+#     or `rsm-here`) and any auto-detected ./.venv still override this fallback.
+_vscode_machine="$HOME/.vscode-server/data/Machine/settings.json"
+if [ -x "$RSM_UV_ENV/bin/python" ]; then
+  mkdir -p "$(dirname "$_vscode_machine")"
+  "$RSM_UV_ENV/bin/python" - "$_vscode_machine" "$RSM_UV_ENV/bin/python" <<'PY'
+import json, os, sys
+path, interp = sys.argv[1], sys.argv[2]
+data = {}
+if os.path.isfile(path):
+    try:
+        with open(path) as f:
+            data = json.load(f)
+    except Exception:
+        data = {}  # unreadable/corrupt -> start clean rather than fail setup
+data["python.defaultInterpreterPath"] = interp
+data.setdefault("python.terminal.activateEnvironment", False)
+with open(path, "w") as f:
+    json.dump(data, f, indent=4)
+    f.write("\n")
+PY
+  echo "    vscode    : Remote-SSH default interpreter -> nix-uv (Machine settings)"
+fi
+
+# 1d. On a laptop with VS Code installed, also set the LOCAL default interpreter
+#     (User settings) so opening a folder locally (not via Remote-SSH) still
+#     defaults to nix-uv. Absolute path -> no dependency on VS Code variable
+#     resolution. NON-destructive: if settings.json exists but is not plain JSON
+#     (e.g. it has // comments), leave it untouched rather than risk clobbering.
+#     Skipped on headless servers (no local VS Code User dir).
+case "$(uname -s)" in
+  Darwin) _vscode_user="$HOME/Library/Application Support/Code/User/settings.json" ;;
+  *)      _vscode_user="$HOME/.config/Code/User/settings.json" ;;
+esac
+if [ -x "$RSM_UV_ENV/bin/python" ] && [ -d "$(dirname "$_vscode_user")" ]; then
+  if "$RSM_UV_ENV/bin/python" - "$_vscode_user" "$RSM_UV_ENV/bin/python" <<'PY'
+import json, os, sys
+path, interp = sys.argv[1], sys.argv[2]
+data = {}
+if os.path.isfile(path):
+    try:
+        with open(path) as f:
+            data = json.load(f)
+    except Exception:
+        sys.exit(3)  # not plain JSON -> do not touch the student's settings
+data["python.defaultInterpreterPath"] = interp
+data.setdefault("python.terminal.activateEnvironment", False)
+with open(path, "w") as f:
+    json.dump(data, f, indent=4)
+    f.write("\n")
+PY
+  then
+    echo "    vscode    : local User default interpreter -> nix-uv"
+  else
+    echo "    note      : left local VS Code User settings.json untouched (unparseable JSON); set python.defaultInterpreterPath to $RSM_UV_ENV/bin/python manually" >&2
+  fi
+fi
 
 # 2. Jupyter kernelspec so VS Code / Jupyter can find the nix-uv environment.
 if [ -x "$RSM_UV_ENV/bin/python" ] && "$RSM_UV_ENV/bin/python" -c "import ipykernel" 2>/dev/null; then

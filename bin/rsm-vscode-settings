@@ -1,0 +1,85 @@
+# rsm-vscode-settings: write <dir>/.vscode/{settings.json,extensions.json} for an
+# RSM folder. Shared by rsm-setup (the ~/rsm-msba workspace root) and rsm-here
+# (nested folders), so the VS Code config is generated in exactly ONE place.
+#
+#   rsm-vscode-settings <dir> --interp <PATH> --zdotdir <PATH>
+#
+# --interp / --zdotdir are written verbatim into the JSON, so they may contain VS
+# Code placeholders such as ${workspaceFolder} or ${userHome}.
+
+_target="${1:-}"
+if [ -z "$_target" ]; then
+  echo "usage: rsm-vscode-settings <dir> --interp <PATH> --zdotdir <PATH>" >&2
+  exit 2
+fi
+shift
+
+_interp=""
+_zdotdir=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --interp)  _interp="${2:-}";  shift 2 ;;
+    --zdotdir) _zdotdir="${2:-}"; shift 2 ;;
+    *) echo "rsm-vscode-settings: unknown argument: $1" >&2; exit 2 ;;
+  esac
+done
+if [ -z "$_interp" ] || [ -z "$_zdotdir" ]; then
+  echo "rsm-vscode-settings: --interp and --zdotdir are required" >&2
+  exit 2
+fi
+
+mkdir -p "$_target/.vscode"
+
+# settings.json = curated vscode/settings.json (if present) + the dynamic RSM keys
+# (the dynamic keys win on conflict). Prefer the nix-uv python for a clean JSON
+# merge; fall back to a dynamic-only file if the env is not built yet.
+_curated="$RSM_FLAKE/vscode/settings.json"
+if [ -x "$RSM_UV_ENV/bin/python" ]; then
+  "$RSM_UV_ENV/bin/python" - "$_target/.vscode/settings.json" "$_curated" "$_interp" "$_zdotdir" <<'PY'
+import json, os, sys
+out, curated, interp, zdotdir = sys.argv[1:5]
+settings = {}
+if os.path.isfile(curated):
+    with open(curated) as f:
+        settings = json.load(f)
+settings.update({
+    "direnv.restart.automatic": True,
+    "python.defaultInterpreterPath": interp,
+    "python.terminal.activateEnvironment": False,
+    "files.exclude": {"**/.rsm-msba": True, "**/.direnv": True},
+    "terminal.integrated.env.linux": {"ZDOTDIR": zdotdir},
+    "terminal.integrated.env.osx": {"ZDOTDIR": zdotdir},
+    "terminal.integrated.defaultProfile.linux": "zsh",
+    "terminal.integrated.fontFamily": "MesloLGS NF",
+})
+with open(out, "w") as f:
+    json.dump(settings, f, indent=2)
+    f.write("\n")
+PY
+else
+  cat > "$_target/.vscode/settings.json" <<EOF
+{
+  "direnv.restart.automatic": true,
+  "python.defaultInterpreterPath": "$_interp",
+  "python.terminal.activateEnvironment": false,
+  "files.exclude": { "**/.rsm-msba": true, "**/.direnv": true },
+  "terminal.integrated.env.linux": { "ZDOTDIR": "$_zdotdir" },
+  "terminal.integrated.env.osx": { "ZDOTDIR": "$_zdotdir" },
+  "terminal.integrated.defaultProfile.linux": "zsh",
+  "terminal.integrated.fontFamily": "MesloLGS NF"
+}
+EOF
+fi
+
+# extensions.json: recommend the curated list (also drives Remote-WSL/SSH install).
+_ext_file="$RSM_FLAKE/vscode/extensions.txt"
+if [ -f "$_ext_file" ]; then
+  _recs="$(sed -e 's/#.*//' -e 's/[[:space:]]//g' "$_ext_file" | grep -v '^$' | sed 's/.*/"&"/' | paste -sd, -)"
+else
+  _recs='"mkhl.direnv", "ms-python.python", "ms-toolsai.jupyter", "quarto.quarto"'
+fi
+cat > "$_target/.vscode/extensions.json" <<EOF
+{
+  "recommendations": [$_recs]
+}
+EOF

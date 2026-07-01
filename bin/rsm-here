@@ -1,0 +1,77 @@
+# rsm-here: make the CURRENT folder a first-class RSM subproject, so you can open
+# it directly in VS Code (or a terminal) and get the full Nix toolchain + the
+# right Python interpreter -- even though it is a nested folder under ~/rsm-msba.
+#
+#   rsm-here          use the shared nix-uv Python (default)
+#   rsm-here --venv   also create a local ./.venv (uv) you own for this folder,
+#                     layered on top of the Nix tools
+#
+# It writes .envrc (source_up -> the parent ~/rsm-msba flake env),
+# .vscode/{settings.json,extensions.json}, and runs `direnv allow`.
+
+_use_venv=0
+for _arg in "$@"; do
+  case "$_arg" in
+    --venv) _use_venv=1 ;;
+    -h|--help)
+      echo "usage: rsm-here [--venv]   (run inside a folder under $RSM_WORKSPACE)"
+      exit 0 ;;
+    *) echo "rsm-here: unknown argument: $_arg" >&2; exit 2 ;;
+  esac
+done
+
+_here="$PWD"
+
+# Must be inside the workspace tree so direnv's source_up finds ~/rsm-msba/.envrc.
+case "$_here/" in
+  "$RSM_WORKSPACE"/*) : ;;
+  *)
+    echo "rsm-here: run this from inside $RSM_WORKSPACE (or a subfolder of it)." >&2
+    echo "  current directory: $_here" >&2
+    exit 1 ;;
+esac
+if [ "$_here" = "$RSM_WORKSPACE" ]; then
+  echo "rsm-here: the workspace root is already set up by rsm-setup; nothing to do." >&2
+  exit 0
+fi
+
+if [ "$_use_venv" -eq 1 ]; then
+  # Create the venv up front so VS Code sees a valid interpreter immediately.
+  [ -d "$_here/.venv" ] || uv venv "$_here/.venv"
+  cat > "$_here/.envrc" <<'EOF'
+# Load the RSM environment (Nix tools + rsm-* commands) from the parent
+# ~/rsm-msba workspace, then activate a LOCAL virtualenv you own for this folder.
+# The Nix tools stay on PATH; `python` becomes your ./.venv.
+source_up
+[ -d .venv ] || uv venv .venv >&2
+source .venv/bin/activate
+EOF
+  # \$ keeps ${workspaceFolder} literal for VS Code (do not expand in the shell).
+  _interp="\${workspaceFolder}/.venv/bin/python"
+else
+  cat > "$_here/.envrc" <<'EOF'
+# Load the RSM environment (Nix tools + rsm-* commands + the shared nix-uv
+# Python) from the parent ~/rsm-msba workspace. direnv walks up to find its .envrc.
+source_up
+EOF
+  # \$ keeps ${userHome} literal for VS Code (do not expand in the shell).
+  _interp="\${userHome}/rsm-msba/.rsm-msba/envs/nix-uv/bin/python"
+fi
+
+# VS Code config (interpreter + RSM terminal shell + curated settings). ${userHome}
+# keeps the nix-uv paths correct no matter how deep this folder is nested.
+rsm-vscode-settings "$_here" \
+  --interp "$_interp" \
+  --zdotdir "\${userHome}/rsm-msba/.rsm-msba/zsh"
+
+if command -v direnv >/dev/null 2>&1; then
+  direnv allow "$_here" || true
+fi
+
+echo "rsm-here: '$_here' is ready to open directly in VS Code or a terminal."
+if [ "$_use_venv" -eq 1 ]; then
+  echo "  Python : a local ./.venv you own (install packages with 'uv pip install ...')."
+else
+  echo "  Python : the shared nix-uv environment."
+fi
+echo "  Tools  : uv, quarto, psql, git, gh and the rsm-* commands are on PATH via direnv."

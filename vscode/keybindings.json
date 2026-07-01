@@ -8,7 +8,7 @@
             "cursorDown"
           ]
         },
-        "when": "editorLangId matches /(shellscript|markdown|quarto|python)/"
+        "when": "editorLangId matches /(shellscript|markdown|quarto|python|sql)/"
     },
     {
         "key": "ctrl+enter",
@@ -19,7 +19,7 @@
             "cursorDown"
           ]
         },
-        "when": "editorLangId matches /(shellscript|markdown|quarto|python)/"
+        "when": "editorLangId matches /(shellscript|markdown|quarto|python|sql)/"
     },
     {
         "key": "ctrl+enter",

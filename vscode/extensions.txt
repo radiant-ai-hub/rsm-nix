@@ -6,6 +6,7 @@ eamodio.gitlens
 esbenp.prettier-vscode
 mechatroner.rainbow-csv
 medo64.render-crlf
+mkhl.direnv
 ms-python.python
 ms-toolsai.jupyter
 ms-toolsai.jupyter-keymap
