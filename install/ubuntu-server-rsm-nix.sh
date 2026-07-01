@@ -147,6 +147,14 @@ _rsm_zsh_load() {
 autoload -Uz add-zsh-hook
 add-zsh-hook chpwd _rsm_zsh_load
 _rsm_zsh_load
+# The host's /etc/zsh/zshrc auto-activates a base venv (/opt/base-uv) on chpwd,
+# which clobbers the rsm-msba nix-uv env that direnv activates. Make direnv the
+# LAST chpwd hook so entering ~/rsm-msba wins (elsewhere direnv is inactive, so
+# the base venv stays the default).
+if (( ${+functions[_direnv_hook]} )); then
+  add-zsh-hook -d chpwd _direnv_hook
+  add-zsh-hook chpwd _direnv_hook
+fi
 # <<< rsm-msba (managed) <<<
 EOF
 fi
