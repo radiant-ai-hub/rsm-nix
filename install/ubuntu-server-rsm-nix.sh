@@ -10,9 +10,10 @@
 # What it sets up (every step idempotent; re-running only fills in what's
 # missing):
 #   1. rsm-setup/rsm-msba/rsm-update + direnv + nix-direnv in a dedicated SYSTEM
-#      Nix profile (/nix/var/nix/profiles/rsm), on PATH for all login shells via
-#      /etc/profile.d/rsm.sh (this also reaches VS Code Remote-SSH, which
-#      resolves its env through a login shell).
+#      Nix profile (/nix/var/nix/profiles/rsm), then symlinked into
+#      /usr/local/bin so the commands are on PATH for EVERY shell -- login and
+#      non-login alike (VS Code terminals, `su`, ...) -- with no shell-config
+#      juggling.
 #   2. /etc/direnv/direnvrc -> nix-direnv `use flake` for all users.
 #   3. (ENABLE_UV_CACHE=1) shared uv download cache at /srv/uv-cache, group
 #      $RSM_GROUP, setgid + default ACL — saves ~1.2 GB per student.
@@ -28,6 +29,8 @@
 #
 # Reverse everything:
 #   sudo rm -f /etc/profile.d/rsm.sh /etc/direnv/direnvrc
+#   sudo rm -f /usr/local/bin/rsm-setup /usr/local/bin/rsm-msba \
+#              /usr/local/bin/rsm-update /usr/local/bin/direnv
 #   sudo rm /nix/var/nix/profiles/rsm /nix/var/nix/profiles/rsm-*   # profile + generations
 #   # and delete the "rsm-msba (managed)" block from /etc/zsh/zshrc
 #   # (the /srv/uv-cache directory can stay or be removed)
@@ -68,13 +71,21 @@ else
     'nixpkgs#direnv' 'nixpkgs#nix-direnv'
 fi
 
-# --- 2. PATH + direnv hook for all login shells ----------------------------
-log "/etc/profile.d/rsm.sh (PATH + direnv hook)"
+# --- 1b. Commands on PATH for EVERY shell, the simple way ------------------
+# /usr/local/bin is on the default PATH for login AND non-login shells (VS Code
+# terminals, `su`, subshells), so a symlink here beats juggling profile.d vs
+# /etc/zsh/zshrc. Points at the gc-rooted profile, so it survives upgrades.
+log "symlinks in /usr/local/bin"
+for t in rsm-setup rsm-msba rsm-update direnv; do
+  sudo ln -sfn "$PROFILE/bin/$t" "/usr/local/bin/$t"
+done
+
+# --- 2. direnv hook (+ shared cache) for login shells ----------------------
+log "/etc/profile.d/rsm.sh (direnv hook + uv cache)"
 sudo tee /etc/profile.d/rsm.sh >/dev/null <<'EOF'
 # RSM-MSBA environment (Ubuntu analog of sc1's NixOS rsm-server.nix).
-# rsm-setup / rsm-msba / rsm-update + direnv on PATH for all login shells.
-# VS Code Remote-SSH resolves its env via a login shell, so this reaches the editor too.
-export PATH="/nix/var/nix/profiles/rsm/bin:$PATH"
+# The rsm-* commands + direnv are on PATH via /usr/local/bin symlinks (step 1b);
+# this only adds the direnv hook so `cd ~/rsm-msba` auto-loads the flake env.
 if command -v direnv >/dev/null 2>&1; then
   if   [ -n "${ZSH_VERSION:-}" ];  then eval "$(direnv hook zsh)"
   elif [ -n "${BASH_VERSION:-}" ]; then eval "$(direnv hook bash)"
@@ -107,18 +118,25 @@ if [ "$ENABLE_UV_CACHE" = "1" ]; then
   fi
 fi
 
-# --- 5. zsh chpwd loader for plain SSH terminals (optional) ----------------
+# --- 5. interactive-shell coverage -----------------------------------------
+# Commands are already on PATH via /usr/local/bin; this adds the direnv hook +
+# ~/rsm-msba loader for NON-login interactive zsh (VS Code terminals, `su`),
+# which never source /etc/profile.d. Every interactive zsh sources
+# /etc/zsh/zshrc. Strip any prior managed block first so re-runs update in
+# place. Mirrors nixos/rsm-server.nix.
 if [ "$ENABLE_ZSH_HOOK" = "1" ] && [ -f /etc/zsh/zshrc ]; then
-  if grep -q 'rsm-msba (managed)' /etc/zsh/zshrc; then
-    log "/etc/zsh/zshrc already has the rsm-msba loader — skipping"
-  else
-    log "/etc/zsh/zshrc (rsm-msba chpwd loader)"
-    sudo tee -a /etc/zsh/zshrc >/dev/null <<'EOF'
+  log "/etc/zsh/zshrc (direnv hook + rsm-msba loader)"
+  sudo su -c "sed -i '/# >>> rsm-msba (managed) >>>/,/# <<< rsm-msba (managed) <<</d' /etc/zsh/zshrc"
+  sudo tee -a /etc/zsh/zshrc >/dev/null <<'EOF'
 
 # >>> rsm-msba (managed) >>>
-# Load the full oh-my-zsh + powerlevel10k shell on entering ~/rsm-msba in any
-# interactive zsh (kitty/SSH). VS Code terminals get this via the workspace
-# ZDOTDIR instead. Mirrors nixos/rsm-server.nix's interactiveShellInit.
+# Non-login interactive zsh (VS Code terminals, `su`) doesn't source
+# /etc/profile.d, so set the shared cache + direnv hook here too. (The rsm-*
+# commands + direnv are already on PATH via /usr/local/bin symlinks.)
+[ -d /srv/uv-cache ] && export UV_CACHE_DIR="${UV_CACHE_DIR:-/srv/uv-cache}"
+command -v direnv >/dev/null 2>&1 && eval "$(direnv hook zsh)"
+# Load the full oh-my-zsh + powerlevel10k shell on entering ~/rsm-msba (kitty/SSH;
+# VS Code gets it via the workspace ZDOTDIR).
 _rsm_zsh_load() {
   local zd="$HOME/rsm-msba/.rsm-msba/zsh"
   if [[ -z ${_RSM_ZSH_LOADED:-} && -f "$zd/.zshrc" && ( $PWD == "$HOME/rsm-msba" || $PWD == "$HOME/rsm-msba"/* ) ]]; then
@@ -131,7 +149,6 @@ add-zsh-hook chpwd _rsm_zsh_load
 _rsm_zsh_load
 # <<< rsm-msba (managed) <<<
 EOF
-  fi
 fi
 
 log "done"
