@@ -40,7 +40,17 @@ check_cmd "npm --version"      npm --version
 # verify it only when present — this catches a broken Node/Claude combo in CI
 # (where rsm-setup has run) without failing a bare check before setup.
 if have claude; then
-  check_cmd "claude --version" claude --version
+  # NON-FATAL: Claude Code is a per-user npm install, not part of the core RSM
+  # Nix environment, and depends on the network/registry. A broken 'claude' must
+  # not fail the whole environment install/validation — warn instead. Set
+  # RSM_STRICT_CLAUDE=1 (e.g. in CI) to make it a hard check again.
+  if claude --version >/dev/null 2>&1; then
+    ok "claude --version"
+  elif [ "${RSM_STRICT_CLAUDE:-0}" = "1" ]; then
+    bad "claude --version (claude --version)"
+  else
+    printf '  \033[33mwarn\033[0m %s\n' "claude present but 'claude --version' failed — not required for the RSM env; run 'rsm-update' to reinstall Claude Code"
+  fi
 else
   printf '  \033[33mskip\033[0m %s\n' "claude not installed yet (run rsm-setup / rsm-update)"
 fi

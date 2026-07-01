@@ -599,7 +599,13 @@ function Invoke-WslBash {
 
     & wsl.exe -d $DistroName --user $User -- bash -c $remote
     if ($LASTEXITCODE -ne 0) {
-        throw "$Description failed."
+        Write-BlankLine
+        Write-Host "  $Description failed (exit $LASTEXITCODE)." -ForegroundColor Red
+        Write-Host "  The real error is in the WSL output above (look for a red 'FAIL' line)." -ForegroundColor Yellow
+        Write-Host "  To reproduce it with full detail, open a WSL terminal and run:" -ForegroundColor Yellow
+        Write-Host "      wsl -d $DistroName" -ForegroundColor Yellow
+        Write-Host "      nix develop ~/rsm-nix -c rsm-setup" -ForegroundColor Yellow
+        throw "$Description failed (exit $LASTEXITCODE) - see the WSL output above."
     }
 }
 
