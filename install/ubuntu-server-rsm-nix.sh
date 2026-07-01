@@ -147,10 +147,25 @@ _rsm_zsh_load() {
 autoload -Uz add-zsh-hook
 add-zsh-hook chpwd _rsm_zsh_load
 _rsm_zsh_load
-# The host's /etc/zsh/zshrc auto-activates a base venv (/opt/base-uv) on chpwd,
-# which clobbers the rsm-msba nix-uv env that direnv activates. Make direnv the
-# LAST chpwd hook so entering ~/rsm-msba wins (elsewhere direnv is inactive, so
-# the base venv stays the default).
+# The host /etc/zsh/zshrc installs `_uv_auto_activate`, a chpwd hook that
+# activates a local ./.venv or else falls back to /opt/base-uv/.venv. The
+# rsm-msba nix-uv env lives in .rsm-msba/envs (not ./.venv), so that hook never
+# finds it and re-sources base-uv on EVERY chpwd -- including cd'ing *within*
+# ~/rsm-msba (e.g. into examples/), where direnv is already loaded and so does
+# NOT re-assert. That silently clobbers nix-uv back to base-uv (wrong numpy,
+# missing sqlalchemy/duckdb, ...). Fix: make that hook defer to direnv whenever
+# direnv manages the current dir (DIRENV_DIR set), keeping its original behavior
+# everywhere else. Wrap (don't rewrite) the host function so SDSC updates to it
+# are preserved.
+if (( ${+functions[_uv_auto_activate]} )); then
+  functions[_rsm_uv_auto_activate_orig]=$functions[_uv_auto_activate]
+  _uv_auto_activate() {
+    [[ -n ${DIRENV_DIR:-} ]] && return   # direnv owns the venv in this tree
+    _rsm_uv_auto_activate_orig
+  }
+fi
+# Belt-and-suspenders: also make direnv the LAST chpwd hook so it wins on the
+# first entry into ~/rsm-msba, before DIRENV_DIR is set.
 if (( ${+functions[_direnv_hook]} )); then
   add-zsh-hook -d chpwd _direnv_hook
   add-zsh-hook chpwd _direnv_hook
