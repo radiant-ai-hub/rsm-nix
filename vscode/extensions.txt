@@ -4,8 +4,6 @@ christian-kohler.path-intellisense
 ckolkman.vscode-postgres
 eamodio.gitlens
 esbenp.prettier-vscode
-GitHub.copilot
-GitHub.copilot-chat
 mechatroner.rainbow-csv
 medo64.render-crlf
 ms-python.python
