@@ -7,6 +7,8 @@ let
   system = pkgs.stdenv.hostPlatform.system; # e.g. "x86_64-linux"
   rsmSetup = rsm-nix.packages.${system}.rsm-setup;
   rsmMsba = rsm-nix.packages.${system}.rsm-msba;
+  rsmHere = rsm-nix.packages.${system}.rsm-here;
+  rsmProjectCheck = rsm-nix.packages.${system}.rsm-project-check;
 in
 {
   # --- VS Code Remote-SSH fix (the important one) ----------------------------
@@ -102,6 +104,8 @@ in
     direnv
     rsmSetup # `rsm-setup` available system-wide
     rsmMsba # `rsm-msba` — clone-if-missing + rsm-setup, for full reset
+    rsmHere # `rsm-here` — set up a folder (nested or standalone) as a project
+    rsmProjectCheck # `rsm-project-check` — verify a project's imports
   ];
 
   # --- Seed each student's flake checkout ------------------------------------

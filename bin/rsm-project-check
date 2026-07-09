@@ -1,0 +1,84 @@
+# rsm-project-check: verify the current project's environment by importing each
+# declared dependency with the project's own .venv python.
+#
+# A plain "not installed" means you still need to run `uv sync` (or `uv add`).
+# A failure WITH the package installed — especially a missing shared library
+# (".so") — means the package needs a SYSTEM dependency that is not in the
+# environment. Exits non-zero if anything fails, so it doubles as a smoke test
+# (usable in a VS Code task or a script).
+
+venv="${VIRTUAL_ENV:-$PWD/.venv}"
+py="$venv/bin/python"
+
+if [ ! -x "$py" ]; then
+  echo "rsm-project-check: no project .venv found at $venv" >&2
+  echo "  run 'direnv allow' in the project folder first (that builds the .venv)." >&2
+  exit 1
+fi
+
+if [ ! -f "$PWD/pyproject.toml" ]; then
+  echo "rsm-project-check: no pyproject.toml in $PWD" >&2
+  echo "  run this inside a project folder created by rsm-new-project." >&2
+  exit 1
+fi
+
+"$py" - "$PWD/pyproject.toml" <<'PY'
+import importlib
+import sys
+import tomllib
+from importlib.metadata import packages_distributions
+
+with open(sys.argv[1], "rb") as fh:
+    data = tomllib.load(fh)
+
+
+def dep_name(spec):
+    # "polars>=1.0" -> "polars"; "foo[bar]" -> "foo"; "x ; sys=='linux'" -> "x"
+    name = spec.strip()
+    for sep in (" ", ";", "[", "=", "<", ">", "!", "~", "("):
+        name = name.split(sep, 1)[0]
+    return name.strip()
+
+
+deps = [dep_name(d) for d in data.get("project", {}).get("dependencies", [])]
+deps = [d for d in deps if d]
+
+# distribution name -> importable top-level module (e.g. "scikit-learn" -> "sklearn")
+dist_to_mod = {}
+for mod, dists in packages_distributions().items():
+    for dist in dists:
+        dist_to_mod.setdefault(dist.lower().replace("-", "_"), mod)
+
+if not deps:
+    print("no declared dependencies to check")
+    sys.exit(0)
+
+print(f"checking {len(deps)} dependenc{'y' if len(deps) == 1 else 'ies'} in {sys.prefix}\n")
+
+missing, broken = [], []
+for dep in deps:
+    key = dep.lower().replace("-", "_")
+    mod = dist_to_mod.get(key, key)
+    try:
+        importlib.import_module(mod)
+        print(f"  ok       {dep}  (import {mod})")
+    except ModuleNotFoundError as exc:
+        print(f"  missing  {dep}  (import {mod}): {exc}")
+        missing.append(dep)
+    except Exception as exc:  # ImportError (missing .so), OSError, etc.
+        print(f"  FAIL     {dep}  (import {mod}): {exc}")
+        broken.append(dep)
+
+if missing:
+    print(f"\nnot installed: {', '.join(missing)} — run 'uv sync' (or 'uv add' them).")
+if broken:
+    print(f"\nfailed to load: {', '.join(broken)}")
+    print("A missing shared library (\".so\") means the package needs a system")
+    print("dependency not in this environment. Ask Claude (the 'rsm-project' skill)")
+    print("or an instructor to help add it.")
+
+if missing or broken:
+    sys.exit(1)
+
+print("\nall imports ok")
+PY

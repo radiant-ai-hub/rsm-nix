@@ -205,6 +205,14 @@ extensions and points Python at the base environment for you.
 That’s it. Open a notebook or script in any course folder and run — no
 activation step needed.
 
+**Opening one folder on its own.** To open a single course/assignment
+folder directly (its own VS Code window and git repo) with the right
+interpreter, run `rsm-here` in it once. Add `--venv` to give that folder
+its **own** isolated packages (`uv add …`, checked with
+`rsm-project-check`) — the conda alternative. You can also just ask
+Claude in the editor; the `rsm-project` skill handles setting up folders
+and adding/verifying packages.
+
 > Tip: keep one VS Code window open on `~/rsm-msba` so every course
 > folder shares the same Explorer, environment, PostgreSQL, and kernel.
 > Reopen the folder (or run **Developer: Reload Window**) after

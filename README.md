@@ -51,6 +51,27 @@ is **not** a git repo, so each course folder can be its own. Nothing is
 written to host dotfiles (`~/.zshrc`, `~/.bashrc`). To fully reset,
 delete `~/rsm-msba/.rsm-msba`.
 
+### Organizing project folders
+
+Everything under `~/rsm-msba` shares the one `nix-uv` environment —
+direnv activates it automatically in every subfolder, at any depth, so
+most coursework needs nothing extra. To open a single folder
+**directly** in VS Code (e.g. an assignment that is its own git repo)
+with the right interpreter, or to give a folder its **own** isolated
+packages, use `rsm-here`:
+
+```bash
+rsm-here                   # set up the CURRENT folder (shared nix-uv Python)
+rsm-here ~/projects/thesis # a standalone folder anywhere (created if needed)
+rsm-here --venv            # give this folder its OWN reproducible .venv
+```
+
+`--venv` is the alternative to a conda environment: a project-local
+`.venv` you grow with `uv add …` and check with `rsm-project-check`,
+layered on the flake’s system tools (Python, Quarto, PostgreSQL, Node).
+In VS Code you can also just ask Claude — the `rsm-project` skill drives
+all of this for you.
+
 ## Using VS Code
 
 The smoothest workflow uses the **direnv** VS Code extension so the
@@ -88,6 +109,14 @@ extensions and points Python at the base environment for you.
 
 That’s it. Open a notebook or script in any course folder and run — no
 activation step needed.
+
+**Opening one folder on its own.** To open a single course/assignment
+folder directly (its own VS Code window and git repo) with the right
+interpreter, run `rsm-here` in it once. Add `--venv` to give that folder
+its **own** isolated packages (`uv add …`, checked with
+`rsm-project-check`) — the conda alternative. You can also just ask
+Claude in the editor; the `rsm-project` skill handles setting up folders
+and adding/verifying packages.
 
 > Tip: keep one VS Code window open on `~/rsm-msba` so every course
 > folder shares the same Explorer, environment, PostgreSQL, and kernel.

@@ -1,65 +1,141 @@
-# rsm-here: make the CURRENT folder a first-class RSM subproject, so you can open
-# it directly in VS Code (or a terminal) and get the full Nix toolchain + the
-# right Python interpreter -- even though it is a nested folder under ~/rsm-msba.
+# rsm-here [--venv] [PATH]: make a folder a first-class RSM project, so you can
+# open it directly in VS Code (or a terminal) and get the full Nix toolchain +
+# the right Python interpreter.
 #
-#   rsm-here          use the shared nix-uv Python (default)
-#   rsm-here --venv   also create a local ./.venv (uv) you own for this folder,
-#                     layered on top of the Nix tools
+#   rsm-here                 the CURRENT folder, shared nix-uv Python (default)
+#   rsm-here PATH            that folder instead (created if needed); may be
+#                            ANYWHERE -- a nested folder under ~/rsm-msba, or a
+#                            standalone project (e.g. ~/projects/thesis)
+#   rsm-here --venv [PATH]   also give the folder its OWN reproducible venv
+#                            (pyproject.toml + uv.lock, grown with `uv add`) --
+#                            the alternative to a conda environment, layered on
+#                            top of the Nix tools.
 #
-# It writes .envrc (source_up -> the parent ~/rsm-msba flake env),
-# .vscode/{settings.json,extensions.json}, and runs `direnv allow`.
+# It writes .envrc, .vscode/{settings,extensions}.json, (with --venv) a starter
+# pyproject.toml + .gitignore, and runs `direnv allow`. A folder inside
+# ~/rsm-msba loads the workspace env via `source_up`; a standalone folder loads
+# the flake directly with `use flake`.
 
 _use_venv=0
+_target=""
 for _arg in "$@"; do
   case "$_arg" in
     --venv) _use_venv=1 ;;
     -h|--help)
-      echo "usage: rsm-here [--venv]   (run inside a folder under $RSM_WORKSPACE)"
+      echo "usage: rsm-here [--venv] [PATH]"
+      echo "  PATH   folder to set up (default: current); may be anywhere"
+      echo "  --venv also create a local ./.venv (pyproject + uv) you own"
       exit 0 ;;
-    *) echo "rsm-here: unknown argument: $_arg" >&2; exit 2 ;;
+    -*) echo "rsm-here: unknown argument: $_arg" >&2; exit 2 ;;
+    *)
+      [ -n "$_target" ] && { echo "rsm-here: only one PATH may be given" >&2; exit 2; }
+      _target="$_arg" ;;
   esac
 done
 
-_here="$PWD"
+# Resolve the target folder (default: current). Expand a leading ~ even if quoted.
+if [ -n "$_target" ]; then
+  if [ "${_target#\~}" != "$_target" ]; then
+    _target="$HOME${_target#\~}"
+  fi
+  mkdir -p "$_target"
+  _here="$(cd "$_target" && pwd)"
+else
+  _here="$PWD"
+fi
 
-# Must be inside the workspace tree so direnv's source_up finds ~/rsm-msba/.envrc.
+# Is this inside the ~/rsm-msba workspace tree (so direnv's source_up finds the
+# workspace .envrc), or a standalone folder elsewhere?
 case "$_here/" in
-  "$RSM_WORKSPACE"/*) : ;;
-  *)
-    echo "rsm-here: run this from inside $RSM_WORKSPACE (or a subfolder of it)." >&2
-    echo "  current directory: $_here" >&2
-    exit 1 ;;
+  "$RSM_WORKSPACE"/*) _inside=1 ;;
+  *) _inside=0 ;;
 esac
 if [ "$_here" = "$RSM_WORKSPACE" ]; then
   echo "rsm-here: the workspace root is already set up by rsm-setup; nothing to do." >&2
   exit 0
 fi
 
-if [ "$_use_venv" -eq 1 ]; then
-  # Create the venv up front so VS Code sees a valid interpreter immediately.
-  [ -d "$_here/.venv" ] || uv venv "$_here/.venv"
-  cat > "$_here/.envrc" <<'EOF'
-# Load the RSM environment (Nix tools + rsm-* commands) from the parent
-# ~/rsm-msba workspace, then activate a LOCAL virtualenv you own for this folder.
-# The Nix tools stay on PATH; `python` becomes your ./.venv.
-source_up
-[ -d .venv ] || uv venv .venv >&2
-source .venv/bin/activate
-EOF
-  # \$ keeps ${workspaceFolder} literal for VS Code (do not expand in the shell).
-  _interp="\${workspaceFolder}/.venv/bin/python"
-else
+# --- .envrc: load the RSM environment ---------------------------------------
+if [ "$_inside" -eq 1 ]; then
   cat > "$_here/.envrc" <<'EOF'
 # Load the RSM environment (Nix tools + rsm-* commands + the shared nix-uv
 # Python) from the parent ~/rsm-msba workspace. direnv walks up to find its .envrc.
 source_up
 EOF
+else
+  cat > "$_here/.envrc" <<'EOF'
+# Standalone RSM project — load the flake's tools (Nix + rsm-* commands + the
+# shared nix-uv Python) directly, without a parent ~/rsm-msba workspace.
+export RSM_FLAKE="${RSM_FLAKE:-$HOME/rsm-nix}"
+use flake "$RSM_FLAKE"
+EOF
+fi
+
+if [ "$_use_venv" -eq 1 ]; then
+  # Layer a PROJECT-LOCAL venv on top, overriding the shared nix-uv activation.
+  # The override MUST come after the loader above (which activates the shared
+  # env), so re-point uv / VIRTUAL_ENV / PATH last.
+  cat >> "$_here/.envrc" <<'EOF'
+
+# Project-local venv (reproducible: pyproject.toml + uv.lock). Grow it with
+# `uv add <pkg>`; verify it with `rsm-project-check`.
+export UV_PROJECT_ENVIRONMENT="$PWD/.venv"
+[ -d .venv ] || uv venv .venv
+uv sync --quiet 2>/dev/null || true
+export VIRTUAL_ENV="$PWD/.venv"
+export VIRTUAL_ENV_PROMPT="($(basename "$PWD")) "
+export QUARTO_PYTHON="$PWD/.venv/bin/python"
+PATH_add "$PWD/.venv/bin"
+watch_file pyproject.toml uv.lock
+EOF
+  # \$ keeps ${workspaceFolder} literal for VS Code (do not expand in the shell).
+  _interp="\${workspaceFolder}/.venv/bin/python"
+
+  # Starter pyproject.toml (minimal + reproducible). `package = false` makes uv
+  # treat this as a plain dependency environment (no build backend needed).
+  if [ ! -e "$_here/pyproject.toml" ]; then
+    _name="$(basename "$_here")"
+    _name="$(printf '%s' "$_name" | tr -c '[:alnum:]._-' '-')"
+    while [ "${_name#-}" != "$_name" ]; do _name="${_name#-}"; done
+    while [ "${_name%-}" != "$_name" ]; do _name="${_name%-}"; done
+    [ -z "$_name" ] && _name="project"
+    cat > "$_here/pyproject.toml" <<EOF2
+[project]
+name = "$_name"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+  "ipykernel>=6", # enables the VS Code / Jupyter kernel picker
+]
+
+[tool.uv]
+package = false # a plain dependency environment, not an installable package
+EOF2
+  fi
+
+  # Create + populate the venv up front so VS Code sees a valid interpreter now.
+  ( cd "$_here" \
+    && export UV_PROJECT_ENVIRONMENT="$_here/.venv" \
+    && { [ -d .venv ] || uv venv .venv >/dev/null 2>&1; } \
+    && uv sync --quiet 2>/dev/null ) || true
+else
   # \$ keeps ${userHome} literal for VS Code (do not expand in the shell).
   _interp="\${userHome}/rsm-msba/.rsm-msba/envs/nix-uv/bin/python"
 fi
 
-# VS Code config (interpreter + RSM terminal shell + curated settings). ${userHome}
-# keeps the nix-uv paths correct no matter how deep this folder is nested.
+# Keep build artifacts out of the student's git repo (harmless if no venv).
+if [ ! -e "$_here/.gitignore" ]; then
+  cat > "$_here/.gitignore" <<'EOF'
+.venv/
+.direnv/
+__pycache__/
+*.pyc
+EOF
+fi
+
+# VS Code config (interpreter + RSM terminal shell + curated settings), via the
+# shared generator that rsm-setup also uses. ${userHome} keeps the nix-uv paths
+# correct no matter how deep this folder is nested.
 rsm-vscode-settings "$_here" \
   --interp "$_interp" \
   --zdotdir "\${userHome}/rsm-msba/.rsm-msba/zsh"
@@ -70,7 +146,7 @@ fi
 
 echo "rsm-here: '$_here' is ready to open directly in VS Code or a terminal."
 if [ "$_use_venv" -eq 1 ]; then
-  echo "  Python : a local ./.venv you own (install packages with 'uv pip install ...')."
+  echo "  Python : a local ./.venv you own — add packages with 'uv add <pkg>', check with 'rsm-project-check'."
 else
   echo "  Python : the shared nix-uv environment."
 fi

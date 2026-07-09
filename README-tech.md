@@ -103,21 +103,44 @@ is **not** a git repo, so each course folder can be its own. Nothing is
 written to host dotfiles (`~/.zshrc`, `~/.bashrc`). To fully reset,
 delete `~/rsm-msba/.rsm-msba`.
 
+### Organizing project folders
+
+Everything under `~/rsm-msba` shares the one `nix-uv` environment —
+direnv activates it automatically in every subfolder, at any depth, so
+most coursework needs nothing extra. To open a single folder
+**directly** in VS Code (e.g. an assignment that is its own git repo)
+with the right interpreter, or to give a folder its **own** isolated
+packages, use `rsm-here`:
+
+```bash
+rsm-here                   # set up the CURRENT folder (shared nix-uv Python)
+rsm-here ~/projects/thesis # a standalone folder anywhere (created if needed)
+rsm-here --venv            # give this folder its OWN reproducible .venv
+```
+
+`--venv` is the alternative to a conda environment: a project-local
+`.venv` you grow with `uv add …` and check with `rsm-project-check`,
+layered on the flake’s system tools (Python, Quarto, PostgreSQL, Node).
+In VS Code you can also just ask Claude — the `rsm-project` skill drives
+all of this for you.
+
 ## Commands
 
-| Command                                        | What it does                                                               |
-| ---------------------------------------------- | -------------------------------------------------------------------------- |
-| `rsm-setup`                                    | Bootstrap: uv base env, Jupyter kernel, course folders                     |
-| `rsm-update`                                   | Same as `rsm-setup` + bump Claude Code to latest (the “update” name)       |
-| `rsm-msba`                                     | Bootstrap/reset: clone the flake if missing, then `rsm-setup`              |
-| `rsm-version`                                  | Print the environment version (the flake’s git commit) + platform          |
-| `rsm-python-sync`                              | Refresh the base env from `uv.lock`                                        |
-| `rsm-new-course NAME...`                       | Create course/project folder(s) + remember in `courses.txt`                |
-| `rsm-vscode-ext`                               | Install the curated VS Code extensions into the connected (WSL/SSH) window |
-| `rsm-pg-init` / `-start` / `-stop` / `-status` | Workspace-local PostgreSQL lifecycle                                       |
-| `rsm-pg-psql`                                  | `psql` into the `rsm-msba` database                                        |
-| `rsm-pgweb`                                    | pgweb UI at <http://127.0.0.1:8282>                                        |
-| `github`                                       | One-time setup of your Git identity + a GitHub SSH key                     |
+| Command                                        | What it does                                                                                                                               |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `rsm-setup`                                    | Bootstrap: uv base env, Jupyter kernel, course folders                                                                                     |
+| `rsm-update`                                   | Same as `rsm-setup` + bump Claude Code to latest (the “update” name)                                                                       |
+| `rsm-msba`                                     | Bootstrap/reset: clone the flake if missing, then `rsm-setup`                                                                              |
+| `rsm-version`                                  | Print the environment version (the flake’s git commit) + platform                                                                          |
+| `rsm-python-sync`                              | Refresh the base env from `uv.lock`                                                                                                        |
+| `rsm-new-course NAME...`                       | Create course folder(s) under `~/rsm-msba` that share the one nix-uv env                                                                   |
+| `rsm-here [--venv] [PATH]`                     | Set up a folder (nested or standalone) to open directly in VS Code; `--venv` gives it its **own** reproducible env (the conda alternative) |
+| `rsm-project-check`                            | In a `--venv` folder, import each declared package and flag anything that fails to load                                                    |
+| `rsm-vscode-ext`                               | Install the curated VS Code extensions into the connected (WSL/SSH) window                                                                 |
+| `rsm-pg-init` / `-start` / `-stop` / `-status` | Workspace-local PostgreSQL lifecycle                                                                                                       |
+| `rsm-pg-psql`                                  | `psql` into the `rsm-msba` database                                                                                                        |
+| `rsm-pgweb`                                    | pgweb UI at <http://127.0.0.1:8282>                                                                                                        |
+| `github`                                       | One-time setup of your Git identity + a GitHub SSH key                                                                                     |
 
 ## Flake interfaces
 

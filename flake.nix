@@ -168,6 +168,7 @@
             text = rsmEnvHeader + "\n" + nativeEnvHook pkgs + ''
               export RSM_OMZ_SRC="${zshOmz}"
               export RSM_ZDOTDIR_TEMPLATE="${./shell/zdotdir}"
+              export RSM_SKILLS_SRC="${./skills}"
             '' + builtins.readFile ./bin/rsm-setup;
           };
           # Bootstrap/reset: clone the flake if missing, then rsm-setup. Lives on
@@ -200,6 +201,9 @@
           # `direnv allow`s it, so opening it directly in VS Code keeps every Nix
           # tool + the right Python. `--venv` also creates a local ./.venv.
           rsm-here = mk "rsm-here" [ rsm-vscode-settings pkgs.uv pkgs.direnv pkgs.coreutils ];
+          # Verifies a project's env: imports each declared dependency and flags
+          # anything that fails to load (missing package or missing system lib).
+          rsm-project-check = mk "rsm-project-check" [ pkgs.coreutils ];
         };
     in
     {

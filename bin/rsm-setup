@@ -277,6 +277,24 @@ if command -v npm >/dev/null 2>&1; then
   fi
 fi
 
+# 6b. Install the RSM Claude Code skills user-level (~/.claude/skills), so they
+#     are available in the workspace AND in folders set up with `rsm-here`
+#     anywhere. Assets come from the flake (RSM_SKILLS_SRC); refreshed each run,
+#     and only the rsm-* skills are touched (a student's own skills are left alone).
+if [ -n "${RSM_SKILLS_SRC:-}" ] && [ -d "$RSM_SKILLS_SRC" ]; then
+  skills_dest="$HOME/.claude/skills"
+  mkdir -p "$skills_dest"
+  for _skill in "$RSM_SKILLS_SRC"/*/; do
+    [ -d "$_skill" ] || continue
+    _sname="$(basename "$_skill")"
+    chmod -R u+w "${skills_dest:?}/$_sname" 2>/dev/null || true
+    rm -rf "${skills_dest:?}/$_sname"
+    cp -R "$_skill" "$skills_dest/$_sname"
+    chmod -R u+w "$skills_dest/$_sname" 2>/dev/null || true
+    echo "    skill     : $_sname -> $skills_dest/$_sname"
+  done
+fi
+
 # 7. Approve the generated workspace .envrc so entering ~/rsm-msba "just works"
 #    (no "direnv: .envrc is blocked" on first cd). rsm-setup wrote this .envrc
 #    itself, so auto-allowing our own generated file is safe.
