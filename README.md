@@ -58,12 +58,12 @@ direnv activates it automatically in every subfolder, at any depth, so
 most coursework needs nothing extra. To open a single folder
 **directly** in VS Code (e.g. an assignment that is its own git repo)
 with the right interpreter, or to give a folder its **own** isolated
-packages, use `rsm-here`:
+packages, use `rsm-new-project`:
 
 ```bash
-rsm-here                   # set up the CURRENT folder (shared nix-uv Python)
-rsm-here ~/projects/thesis # a standalone folder anywhere (created if needed)
-rsm-here --venv            # give this folder its OWN reproducible .venv
+rsm-new-project                   # set up the CURRENT folder (shared nix-uv Python)
+rsm-new-project ~/projects/thesis # a standalone folder anywhere (created if needed)
+rsm-new-project --venv            # give this folder its OWN reproducible .venv
 ```
 
 `--venv` is the alternative to a conda environment: a project-local
@@ -112,8 +112,8 @@ activation step needed.
 
 **Opening one folder on its own.** To open a single course/assignment
 folder directly (its own VS Code window and git repo) with the right
-interpreter, run `rsm-here` in it once. Add `--venv` to give that folder
-its **own** isolated packages (`uv add …`, checked with
+interpreter, run `rsm-new-project` in it once. Add `--venv` to give that
+folder its **own** isolated packages (`uv add …`, checked with
 `rsm-project-check`) — the conda alternative. You can also just ask
 Claude in the editor; the `rsm-project` skill handles setting up folders
 and adding/verifying packages.

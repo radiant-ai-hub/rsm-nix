@@ -1,15 +1,13 @@
-# rsm-here [--venv] [PATH]: make a folder a first-class RSM project, so you can
-# open it directly in VS Code (or a terminal) and get the full Nix toolchain +
-# the right Python interpreter.
+# rsm-new-project [--venv] [PATH]: make a folder a first-class RSM project, so you
+# can open it directly in VS Code (or a terminal) and get the full Nix toolchain +
+# the right Python interpreter. PATH may be ANYWHERE -- a nested folder under
+# ~/rsm-msba, or a standalone project elsewhere (e.g. ~/projects/thesis).
 #
-#   rsm-here                 the CURRENT folder, shared nix-uv Python (default)
-#   rsm-here PATH            that folder instead (created if needed); may be
-#                            ANYWHERE -- a nested folder under ~/rsm-msba, or a
-#                            standalone project (e.g. ~/projects/thesis)
-#   rsm-here --venv [PATH]   also give the folder its OWN reproducible venv
-#                            (pyproject.toml + uv.lock, grown with `uv add`) --
-#                            the alternative to a conda environment, layered on
-#                            top of the Nix tools.
+#   rsm-new-project                  the CURRENT folder, shared nix-uv Python
+#   rsm-new-project ~/projects/foo   that folder instead (created if needed)
+#   rsm-new-project --venv [PATH]    give the project its OWN reproducible venv
+#                                    (pyproject.toml + uv.lock, grown with
+#                                    `uv add`) -- the alternative to a conda env.
 #
 # It writes .envrc, .vscode/{settings,extensions}.json, (with --venv) a starter
 # pyproject.toml + .gitignore, and runs `direnv allow`. A folder inside
@@ -22,13 +20,13 @@ for _arg in "$@"; do
   case "$_arg" in
     --venv) _use_venv=1 ;;
     -h|--help)
-      echo "usage: rsm-here [--venv] [PATH]"
+      echo "usage: rsm-new-project [--venv] [PATH]"
       echo "  PATH   folder to set up (default: current); may be anywhere"
       echo "  --venv also create a local ./.venv (pyproject + uv) you own"
       exit 0 ;;
-    -*) echo "rsm-here: unknown argument: $_arg" >&2; exit 2 ;;
+    -*) echo "rsm-new-project: unknown argument: $_arg" >&2; exit 2 ;;
     *)
-      [ -n "$_target" ] && { echo "rsm-here: only one PATH may be given" >&2; exit 2; }
+      [ -n "$_target" ] && { echo "rsm-new-project: only one PATH may be given" >&2; exit 2; }
       _target="$_arg" ;;
   esac
 done
@@ -51,7 +49,7 @@ case "$_here/" in
   *) _inside=0 ;;
 esac
 if [ "$_here" = "$RSM_WORKSPACE" ]; then
-  echo "rsm-here: the workspace root is already set up by rsm-setup; nothing to do." >&2
+  echo "rsm-new-project: the workspace root is already set up by rsm-setup; nothing to do." >&2
   exit 0
 fi
 
@@ -144,7 +142,7 @@ if command -v direnv >/dev/null 2>&1; then
   direnv allow "$_here" || true
 fi
 
-echo "rsm-here: '$_here' is ready to open directly in VS Code or a terminal."
+echo "rsm-new-project: '$_here' is ready to open directly in VS Code or a terminal."
 if [ "$_use_venv" -eq 1 ]; then
   echo "  Python : a local ./.venv you own — add packages with 'uv add <pkg>', check with 'rsm-project-check'."
 else

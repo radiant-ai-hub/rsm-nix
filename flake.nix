@@ -194,13 +194,15 @@
           # integrated terminal so they land in the remote, not just the laptop.
           rsm-vscode-ext = mk "rsm-vscode-ext" [ pkgs.coreutils ];
           # Writes a folder's .vscode/{settings,extensions}.json (interpreter,
-          # RSM terminal shell, curated settings). Shared by rsm-setup + rsm-here.
+          # RSM terminal shell, curated settings). Shared by rsm-setup +
+          # rsm-new-project.
           rsm-vscode-settings = mk "rsm-vscode-settings" [ pkgs.coreutils pkgs.gnused pkgs.gnugrep ];
-          # Makes the CURRENT nested folder a first-class RSM subproject: writes
-          # .envrc (source_up -> the ~/rsm-msba flake env) + .vscode config and
-          # `direnv allow`s it, so opening it directly in VS Code keeps every Nix
-          # tool + the right Python. `--venv` also creates a local ./.venv.
-          rsm-here = mk "rsm-here" [ rsm-vscode-settings pkgs.uv pkgs.direnv pkgs.coreutils ];
+          # Makes a folder a first-class RSM project (nested under ~/rsm-msba via
+          # source_up, or standalone anywhere via `use flake`): writes .envrc +
+          # .vscode config and `direnv allow`s it, so opening it directly in VS
+          # Code keeps every Nix tool + the right Python. `--venv` gives it its
+          # own reproducible venv (pyproject.toml + uv).
+          rsm-new-project = mk "rsm-new-project" [ rsm-vscode-settings pkgs.uv pkgs.direnv pkgs.coreutils ];
           # Verifies a project's env: imports each declared dependency and flags
           # anything that fails to load (missing package or missing system lib).
           rsm-project-check = mk "rsm-project-check" [ pkgs.coreutils ];

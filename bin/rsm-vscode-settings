@@ -1,5 +1,5 @@
 # rsm-vscode-settings: write <dir>/.vscode/{settings.json,extensions.json} for an
-# RSM folder. Shared by rsm-setup (the ~/rsm-msba workspace root) and rsm-here
+# RSM folder. Shared by rsm-setup (the ~/rsm-msba workspace root) and rsm-new-project
 # (nested folders), so the VS Code config is generated in exactly ONE place.
 #
 #   rsm-vscode-settings <dir> --interp <PATH> --zdotdir <PATH>

@@ -30,7 +30,8 @@
 # Reverse everything:
 #   sudo rm -f /etc/profile.d/rsm.sh /etc/direnv/direnvrc
 #   sudo rm -f /usr/local/bin/rsm-setup /usr/local/bin/rsm-msba \
-#              /usr/local/bin/rsm-update /usr/local/bin/direnv
+#              /usr/local/bin/rsm-update /usr/local/bin/rsm-new-project \
+#              /usr/local/bin/rsm-project-check /usr/local/bin/direnv
 #   sudo rm /nix/var/nix/profiles/rsm /nix/var/nix/profiles/rsm-*   # profile + generations
 #   # and delete the "rsm-msba (managed)" block from /etc/zsh/zshrc
 #   # (the /srv/uv-cache directory can stay or be removed)
@@ -65,9 +66,10 @@ if [ -e "$PROFILE" ]; then
   detail "already present — leaving as-is"
   detail "update later with: sudo $NIX profile upgrade --profile $PROFILE --all"
 else
-  detail "installing rsm-setup/rsm-msba/rsm-update + direnv + nix-direnv"
+  detail "installing rsm-setup/rsm-msba/rsm-update/rsm-new-project/rsm-project-check + direnv + nix-direnv"
   sudo "$NIX" "${NIXFLAGS[@]}" profile install --profile "$PROFILE" \
     "${FLAKE_REF}#rsm-setup" "${FLAKE_REF}#rsm-msba" "${FLAKE_REF}#rsm-update" \
+    "${FLAKE_REF}#rsm-new-project" "${FLAKE_REF}#rsm-project-check" \
     'nixpkgs#direnv' 'nixpkgs#nix-direnv'
 fi
 
@@ -76,7 +78,7 @@ fi
 # terminals, `su`, subshells), so a symlink here beats juggling profile.d vs
 # /etc/zsh/zshrc. Points at the gc-rooted profile, so it survives upgrades.
 log "symlinks in /usr/local/bin"
-for t in rsm-setup rsm-msba rsm-update direnv; do
+for t in rsm-setup rsm-msba rsm-update rsm-new-project rsm-project-check direnv; do
   sudo ln -sfn "$PROFILE/bin/$t" "/usr/local/bin/$t"
 done
 

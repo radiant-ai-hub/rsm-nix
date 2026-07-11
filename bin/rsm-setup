@@ -64,7 +64,7 @@ mkdir -p \
 rsm-python-sync
 
 # 1b. Workspace VS Code config (.vscode/settings.json + extensions.json), via the
-#     shared helper that `rsm-here` also uses to scaffold nested folders -- so the
+#     shared helper that `rsm-new-project` also uses to scaffold nested folders -- so the
 #     config is generated in one place. ${workspaceFolder} keeps the file identical
 #     for every student/OS; running after the sync gives the curated-settings merge
 #     the nix-uv python. (VS Code reads workspace settings.json on the remote;
@@ -80,7 +80,7 @@ echo "    vscode    : wrote $RSM_WORKSPACE/.vscode/{settings,extensions}.json"
 #     a leftover base-uv env. VS Code (Remote-SSH) reads this file on the server.
 #     Merge, never clobber: keep any other machine settings the student has set.
 #     Harmless if they never connect with Remote-SSH. A workspace .vscode/ (root
-#     or `rsm-here`) and any auto-detected ./.venv still override this fallback.
+#     or `rsm-new-project`) and any auto-detected ./.venv still override this fallback.
 _vscode_machine="$HOME/.vscode-server/data/Machine/settings.json"
 if [ -x "$RSM_UV_ENV/bin/python" ]; then
   mkdir -p "$(dirname "$_vscode_machine")"
@@ -278,7 +278,7 @@ if command -v npm >/dev/null 2>&1; then
 fi
 
 # 6b. Install the RSM Claude Code skills user-level (~/.claude/skills), so they
-#     are available in the workspace AND in folders set up with `rsm-here`
+#     are available in the workspace AND in folders set up with `rsm-new-project`
 #     anywhere. Assets come from the flake (RSM_SKILLS_SRC); refreshed each run,
 #     and only the rsm-* skills are touched (a student's own skills are left alone).
 if [ -n "${RSM_SKILLS_SRC:-}" ] && [ -d "$RSM_SKILLS_SRC" ]; then

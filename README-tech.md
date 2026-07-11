@@ -110,12 +110,12 @@ direnv activates it automatically in every subfolder, at any depth, so
 most coursework needs nothing extra. To open a single folder
 **directly** in VS Code (e.g. an assignment that is its own git repo)
 with the right interpreter, or to give a folder its **own** isolated
-packages, use `rsm-here`:
+packages, use `rsm-new-project`:
 
 ```bash
-rsm-here                   # set up the CURRENT folder (shared nix-uv Python)
-rsm-here ~/projects/thesis # a standalone folder anywhere (created if needed)
-rsm-here --venv            # give this folder its OWN reproducible .venv
+rsm-new-project                   # set up the CURRENT folder (shared nix-uv Python)
+rsm-new-project ~/projects/thesis # a standalone folder anywhere (created if needed)
+rsm-new-project --venv            # give this folder its OWN reproducible .venv
 ```
 
 `--venv` is the alternative to a conda environment: a project-local
@@ -134,7 +134,7 @@ all of this for you.
 | `rsm-version`                                  | Print the environment version (the flake’s git commit) + platform                                                                          |
 | `rsm-python-sync`                              | Refresh the base env from `uv.lock`                                                                                                        |
 | `rsm-new-course NAME...`                       | Create course folder(s) under `~/rsm-msba` that share the one nix-uv env                                                                   |
-| `rsm-here [--venv] [PATH]`                     | Set up a folder (nested or standalone) to open directly in VS Code; `--venv` gives it its **own** reproducible env (the conda alternative) |
+| `rsm-new-project [--venv] [PATH]`              | Set up a folder (nested or standalone) to open directly in VS Code; `--venv` gives it its **own** reproducible env (the conda alternative) |
 | `rsm-project-check`                            | In a `--venv` folder, import each declared package and flag anything that fails to load                                                    |
 | `rsm-vscode-ext`                               | Install the curated VS Code extensions into the connected (WSL/SSH) window                                                                 |
 | `rsm-pg-init` / `-start` / `-stop` / `-status` | Workspace-local PostgreSQL lifecycle                                                                                                       |
