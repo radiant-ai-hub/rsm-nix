@@ -45,8 +45,11 @@ jobs:
       - name: Run default smoke checks
         run: nix develop -c bash tests/check-default.sh
 
-      - name: Check xgboost/libomp works without DYLD_ (macOS SIP terminal case)
+      - name: Check xgboost/libomp in a terminal — shared env + isolated venv (macOS SIP)
         run: nix develop -c bash tests/check-macos-omp.sh
+
+      - name: Check xgboost imports in the notebook kernel from kernel.json alone
+        run: nix develop -c bash tests/check-notebook-imports.sh
 
       - name: Run folder layout checks
         run: nix develop -c bash tests/check-folders.sh
