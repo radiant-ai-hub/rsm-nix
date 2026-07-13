@@ -54,6 +54,9 @@ jobs:
       - name: Check quarto render of a .qmd with a python chunk (Session-4 workflow)
         run: nix develop -c bash tests/check-quarto-render.sh
 
+      - name: Run the student diagnostic as a gate (check_environment.py --strict)
+        run: nix develop -c python examples/check_environment.py --strict
+
       - name: Run folder layout checks
         run: nix develop -c bash tests/check-folders.sh
 

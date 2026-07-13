@@ -12,14 +12,20 @@ import shutil
 import sys
 
 ok, warn = [], []
+# `hard` failures gate `--strict` (CI). `soft` ones only print — e.g. git/gh
+# resolving to a system copy is harmless (any recent version works), whereas the
+# pinned quarto/psql/uv/python being shadowed WOULD break reproducibility.
+hard_fail = []
 
 
 def _norm(p):
     return os.path.realpath(p) if p else p
 
 
-def check(label, cond, detail=""):
+def check(label, cond, detail="", soft=False):
     (ok if cond else warn).append((label, detail))
+    if not cond and not soft:
+        hard_fail.append((label, detail))
     mark = "ok  " if cond else "WARN"
     print(f"[{mark}] {label}" + (f"  ->  {detail}" if detail else ""))
 
@@ -53,10 +59,13 @@ check("PATH does not contain /opt/base-uv", "/opt/base-uv" not in path)
 
 # %%
 print("\n== tools resolve to the Nix/RSM environment ==")
+# git/gh are version-tolerant, so a system copy is only a soft warning; the
+# pinned tools (quarto/psql/uv/python) must come from Nix or reproducibility breaks.
+soft_tools = {"git", "gh"}
 for tool in ["python", "uv", "quarto", "psql", "git", "gh"]:
     p = shutil.which(tool) or "(not found)"
     good = ("/nix/store/" in p) or (rsm_env and p.startswith(rsm_env))
-    check(f"{tool:7s} -> {p}", bool(good), "")
+    check(f"{tool:7s} -> {p}", bool(good), "", soft=tool in soft_tools)
 
 # %%
 print("\n== RSM environment variables (set by the dev shell) ==")
@@ -88,3 +97,12 @@ else:
     print("\nIf VIRTUAL_ENV points at /opt/base-uv (a server's old base env),")
     print("see examples/README.md -> 'Server: the old /opt/base-uv leak'.")
 print("=" * 60)
+
+# `--strict` turns this human diagnostic into a gate: exit non-zero if anything
+# warned. Used by CI (tests/) so the exact script students run to confirm
+# "ALL GOOD" is actually enforced on every platform.
+if "--strict" in sys.argv and hard_fail:
+    print(f"\n--strict: {len(hard_fail)} hard failure(s):", file=sys.stderr)
+    for label, detail in hard_fail:
+        print(f"  - {label}  {detail}", file=sys.stderr)
+    sys.exit(1)
