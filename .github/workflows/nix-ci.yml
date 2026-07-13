@@ -51,6 +51,9 @@ jobs:
       - name: Check xgboost imports in the notebook kernel from kernel.json alone
         run: nix develop -c bash tests/check-notebook-imports.sh
 
+      - name: Check quarto render of a .qmd with a python chunk (Session-4 workflow)
+        run: nix develop -c bash tests/check-quarto-render.sh
+
       - name: Run folder layout checks
         run: nix develop -c bash tests/check-folders.sh
 

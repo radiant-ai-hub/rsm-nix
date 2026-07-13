@@ -51,8 +51,13 @@ if [ -d "$RSM_UV_ENV/bin" ]; then
   export VIRTUAL_ENV_PROMPT="(nix-uv) "
 fi
 
-# Quarto should render with the course-core interpreter.
-export QUARTO_PYTHON="${QUARTO_PYTHON:-$RSM_UV_ENV/bin/python}"
+# Quarto must render with the course-core interpreter. FORCE it (not a ":-"
+# default): a QUARTO_PYTHON leaked from the login shell — e.g. a server's
+# deprecated /opt/base-uv that /etc/zsh/zshrc auto-activates — would otherwise
+# hijack every render, silently, whenever its packages happen to overlap. A
+# project-local venv re-exports QUARTO_PYTHON AFTER this hook (see
+# rsm-new-project), so per-project overrides still win.
+export QUARTO_PYTHON="$RSM_UV_ENV/bin/python"
 
 # Convenience aliases (available under `nix develop`; bash).
 alias c="clear"
