@@ -13,13 +13,18 @@ Intel Macs.
 
 Use the one your instructor gives you. There are two:
 
-| Server  | Address on campus / VPN   | Tailscale name | Tailscale IP     |
-| ------- | ------------------------- | -------------- | ---------------- |
-| **sc1** | `rsm-compute-01.ucsd.edu` | `sc1-nixos`    | `100.120.22.116` |
-| **sc2** | `rsm-compute-02.ucsd.edu` | `sc2-ubuntu`   | `100.120.8.242`  |
+| Server  | Campus / VPN address      | Tailscale hostname (recommended) | Tailscale IP     |
+| ------- | ------------------------- | -------------------------------- | ---------------- |
+| **sc1** | `rsm-compute-01.ucsd.edu` | `sc1-nixos.tail37260b.ts.net`    | `100.120.22.116` |
+| **sc2** | `rsm-compute-02.ucsd.edu` | `sc2-ubuntu.tail37260b.ts.net`   | `100.120.8.242`  |
+
+Use the **full Tailscale hostname** (the `….ts.net` name) — it works
+from any network once Tailscale is connected, and doesn’t depend on your
+laptop’s DNS settings the way the short name (`sc2-ubuntu`) does. The
+Tailscale IP is a last-resort fallback.
 
 Wherever this guide shows `<server>`, replace it with your assigned
-server’s address (e.g. `sc2-ubuntu` over Tailscale, or
+server’s address (e.g. `sc2-ubuntu.tail37260b.ts.net` over Tailscale, or
 `rsm-compute-02.ucsd.edu` on the campus VPN).
 
 ## What you need
@@ -88,8 +93,9 @@ lets VS Code connect to the server.
 
         ssh <your-ad-username>@<server>
 
-    For example, over Tailscale: `ssh msaad@sc2-ubuntu` (or on the
-    campus VPN: `ssh msaad@rsm-compute-02.ucsd.edu`).
+    For example, over Tailscale:
+    `ssh msaad@sc2-ubuntu.tail37260b.ts.net` (or on the campus VPN:
+    `ssh msaad@rsm-compute-02.ucsd.edu`).
 
 3.  When asked which SSH config file to use, accept the first one. Then
     choose **Connect** (you can also reconnect any time via
