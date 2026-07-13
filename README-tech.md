@@ -271,7 +271,7 @@ home directories are always protected by the server, not by Tailscale.
 **Instructor — once for the whole group (Tailscale admin console):**
 
 1.  Make sure the server is in your tailnet and powered on
-    (e.g. `sc1-nixos`).
+    (e.g. `sc2-ubuntu`).
 2.  Open <https://login.tailscale.com/admin/machines>.
 3.  Find the server’s row, click its `...` menu, choose **Share**.
 4.  Pick a **reusable** link (good for up to 1,000 people) and copy it.

@@ -14,11 +14,10 @@ on any laptop — including older Intel Macs.
 
 ## Which server?
 
-Use the one your instructor gives you. There are two:
+You'll use the shared RSM server **sc2**:
 
 | Server | Campus / VPN address | Tailscale hostname (recommended) | Tailscale IP |
 |--------|----------------------|----------------------------------|--------------|
-| **sc1** | `rsm-compute-01.ucsd.edu` | `sc1-nixos.tail37260b.ts.net` | `100.120.22.116` |
 | **sc2** | `rsm-compute-02.ucsd.edu` | `sc2-ubuntu.tail37260b.ts.net` | `100.120.8.242` |
 
 Use the **full Tailscale hostname** (the `….ts.net` name) — it works from any
