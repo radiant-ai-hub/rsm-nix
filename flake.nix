@@ -125,7 +125,15 @@
           export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc.lib pkgs.zlib ]}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
           export PKG_CONFIG_PATH="${pkgs.python313}/lib/pkgconfig''${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
         '' + pkgs.lib.optionalString pkgs.stdenv.isDarwin ''
-          export DYLD_FALLBACK_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [ pkgs.llvmPackages.openmp ]}''${DYLD_FALLBACK_LIBRARY_PATH:+:$DYLD_FALLBACK_LIBRARY_PATH}"
+          # RSM_OMP_LIBDIR is a SIP-SAFE twin of the OpenMP path below. macOS SIP
+          # strips every DYLD_* var from the environment a protected shell (the
+          # default /bin/zsh) hands to its children, so DYLD_FALLBACK_LIBRARY_PATH
+          # is gone before python starts in a TERMINAL -- xgboost then can't find
+          # libomp there even though it works in a kernel. A var not named DYLD_*
+          # survives that hop, so the sitecustomize preload (shell/rsm-sitecustomize.py,
+          # installed on PYTHONPATH by rsm-setup) reads this to load libomp by path.
+          export RSM_OMP_LIBDIR="${pkgs.lib.makeLibraryPath [ pkgs.llvmPackages.openmp ]}"
+          export DYLD_FALLBACK_LIBRARY_PATH="$RSM_OMP_LIBDIR''${DYLD_FALLBACK_LIBRARY_PATH:+:$DYLD_FALLBACK_LIBRARY_PATH}"
         '';
 
       mkRsmScripts = pkgs:
@@ -169,6 +177,7 @@
               export RSM_OMZ_SRC="${zshOmz}"
               export RSM_ZDOTDIR_TEMPLATE="${./shell/zdotdir}"
               export RSM_SKILLS_SRC="${./skills}"
+              export RSM_SITECUSTOMIZE_SRC="${./shell/rsm-sitecustomize.py}"
             '' + builtins.readFile ./bin/rsm-setup;
           };
           # Bootstrap/reset: clone the flake if missing, then rsm-setup. Lives on

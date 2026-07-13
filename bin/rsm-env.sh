@@ -48,3 +48,14 @@ case ":$PATH:" in
   *":$NPM_CONFIG_PREFIX/bin:"*) ;;
   *) PATH="$NPM_CONFIG_PREFIX/bin:$PATH"; export PATH ;;
 esac
+
+# Make the RSM sitecustomize (native-library preload) importable at EVERY Python
+# startup. PYTHONPATH is not a DYLD_* var, so macOS SIP keeps it across the
+# shell -> python hop where it strips DYLD_FALLBACK_LIBRARY_PATH -- that is what
+# lets xgboost find libomp in a TERMINAL, not only in a notebook. The file is
+# installed by rsm-setup; a missing dir is harmless (python just skips it).
+# See shell/rsm-sitecustomize.py.
+case ":${PYTHONPATH:-}:" in
+  *":$RSMBASE/pythonpath:"*) ;;
+  *) PYTHONPATH="$RSMBASE/pythonpath${PYTHONPATH:+:$PYTHONPATH}"; export PYTHONPATH ;;
+esac

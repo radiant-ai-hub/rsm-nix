@@ -180,6 +180,22 @@ else
   echo "    kernel    : skipped (ipykernel not available yet)"
 fi
 
+# 2b. Native-library preload for the TERMINAL (macOS SIP-proof). The kernel.json
+#     above fixes notebooks, but macOS SIP strips DYLD_* before python starts in
+#     a terminal, so xgboost still could not find libomp there. Install a
+#     sitecustomize on PYTHONPATH (a non-DYLD_* var SIP keeps; wired up in
+#     bin/rsm-env.sh) that preloads libomp by absolute path -- so `import xgboost`
+#     works in a terminal, in scripts, AND in notebooks, with no `brew install
+#     libomp`. See shell/rsm-sitecustomize.py. Baking RSM_OMP_LIBDIR as a literal
+#     fallback keeps it working even if the env var is ever missing. On Linux
+#     RSM_OMP_LIBDIR is unset (no SIP, no preload needed) and the file no-ops.
+if [ -n "${RSM_SITECUSTOMIZE_SRC:-}" ] && [ -f "$RSM_SITECUSTOMIZE_SRC" ]; then
+  mkdir -p "$RSMBASE/pythonpath"
+  sed "s|@RSM_OMP_LIBDIR@|${RSM_OMP_LIBDIR:-}|g" \
+    "$RSM_SITECUSTOMIZE_SRC" > "$RSMBASE/pythonpath/sitecustomize.py"
+  echo "    preload   : libomp sitecustomize -> $RSMBASE/pythonpath/sitecustomize.py"
+fi
+
 # 2b. zsh: install oh-my-zsh + powerlevel10k into the workspace ZDOTDIR
 #     ($RSMBASE/zsh). The generated .vscode/settings.json points VS Code
 #     terminals here, so the rsm-msba environment gets the full RSM shell while
