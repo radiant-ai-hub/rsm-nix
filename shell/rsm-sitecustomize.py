@@ -43,24 +43,35 @@ def _preload_openmp():
 
     import ctypes
 
-    seen = set()
     candidates = []
+
+    # Primary: the copy installed next to this file by rsm-setup, whose install
+    # name was rewritten to `@rpath/libomp.dylib`. Once it is resident under that
+    # name, xgboost/lightgbm's later `dlopen("@rpath/libomp.dylib")` reuses it --
+    # which the stock Nix libomp (absolute-store-path install name) cannot do.
+    here = os.path.dirname(os.path.abspath(__file__))
+    candidates.append(os.path.join(here, "libomp.dylib"))
+
+    # Fallback: the raw Nix OpenMP dir(s). Preloading is harmless; on its own it
+    # does NOT satisfy an `@rpath/libomp.dylib` request, but it covers the rare
+    # case the @rpath copy above is missing.
     for source in (os.environ.get("RSM_OMP_LIBDIR", ""), _BAKED_LIBDIR):
         if not source or source.startswith("@"):
             continue
         for d in source.split(os.pathsep):
-            if d and d not in seen:
-                seen.add(d)
-                candidates.append(d)
+            if d:
+                candidates.append(os.path.join(d, "libomp.dylib"))
 
-    for d in candidates:
-        lib = os.path.join(d, "libomp.dylib")
-        if os.path.exists(lib):
-            try:
-                ctypes.CDLL(lib, mode=ctypes.RTLD_GLOBAL)
-            except OSError:
-                continue
-            return
+    seen = set()
+    for lib in candidates:
+        if lib in seen or not os.path.exists(lib):
+            continue
+        seen.add(lib)
+        try:
+            ctypes.CDLL(lib, mode=ctypes.RTLD_GLOBAL)
+        except OSError:
+            continue
+        return  # first successful load wins (the @rpath copy is tried first)
 
 
 try:

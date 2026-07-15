@@ -163,6 +163,27 @@
             ln -s ${pkgs.zsh-autosuggestions}/share/zsh-autosuggestions "$out/plugins/zsh-autosuggestions"
             ln -s ${pkgs.zsh-syntax-highlighting}/share/zsh-syntax-highlighting "$out/plugins/zsh-syntax-highlighting"
           '';
+
+          # macOS: a copy of the Nix OpenMP runtime whose install name is rewritten
+          # to `@rpath/libomp.dylib` (+ ad-hoc re-signed). The xgboost/lightgbm
+          # wheels dlopen `@rpath/libomp.dylib`; once THIS copy is preloaded (by
+          # the sitecustomize on PYTHONPATH) it is resident under exactly that name,
+          # so their dlopen reuses it -- no Homebrew libomp, no DYLD_* (which macOS
+          # SIP strips in a terminal). The stock Nix libomp cannot do this: its
+          # install name is its absolute /nix/store path, which never matches an
+          # `@rpath/libomp.dylib` request. Built here so students need no Xcode CLT.
+          ompRpath =
+            if pkgs.stdenv.isDarwin then
+              pkgs.runCommand "rsm-libomp-rpath"
+                { nativeBuildInputs = [ pkgs.darwin.cctools pkgs.darwin.sigtool ]; }
+                ''
+                  mkdir -p "$out/lib"
+                  cp ${pkgs.llvmPackages.openmp}/lib/libomp.dylib "$out/lib/libomp.dylib"
+                  chmod u+w "$out/lib/libomp.dylib"
+                  install_name_tool -id @rpath/libomp.dylib "$out/lib/libomp.dylib"
+                  codesign -f -s - "$out/lib/libomp.dylib"
+                ''
+            else null;
         in
         rec {
           rsm-python-sync = pythonSync;
@@ -178,6 +199,8 @@
               export RSM_ZDOTDIR_TEMPLATE="${./shell/zdotdir}"
               export RSM_SKILLS_SRC="${./skills}"
               export RSM_SITECUSTOMIZE_SRC="${./shell/rsm-sitecustomize.py}"
+            '' + pkgs.lib.optionalString pkgs.stdenv.isDarwin ''
+              export RSM_OMP_RPATH_LIB="${ompRpath}/lib/libomp.dylib"
             '' + builtins.readFile ./bin/rsm-setup;
           };
           # Bootstrap/reset: clone the flake if missing, then rsm-setup. Lives on

@@ -25,6 +25,28 @@ if [ ! -e "$RSM_FLAKE/flake.nix" ]; then
 elif [ -d "$RSM_FLAKE/.git" ]; then
   if git -C "$RSM_FLAKE" pull --ff-only >/dev/null 2>&1; then
     echo "    flake     : updated $RSM_FLAKE to latest"
+  else
+    # Fast-forward failed. This clone is meant to be PRISTINE -- every student
+    # edit lives in ~/rsm-msba, never here -- so a non-ff almost always means the
+    # upstream history was rewritten (a force-push) and this clone has diverged.
+    # Left alone, `git pull` keeps failing silently and the student is stranded on
+    # an old commit forever (never receiving fixes). Re-sync HARD to the upstream
+    # default branch. Guarded so we never nuke a clone that isn't ours or that has
+    # uncommitted edits; the discarded commits are still reachable via the backup
+    # tag for a while, just in case.
+    _origin="$(git -C "$RSM_FLAKE" remote get-url origin 2>/dev/null || true)"
+    if printf '%s' "$_origin" | grep -q 'radiant-ai-hub/rsm-nix' &&
+       [ -z "$(git -C "$RSM_FLAKE" status --porcelain 2>/dev/null)" ] &&
+       git -C "$RSM_FLAKE" fetch --quiet origin 2>/dev/null; then
+      _defbranch="$(git -C "$RSM_FLAKE" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')"
+      [ -n "$_defbranch" ] || _defbranch=main
+      git -C "$RSM_FLAKE" tag -f rsm-presync-backup HEAD >/dev/null 2>&1 || true
+      if git -C "$RSM_FLAKE" reset --hard "origin/$_defbranch" >/dev/null 2>&1; then
+        echo "    flake     : re-synced $RSM_FLAKE to origin/$_defbranch (upstream history had diverged)"
+      fi
+    else
+      echo "    flake     : WARNING — could not update $RSM_FLAKE (diverged, or has local changes); leaving it untouched" >&2
+    fi
   fi
 fi
 
@@ -194,6 +216,16 @@ if [ -n "${RSM_SITECUSTOMIZE_SRC:-}" ] && [ -f "$RSM_SITECUSTOMIZE_SRC" ]; then
   sed "s|@RSM_OMP_LIBDIR@|${RSM_OMP_LIBDIR:-}|g" \
     "$RSM_SITECUSTOMIZE_SRC" > "$RSMBASE/pythonpath/sitecustomize.py"
   echo "    preload   : libomp sitecustomize -> $RSMBASE/pythonpath/sitecustomize.py"
+  # macOS: drop the @rpath-id'd libomp copy (built by the flake with install name
+  # @rpath/libomp.dylib + ad-hoc signature) NEXT TO the sitecustomize, which
+  # preloads it. This is what actually resolves xgboost's @rpath/libomp.dylib in
+  # a terminal -- no Homebrew, no DYLD_*. A plain cp keeps the signature (it is
+  # embedded in the Mach-O). Linux leaves RSM_OMP_RPATH_LIB unset (no preload).
+  if [ -n "${RSM_OMP_RPATH_LIB:-}" ] && [ -f "$RSM_OMP_RPATH_LIB" ]; then
+    cp -f "$RSM_OMP_RPATH_LIB" "$RSMBASE/pythonpath/libomp.dylib"
+    chmod u+w "$RSMBASE/pythonpath/libomp.dylib"
+    echo "    preload   : libomp (@rpath id) -> $RSMBASE/pythonpath/libomp.dylib"
+  fi
 fi
 
 # 2b. zsh: install oh-my-zsh + powerlevel10k into the workspace ZDOTDIR
