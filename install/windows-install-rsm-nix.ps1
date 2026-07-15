@@ -670,7 +670,11 @@ chsh -s "$zsh_path" "$wsl_user" 2>/dev/null || usermod -s "$zsh_path" "$wsl_user
 printf '%s ALL=(ALL) NOPASSWD:ALL\n' "$wsl_user" >"/etc/sudoers.d/90-rsm-nix-$wsl_user"
 chmod 0440 "/etc/sudoers.d/90-rsm-nix-$wsl_user"
 
-printf '%s\n' '[user]' "default=$wsl_user" '' '[boot]' 'systemd=true' >/etc/wsl.conf
+# appendWindowsPath=false keeps the Windows PATH out of WSL so a Windows
+# node/npm/claude (e.g. nvm4w under /mnt/c) can't shadow the WSL-native ones and
+# break `claude`. It does NOT affect /mnt/c file access (that is [automount],
+# left enabled). `code` still works in VS Code's WSL terminal (server-injected).
+printf '%s\n' '[user]' "default=$wsl_user" '' '[boot]' 'systemd=true' '' '[interop]' 'appendWindowsPath=false' >/etc/wsl.conf
 '@
 
     Invoke-WslBash -User "root" -Script $setupScript -Arguments @($script:EffectiveWslUser) -Description "Ubuntu base configuration"

@@ -298,15 +298,28 @@ if [ -f "$RSM_FLAKE/README.md" ]; then
   echo "    readme    : $RSM_WORKSPACE/README.md -> flake README"
 fi
 
+# On WSL, Windows PATH interop can put a Windows node/npm/claude (under /mnt/c,
+# e.g. an nvm4w install) ahead of the WSL-native ones. Those are Windows .exe
+# shims that can't run under Linux, and a leaked `claude` here would make us
+# think Claude Code is already installed and SKIP installing the real Linux one
+# — leaving the student with a `claude` that only fails. Treat a command as
+# present only when it resolves to a native (non-/mnt) path.
+rsm_have_native() {
+  local p
+  p="$(command -v "$1" 2>/dev/null)" || return 1
+  case "$p" in /mnt/*) return 1 ;; esac
+  return 0
+}
+
 # 6. Claude Code: install into the user-writable npm prefix (NPM_CONFIG_PREFIX,
 #    set in rsm-env.sh) so students and Claude can upgrade it themselves. It is
 #    intentionally NOT pinned by the flake — it updates very frequently and
 #    self-updates — while Node IS pinned. Install if missing; `rsm-update` (which
 #    sets RSM_CLAUDE_LATEST) forces it to the latest. Non-fatal and time-bounded
 #    so a slow/absent network never blocks setup.
-if command -v npm >/dev/null 2>&1; then
+if rsm_have_native npm; then
   mkdir -p "$NPM_CONFIG_PREFIX"
-  if ! command -v claude >/dev/null 2>&1; then
+  if ! rsm_have_native claude; then
     echo "    claude    : installing @anthropic-ai/claude-code (npm global)"
     if timeout 180 npm install -g @anthropic-ai/claude-code >/dev/null 2>&1; then
       echo "    claude    : $(claude --version 2>/dev/null || echo installed)"
