@@ -469,13 +469,48 @@ function Enable-WslOptionalFeatures {
     }
 }
 
+function Stop-ForReboot {
+    param([string]$Reason)
+    # A reboot-required stop is a normal step, not a failure -- present it as a
+    # clear "action needed" banner and exit 0 so it never reads as a crash.
+    Write-BlankLine
+    Write-Host "============================================================" -ForegroundColor Yellow
+    Write-Host " ACTION NEEDED - reboot Windows, then rerun this installer." -ForegroundColor Yellow
+    Write-Host " $Reason" -ForegroundColor Yellow
+    Write-Host "============================================================" -ForegroundColor Yellow
+    Write-BlankLine
+    exit 0
+}
+
+function Install-WslPlatform {
+    # Enable + install the WSL platform, then STOP for a reboot. A fresh WSL
+    # enablement ALWAYS needs a reboot before WSL can run, so this is shared by
+    # both the "wsl.exe missing" and "wsl.exe present but WSL not actually
+    # installed" paths -- a half-enabled WSL must never plow ahead into a
+    # confusing "Windows Subsystem for Linux is not installed" failure later.
+    if (-not (Test-IsAdministrator)) {
+        throw "WSL is not installed, and installing it requires Administrator. Right-click PowerShell, choose 'Run as Administrator', then rerun this installer."
+    }
+    Assert-WslPrerequisites
+    Write-Detail "Installing the Windows Subsystem for Linux..."
+    Enable-WslOptionalFeatures
+    if (Get-CommandPathOrNull "wsl.exe") {
+        # Best effort: register the platform / fetch the WSL2 kernel. Its exit
+        # code is unreliable before the reboot, so we don't gate on it -- the
+        # feature enablement above is what actually matters.
+        & wsl.exe --install --no-distribution 2>&1 | Out-Host
+    }
+    Stop-ForReboot "WSL has been installed. It needs a reboot to finish enabling before the Ubuntu setup can run."
+}
+
 function Ensure-WslFeature {
     Write-Section "Step 2: Checking WSL2..."
 
-    if ($SimulateMissingWsl -or -not (Get-CommandPathOrNull "wsl.exe")) {
+    $wslPresent = (-not $SimulateMissingWsl) -and [bool](Get-CommandPathOrNull "wsl.exe")
+
+    if (-not $wslPresent) {
         # No wsl.exe at all (older Windows, or the WSL feature was never enabled).
-        # INSTALL it rather than bailing out. This needs Administrator and, after
-        # a fresh feature enablement, a reboot before WSL can actually run.
+        # INSTALL it rather than bailing out.
         if ($DryRun) {
             Write-Detail "[dry-run] wsl.exe not found; would install WSL:"
             Write-Detail "[dry-run] Would run: dism /online /enable-feature Microsoft-Windows-Subsystem-Linux /all /norestart"
@@ -484,24 +519,7 @@ function Ensure-WslFeature {
             Write-BlankLine
             return
         }
-        if (-not (Test-IsAdministrator)) {
-            throw "WSL is not installed, and installing it requires Administrator. Right-click PowerShell, choose 'Run as Administrator', then rerun this installer."
-        }
-
-        Assert-WslPrerequisites
-
-        Write-Detail "wsl.exe not found -- installing WSL..."
-        Enable-WslOptionalFeatures
-
-        # With the features staged, wsl.exe usually appears immediately. Kick off
-        # the modern one-shot installer too when it does (fetches the WSL2 kernel);
-        # its exit code is unreliable pre-reboot, so the feature enablement above
-        # is what we rely on.
-        if (Get-CommandPathOrNull "wsl.exe") {
-            & wsl.exe --install --no-distribution
-        }
-
-        throw "WSL has been installed. REBOOT Windows now, then rerun this installer to finish setting up the RSM environment."
+        Install-WslPlatform   # enables the features, then stops for a reboot
     }
 
     if ($DryRun) {
@@ -513,17 +531,15 @@ function Ensure-WslFeature {
         return
     }
 
+    # wsl.exe exists -- but the stub ships even when the WSL platform is NOT
+    # enabled, in which case `wsl --status` either fails or literally reports
+    # "Windows Subsystem for Linux is not installed". Treat either as not-ready
+    # and install the platform (which then stops for a reboot) instead of
+    # continuing and hitting that same error downstream.
     $status = & wsl.exe --status 2>&1 | Out-String
-    if ($LASTEXITCODE -ne 0) {
-        if (-not (Test-IsAdministrator)) {
-            throw "WSL is not ready. Rerun this PowerShell script as Administrator so it can enable WSL, then reboot if Windows asks."
-        }
-        Assert-WslPrerequisites
-        Write-Detail "Installing WSL without a default distro..."
-        & wsl.exe --install --no-distribution
-        if ($LASTEXITCODE -ne 0) {
-            throw "WSL installation failed. Reboot if Windows requested it, then rerun this installer."
-        }
+    $ready = ($LASTEXITCODE -eq 0) -and ($status -notmatch 'not installed')
+    if (-not $ready) {
+        Install-WslPlatform
     } else {
         Write-Detail ($status.Trim() -replace "`r?`n", "; ")
     }
