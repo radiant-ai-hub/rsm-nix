@@ -6,7 +6,6 @@ eamodio.gitlens
 esbenp.prettier-vscode
 mechatroner.rainbow-csv
 medo64.render-crlf
-mkhl.direnv
 ms-python.python
 ms-toolsai.jupyter
 ms-toolsai.jupyter-keymap
@@ -20,6 +19,7 @@ ms-vscode-remote.vscode-remote-extensionpack
 ms-vscode.live-server
 ms-vscode.remote-explorer
 ms-vsliveshare.vsliveshare
+pinage404.nix-extension-pack
 quarto.quarto
 streetsidesoftware.code-spell-checker
 tomoki1207.pdf
