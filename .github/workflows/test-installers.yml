@@ -38,6 +38,28 @@ jobs:
           Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
           .\install\windows-install-rsm-nix.ps1 -DryRun -SkipWorkspaceSetup
 
+      - name: Regression - installs WSL when it is missing
+        shell: powershell
+        run: |
+          Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
+          # -SimulateMissingWsl forces the "wsl.exe absent" branch even though the
+          # runner has WSL, so we can assert the installer actually installs WSL
+          # (enables both required Windows features) instead of bailing out.
+          # 6>&1 merges the Information stream (Write-Host/Write-Detail) into the
+          # pipeline so Out-String actually captures it on Windows PowerShell 5.1.
+          $out = .\install\windows-install-rsm-nix.ps1 -DryRun -SkipWorkspaceSetup -SimulateMissingWsl 6>&1 | Out-String
+          Write-Host $out
+          foreach ($needle in @(
+            "Microsoft-Windows-Subsystem-Linux",
+            "VirtualMachinePlatform",
+            "wsl --install --no-distribution"
+          )) {
+            if ($out -notmatch [regex]::Escape($needle)) {
+              throw "WSL-install regression: expected '$needle' in the missing-WSL install path, but it was absent."
+            }
+          }
+          Write-Host "OK: missing-WSL path installs WSL (both features + wsl --install)."
+
   macos:
     name: macOS ARM installer dry run
     runs-on: macos-26

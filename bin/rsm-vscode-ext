@@ -15,7 +15,27 @@ if [ ! -f "$ext_file" ]; then
   exit 1
 fi
 
-if ! command -v code >/dev/null 2>&1; then
+# Resolve the `code` CLI. In a VS Code integrated terminal it's on PATH (the
+# remote CLI). In a plain WSL shell it may not be — the installer disables
+# Windows PATH interop (so a Windows node/claude can't shadow the WSL ones),
+# which also drops the Windows `code` from PATH. Fall back to an explicit path
+# ($RSM_CODE_BIN, set by the Windows installer) or the Windows VS Code Linux
+# shim under /mnt/c; invoked from within WSL it still installs into the WSL
+# remote (~/.vscode-server), which is what we want.
+code_bin=""
+if [ -n "${RSM_CODE_BIN:-}" ] && [ -x "${RSM_CODE_BIN}" ]; then
+  code_bin="$RSM_CODE_BIN"
+elif command -v code >/dev/null 2>&1; then
+  code_bin="code"
+else
+  for c in /mnt/c/Users/*/AppData/Local/Programs/"Microsoft VS Code"/bin/code \
+           "/mnt/c/Program Files/Microsoft VS Code/bin/code" \
+           "/mnt/c/Program Files (x86)/Microsoft VS Code/bin/code"; do
+    if [ -x "$c" ]; then code_bin="$c"; break; fi
+  done
+fi
+
+if [ -z "$code_bin" ]; then
   echo "rsm-vscode-ext: the 'code' command is not available in this terminal." >&2
   echo "  Open ~/rsm-msba in VS Code and run 'rsm-vscode-ext' in ITS integrated" >&2
   echo "  terminal — that 'code' targets the WSL/SSH remote, so the extensions" >&2
@@ -23,7 +43,7 @@ if ! command -v code >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "==> Installing VS Code extensions into: $(command -v code)"
+echo "==> Installing VS Code extensions into: $code_bin"
 count=0
 fail=0
 while IFS= read -r line || [ -n "$line" ]; do
@@ -31,7 +51,7 @@ while IFS= read -r line || [ -n "$line" ]; do
   ext="$(printf '%s' "$ext" | tr -d '[:space:]')"
   [ -z "$ext" ] && continue
   printf '    %s\n' "$ext"
-  if ! code --install-extension "$ext" --force >/dev/null 2>&1; then
+  if ! "$code_bin" --install-extension "$ext" --force >/dev/null 2>&1; then
     printf '      (skipped — not on the marketplace?)\n'
     fail=$((fail + 1))
   fi

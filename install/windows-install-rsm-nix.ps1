@@ -17,7 +17,11 @@ param(
     [switch]$Force,
     [switch]$SkipVSCode,
     [switch]$SkipWorkspaceSetup,
-    [switch]$DryRun
+    [switch]$DryRun,
+    # Test hook: force the "wsl.exe is missing" install path even when wsl.exe
+    # exists, so CI can regression-test WSL installation on a runner that already
+    # has WSL. Not for normal use.
+    [switch]$SimulateMissingWsl
 )
 
 $ErrorActionPreference = "Stop"
@@ -426,6 +430,31 @@ function Install-Tailscale {
     Write-BlankLine
 }
 
+function Assert-WslPrerequisites {
+    # WSL2 needs a recent-enough Windows build and hardware virtualization.
+    # Neither is something this script can install/toggle, so surface exactly
+    # what the user must do -- a Windows Update/upgrade vs a BIOS/UEFI setting --
+    # instead of letting them hit a cryptic DISM or "WSL won't start" failure.
+    $build = 0
+    try {
+        $build = [int](Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' -ErrorAction Stop).CurrentBuildNumber
+    } catch {}
+    if ($build -gt 0 -and $build -lt 19041) {
+        throw "This Windows build ($build) is too old for WSL2, which needs build 19041 (Windows 10, version 2004) or Windows 11. Fix: open Settings > Windows Update, install all updates (or upgrade Windows), reboot, then rerun this installer."
+    }
+
+    $virtEnabled = $null
+    $hypervisor = $null
+    try { $virtEnabled = (Get-CimInstance -ClassName Win32_Processor -ErrorAction Stop | Select-Object -First 1).VirtualizationFirmwareEnabled } catch {}
+    try { $hypervisor = (Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop).HypervisorPresent } catch {}
+    if (($hypervisor -eq $false) -and ($virtEnabled -eq $false)) {
+        Write-Host "  WARNING: hardware virtualization appears disabled in firmware." -ForegroundColor Yellow
+        Write-Host "  WSL2 will not start until it is enabled. Reboot into your BIOS/UEFI and" -ForegroundColor Yellow
+        Write-Host "  turn on Intel VT-x / AMD-V (often labeled 'SVM' or 'Virtualization" -ForegroundColor Yellow
+        Write-Host "  Technology'), then rerun this installer." -ForegroundColor Yellow
+    }
+}
+
 function Enable-WslOptionalFeatures {
     # Enable the two Windows features WSL2 needs. This is the fallback for builds
     # where wsl.exe isn't present yet (so `wsl --install` can't run). DISM returns
@@ -443,7 +472,7 @@ function Enable-WslOptionalFeatures {
 function Ensure-WslFeature {
     Write-Section "Step 2: Checking WSL2..."
 
-    if (-not (Get-CommandPathOrNull "wsl.exe")) {
+    if ($SimulateMissingWsl -or -not (Get-CommandPathOrNull "wsl.exe")) {
         # No wsl.exe at all (older Windows, or the WSL feature was never enabled).
         # INSTALL it rather than bailing out. This needs Administrator and, after
         # a fresh feature enablement, a reboot before WSL can actually run.
@@ -458,6 +487,8 @@ function Ensure-WslFeature {
         if (-not (Test-IsAdministrator)) {
             throw "WSL is not installed, and installing it requires Administrator. Right-click PowerShell, choose 'Run as Administrator', then rerun this installer."
         }
+
+        Assert-WslPrerequisites
 
         Write-Detail "wsl.exe not found -- installing WSL..."
         Enable-WslOptionalFeatures
@@ -487,6 +518,7 @@ function Ensure-WslFeature {
         if (-not (Test-IsAdministrator)) {
             throw "WSL is not ready. Rerun this PowerShell script as Administrator so it can enable WSL, then reboot if Windows asks."
         }
+        Assert-WslPrerequisites
         Write-Detail "Installing WSL without a default distro..."
         & wsl.exe --install --no-distribution
         if ($LASTEXITCODE -ne 0) {
@@ -842,6 +874,64 @@ RSM_WORKSPACE="$workspace" nix develop "$flake" -c bash "$flake/tests/check-fold
     Write-BlankLine
 }
 
+function ConvertTo-WslPath {
+    param([string]$WindowsPath)
+    # C:\Users\me\x -> /mnt/c/Users/me/x  (drive letter lowercased, \ -> /)
+    $p = $WindowsPath -replace '\\', '/'
+    if ($p -match '^([A-Za-z]):/(.*)$') {
+        return "/mnt/$($Matches[1].ToLowerInvariant())/$($Matches[2])"
+    }
+    return $p
+}
+
+function Install-WslRemoteExtensions {
+    # VS Code splits extensions into a local (Windows/UI) side and a remote
+    # (WSL) side. Install-VSCodeAndExtensions covers the UI side; coursework runs
+    # in WSL, so Python/Jupyter/Quarto/etc. must also be installed into the WSL
+    # remote. Do that automatically here (previously a manual `rsm-vscode-ext`
+    # step) by running that same script inside WSL against the Windows VS Code
+    # Linux CLI shim -- invoked from within WSL, `code --install-extension`
+    # installs into ~/.vscode-server, i.e. the WSL remote.
+    if ($SkipVSCode -or $SkipWorkspaceSetup) {
+        Write-Detail "Skipping WSL VS Code extension install."
+        return
+    }
+
+    Write-Section "Step 6: Installing VS Code extensions into the WSL remote..."
+
+    $codeCommand = Find-VSCodeCommand
+    if (-not $codeCommand) {
+        Write-Detail "VS Code 'code' command not found; skipping remote extension install."
+        Write-BlankLine
+        return
+    }
+    # The Linux CLI shim sits next to code.cmd/code.exe as 'code' (no extension).
+    $wslShim = ConvertTo-WslPath (Join-Path (Split-Path -Parent $codeCommand) "code")
+
+    if ($DryRun) {
+        Write-Detail "[dry-run] Would install WSL-remote extensions via: $wslShim --install-extension <id>"
+        Write-BlankLine
+        return
+    }
+
+    $extScript = @'
+set -uo pipefail
+code_shim="$1"
+flake="$HOME/rsm-nix"
+export RSM_FLAKE="$flake"
+export RSM_CODE_BIN="$code_shim"
+# Non-fatal: a missing/marketplace-less extension must never fail the install.
+bash "$flake/bin/rsm-vscode-ext" || true
+'@
+
+    try {
+        Invoke-WslBash -User $script:EffectiveWslUser -Script $extScript -Arguments @($wslShim) -Description "WSL remote VS Code extensions"
+    } catch {
+        Write-Detail "Remote extension install had problems (non-fatal): $($_.Exception.Message)"
+    }
+    Write-BlankLine
+}
+
 $script:EffectiveWslUser = Get-SafeWslUser -Candidate $WslUser
 
 Write-Host "Rady School of Management @ UCSD" -ForegroundColor Cyan
@@ -864,6 +954,7 @@ Install-UbuntuDistro
 Initialize-WslDistro
 Configure-UbuntuUser
 Install-RsmWorkspace
+Install-WslRemoteExtensions
 
 Write-Host "Installation complete." -ForegroundColor Green
 Write-Host "Open VS Code, choose 'Connect to WSL', then open $WorkspacePath in $DistroName."
