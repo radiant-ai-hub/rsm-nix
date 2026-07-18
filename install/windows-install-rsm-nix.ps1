@@ -482,55 +482,69 @@ function Stop-ForReboot {
     exit 0
 }
 
+function Install-WslRuntime {
+    # Install the actual WSL runtime PACKAGE -- not just the Windows features. On
+    # Windows 11 the runtime is an app delivered by winget/Store; enabling the
+    # optional features alone leaves every wsl command reporting "...is not
+    # installed". `winget install Microsoft.WSL` reliably installs it, whereas the
+    # inbox `wsl.exe --install` stub can loop ("...is not installed. You can
+    # install by running 'wsl.exe --install'.") once the features are enabled.
+    # Prefer winget; fall back to wsl.exe --install.
+    if (Get-CommandPathOrNull "winget.exe") {
+        Write-Detail "Installing the WSL runtime (winget Microsoft.WSL)..."
+        & winget.exe install --id Microsoft.WSL --silent --accept-package-agreements --accept-source-agreements --disable-interactivity 2>&1 | Out-Host
+        if ($LASTEXITCODE -eq 0) { return }
+        Write-Detail "winget install did not succeed (exit $LASTEXITCODE); trying 'wsl --install'."
+    } else {
+        Write-Detail "winget not found; using 'wsl --install' to fetch the WSL runtime."
+    }
+    if (Get-CommandPathOrNull "wsl.exe") {
+        & wsl.exe --install --no-distribution --web-download 2>&1 | Out-Host
+    }
+}
+
 function Install-WslPlatform {
-    # Enable + install the WSL platform, then STOP for a reboot. A fresh WSL
-    # enablement ALWAYS needs a reboot before WSL can run, so this is shared by
-    # both the "wsl.exe missing" and "wsl.exe present but WSL not actually
-    # installed" paths -- a half-enabled WSL must never plow ahead into a
-    # confusing "Windows Subsystem for Linux is not installed" failure later.
+    # Enable the WSL Windows features AND install the WSL runtime package, then
+    # continue if WSL works now, or STOP for a reboot if it doesn't. The features
+    # being Enabled is NOT sufficient -- the runtime (Microsoft.WSL) must be
+    # present too. If the features were only just enabled, VirtualMachinePlatform
+    # needs a reboot to activate before WSL can run.
     if (-not (Test-IsAdministrator)) {
         throw "WSL is not installed, and installing it requires Administrator. Right-click PowerShell, choose 'Run as Administrator', then rerun this installer."
     }
     Assert-WslPrerequisites
-    Write-Detail "Installing the Windows Subsystem for Linux..."
+    Write-Detail "Enabling the WSL Windows features..."
     Enable-WslOptionalFeatures
-    if (Get-CommandPathOrNull "wsl.exe") {
-        # Best effort: register the platform / fetch the WSL2 kernel. Its exit
-        # code is unreliable before the reboot, so we don't gate on it -- the
-        # feature enablement above is what actually matters.
-        & wsl.exe --install --no-distribution 2>&1 | Out-Host
+    Install-WslRuntime
+
+    # Continue without a disruptive reboot if WSL is functional now (features were
+    # already active); otherwise the freshly enabled VirtualMachinePlatform needs
+    # a reboot to activate.
+    & wsl.exe --shutdown 2>$null
+    if (Test-WslReady) {
+        Write-Detail "WSL is installed and functional."
+        return
     }
-    Stop-ForReboot "WSL has been installed. It needs a reboot to finish enabling before the Ubuntu setup can run."
+    Stop-ForReboot "WSL has been installed. Reboot to finish enabling it, then rerun this installer to continue."
 }
 
 function Test-WslReady {
-    # Is the WSL platform actually installed and enabled? wsl.exe ships as a stub
-    # even when it is NOT, so its mere presence proves nothing -- and its --status
-    # output is UTF-16 and can exit 0 while printing "...is not installed", which
-    # made naive text/exit-code checks wrongly report "ready" and march into a
-    # downstream "Windows Subsystem for Linux is not installed" failure.
-    #
-    # Primary signal: the Windows feature State (an enum, locale-independent, and
-    # independent of wsl.exe entirely). Requires elevation, so fall back to a
-    # NUL-stripped status probe when the feature query isn't available.
-    try {
-        $subsystem = (Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux -ErrorAction Stop).State
-        $vmplatform = (Get-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform -ErrorAction Stop).State
-        return (($subsystem -eq 'Enabled') -and ($vmplatform -eq 'Enabled'))
-    } catch {
-        # Feature query needs elevation / the DISM module; probe wsl.exe instead.
-    }
-
+    # Is the WSL RUNTIME installed and working? This is the authoritative check --
+    # NOT the Windows feature state. On Windows 11 the features can be 'Enabled'
+    # while the runtime package (Microsoft.WSL) is absent, in which case every wsl
+    # command exits nonzero and prints "...is not installed". wsl.exe also ships
+    # as a stub even when nothing is installed, so its mere presence proves
+    # nothing, and its output is UTF-16 (NUL-separated). So run wsl --status,
+    # strip NULs, and require a clean, installed result.
     if (-not (Get-CommandPathOrNull "wsl.exe")) {
         return $false
     }
     try {
-        # Strip UTF-16 NULs so the text match is reliable regardless of WSL_UTF8.
+        $env:WSL_UTF8 = "1"
         $raw = ((& wsl.exe --status 2>&1 | Out-String) -replace "`0", "")
         return (($LASTEXITCODE -eq 0) -and
                 ($raw.Trim().Length -gt 0) -and
-                ($raw -notmatch 'not installed') -and
-                ($raw -notmatch 'no installed distributions'))
+                ($raw -notmatch 'not installed'))
     } catch {
         return $false
     }
@@ -544,9 +558,9 @@ function Ensure-WslFeature {
             Write-Detail "[dry-run] WSL not installed; would install it:"
             Write-Detail "[dry-run] Would run: dism /online /enable-feature Microsoft-Windows-Subsystem-Linux /all /norestart"
             Write-Detail "[dry-run] Would run: dism /online /enable-feature VirtualMachinePlatform /all /norestart"
-            Write-Detail "[dry-run] Would run: wsl --install --no-distribution"
+            Write-Detail "[dry-run] Would run: winget install --id Microsoft.WSL (fallback: wsl --install --no-distribution)"
         } else {
-            Write-Detail "[dry-run] Would verify WSL readiness via the Windows feature state."
+            Write-Detail "[dry-run] Would verify WSL readiness by running wsl --status."
             Write-Detail "[dry-run] Would run: wsl --update --web-download"
             Write-Detail "[dry-run] Would run: wsl --set-default-version 2"
         }

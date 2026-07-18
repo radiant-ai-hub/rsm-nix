@@ -52,6 +52,7 @@ jobs:
           foreach ($needle in @(
             "Microsoft-Windows-Subsystem-Linux",
             "VirtualMachinePlatform",
+            "Microsoft.WSL",
             "wsl --install --no-distribution"
           )) {
             if ($out -notmatch [regex]::Escape($needle)) {
