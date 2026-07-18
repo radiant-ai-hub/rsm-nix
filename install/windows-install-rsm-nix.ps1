@@ -426,11 +426,51 @@ function Install-Tailscale {
     Write-BlankLine
 }
 
+function Enable-WslOptionalFeatures {
+    # Enable the two Windows features WSL2 needs. This is the fallback for builds
+    # where wsl.exe isn't present yet (so `wsl --install` can't run). DISM returns
+    # 3010 (ERROR_SUCCESS_REBOOT_REQUIRED) when it staged changes that need a
+    # reboot -- treat that as success-with-reboot, not failure.
+    foreach ($feature in @("Microsoft-Windows-Subsystem-Linux", "VirtualMachinePlatform")) {
+        Write-Detail "Enabling Windows feature: $feature ..."
+        & dism.exe /online /enable-feature /featurename:$feature /all /norestart | Out-Host
+        if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 3010) {
+            throw "Failed to enable Windows feature '$feature' (dism exit $LASTEXITCODE). Enable it manually, reboot, and rerun this installer."
+        }
+    }
+}
+
 function Ensure-WslFeature {
     Write-Section "Step 2: Checking WSL2..."
 
     if (-not (Get-CommandPathOrNull "wsl.exe")) {
-        throw "wsl.exe was not found. This installer requires Windows 11 or Windows 10 21H2+."
+        # No wsl.exe at all (older Windows, or the WSL feature was never enabled).
+        # INSTALL it rather than bailing out. This needs Administrator and, after
+        # a fresh feature enablement, a reboot before WSL can actually run.
+        if ($DryRun) {
+            Write-Detail "[dry-run] wsl.exe not found; would install WSL:"
+            Write-Detail "[dry-run] Would run: dism /online /enable-feature Microsoft-Windows-Subsystem-Linux /all /norestart"
+            Write-Detail "[dry-run] Would run: dism /online /enable-feature VirtualMachinePlatform /all /norestart"
+            Write-Detail "[dry-run] Would run: wsl --install --no-distribution"
+            Write-BlankLine
+            return
+        }
+        if (-not (Test-IsAdministrator)) {
+            throw "WSL is not installed, and installing it requires Administrator. Right-click PowerShell, choose 'Run as Administrator', then rerun this installer."
+        }
+
+        Write-Detail "wsl.exe not found -- installing WSL..."
+        Enable-WslOptionalFeatures
+
+        # With the features staged, wsl.exe usually appears immediately. Kick off
+        # the modern one-shot installer too when it does (fetches the WSL2 kernel);
+        # its exit code is unreliable pre-reboot, so the feature enablement above
+        # is what we rely on.
+        if (Get-CommandPathOrNull "wsl.exe") {
+            & wsl.exe --install --no-distribution
+        }
+
+        throw "WSL has been installed. REBOOT Windows now, then rerun this installer to finish setting up the RSM environment."
     }
 
     if ($DryRun) {
