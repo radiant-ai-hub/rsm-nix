@@ -503,45 +503,63 @@ function Install-WslPlatform {
     Stop-ForReboot "WSL has been installed. It needs a reboot to finish enabling before the Ubuntu setup can run."
 }
 
+function Test-WslReady {
+    # Is the WSL platform actually installed and enabled? wsl.exe ships as a stub
+    # even when it is NOT, so its mere presence proves nothing -- and its --status
+    # output is UTF-16 and can exit 0 while printing "...is not installed", which
+    # made naive text/exit-code checks wrongly report "ready" and march into a
+    # downstream "Windows Subsystem for Linux is not installed" failure.
+    #
+    # Primary signal: the Windows feature State (an enum, locale-independent, and
+    # independent of wsl.exe entirely). Requires elevation, so fall back to a
+    # NUL-stripped status probe when the feature query isn't available.
+    try {
+        $subsystem = (Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux -ErrorAction Stop).State
+        $vmplatform = (Get-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform -ErrorAction Stop).State
+        return (($subsystem -eq 'Enabled') -and ($vmplatform -eq 'Enabled'))
+    } catch {
+        # Feature query needs elevation / the DISM module; probe wsl.exe instead.
+    }
+
+    if (-not (Get-CommandPathOrNull "wsl.exe")) {
+        return $false
+    }
+    try {
+        # Strip UTF-16 NULs so the text match is reliable regardless of WSL_UTF8.
+        $raw = ((& wsl.exe --status 2>&1 | Out-String) -replace "`0", "")
+        return (($LASTEXITCODE -eq 0) -and
+                ($raw.Trim().Length -gt 0) -and
+                ($raw -notmatch 'not installed') -and
+                ($raw -notmatch 'no installed distributions'))
+    } catch {
+        return $false
+    }
+}
+
 function Ensure-WslFeature {
     Write-Section "Step 2: Checking WSL2..."
 
-    $wslPresent = (-not $SimulateMissingWsl) -and [bool](Get-CommandPathOrNull "wsl.exe")
-
-    if (-not $wslPresent) {
-        # No wsl.exe at all (older Windows, or the WSL feature was never enabled).
-        # INSTALL it rather than bailing out.
-        if ($DryRun) {
-            Write-Detail "[dry-run] wsl.exe not found; would install WSL:"
+    if ($DryRun) {
+        if ($SimulateMissingWsl -or -not (Get-CommandPathOrNull "wsl.exe")) {
+            Write-Detail "[dry-run] WSL not installed; would install it:"
             Write-Detail "[dry-run] Would run: dism /online /enable-feature Microsoft-Windows-Subsystem-Linux /all /norestart"
             Write-Detail "[dry-run] Would run: dism /online /enable-feature VirtualMachinePlatform /all /norestart"
             Write-Detail "[dry-run] Would run: wsl --install --no-distribution"
-            Write-BlankLine
-            return
+        } else {
+            Write-Detail "[dry-run] Would verify WSL readiness via the Windows feature state."
+            Write-Detail "[dry-run] Would run: wsl --update --web-download"
+            Write-Detail "[dry-run] Would run: wsl --set-default-version 2"
         }
-        Install-WslPlatform   # enables the features, then stops for a reboot
-    }
-
-    if ($DryRun) {
-        Write-Detail "[dry-run] Verifying WSL command availability..."
-        & wsl.exe --status | Out-Host
-        Write-Detail "[dry-run] Would run: wsl --update --web-download"
-        Write-Detail "[dry-run] Would run: wsl --set-default-version 2"
         Write-BlankLine
         return
     }
 
-    # wsl.exe exists -- but the stub ships even when the WSL platform is NOT
-    # enabled, in which case `wsl --status` either fails or literally reports
-    # "Windows Subsystem for Linux is not installed". Treat either as not-ready
-    # and install the platform (which then stops for a reboot) instead of
-    # continuing and hitting that same error downstream.
-    $status = & wsl.exe --status 2>&1 | Out-String
-    $ready = ($LASTEXITCODE -eq 0) -and ($status -notmatch 'not installed')
-    if (-not $ready) {
-        Install-WslPlatform
+    # Authoritative readiness check -- NOT just "does wsl.exe exist" (the stub
+    # always exists) nor a fragile parse of wsl --status.
+    if ($SimulateMissingWsl -or -not (Test-WslReady)) {
+        Install-WslPlatform   # enables the features, then STOPS for a reboot
     } else {
-        Write-Detail ($status.Trim() -replace "`r?`n", "; ")
+        Write-Detail "WSL platform is enabled."
     }
 
     Write-Detail "Updating WSL..."
