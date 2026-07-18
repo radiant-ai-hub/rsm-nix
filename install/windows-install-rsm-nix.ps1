@@ -471,14 +471,31 @@ function Enable-WslOptionalFeatures {
 
 function Stop-ForReboot {
     param([string]$Reason)
-    # A reboot-required stop is a normal step, not a failure -- present it as a
-    # clear "action needed" banner and exit 0 so it never reads as a crash.
+    # A reboot-required stop is a normal step, not a failure. A plain script can't
+    # continue across a reboot on its own, so we offer to reboot now (only when
+    # genuinely interactive -- never headless/CI) and tell the user to rerun this
+    # installer afterward; it is idempotent and resumes from where it left off.
     Write-BlankLine
     Write-Host "============================================================" -ForegroundColor Yellow
-    Write-Host " ACTION NEEDED - reboot Windows, then rerun this installer." -ForegroundColor Yellow
     Write-Host " $Reason" -ForegroundColor Yellow
+    Write-Host " Windows must reboot to finish enabling WSL. After it restarts," -ForegroundColor Yellow
+    Write-Host " run this installer again to continue -- it resumes automatically." -ForegroundColor Yellow
     Write-Host "============================================================" -ForegroundColor Yellow
     Write-BlankLine
+
+    # Only prompt/auto-reboot for a real interactive console. A redirected or
+    # non-interactive session (piped, CI, scheduled) must never reboot on its own.
+    if ([Environment]::UserInteractive -and -not [Console]::IsInputRedirected) {
+        $answer = Read-Host "Reboot now? [Y/n]"
+        if ([string]::IsNullOrWhiteSpace($answer) -or $answer -match '^(y|yes)$') {
+            Write-Host "Save any open work -- rebooting now..." -ForegroundColor Yellow
+            Restart-Computer -Force
+            exit 0
+        }
+        Write-Host "OK -- reboot when you're ready, then rerun this installer to continue." -ForegroundColor Yellow
+    } else {
+        Write-Host "Reboot Windows, then rerun this installer to continue." -ForegroundColor Yellow
+    }
     exit 0
 }
 
