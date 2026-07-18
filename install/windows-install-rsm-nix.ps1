@@ -815,8 +815,14 @@ if [ -e /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]; then
 fi
 
 if ! command -v nix >/dev/null 2>&1; then
-  curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix \
-    | sh -s -- install --no-confirm
+  echo "==> Installing Nix (Determinate); this is usually quick (~1-2 min)..."
+  # timeout bounds the whole pipeline so a stalled download / unready systemd
+  # fails loudly instead of hanging the installer forever.
+  if ! timeout 900 sh -c "curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install --no-confirm"; then
+    echo "FAIL: Nix install stalled or failed (network/proxy, or WSL systemd not ready)." >&2
+    echo "      From Windows run 'wsl --shutdown', then rerun this installer." >&2
+    exit 1
+  fi
 fi
 
 if [ -e /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]; then
@@ -825,6 +831,17 @@ fi
 
 if ! command -v nix >/dev/null 2>&1; then
   echo "Nix was installed, but the nix command is not active in this shell." >&2
+  exit 1
+fi
+
+# The Nix daemon must actually respond, else EVERY later `nix` call blocks
+# forever with no output -- the classic "install hung" symptom, usually because
+# WSL systemd didn't come up so nix-daemon never started. Probe it with a hard
+# timeout and fail fast with a fix instead of hanging.
+echo "==> Verifying the Nix daemon is responding..."
+if ! timeout 120 nix store ping >/dev/null 2>&1; then
+  echo "FAIL: the Nix daemon is not responding (WSL systemd likely did not start)." >&2
+  echo "      From Windows run 'wsl --shutdown', then rerun this installer." >&2
   exit 1
 fi
 
