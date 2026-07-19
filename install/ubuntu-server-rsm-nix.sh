@@ -15,8 +15,10 @@
 #      non-login alike (VS Code terminals, `su`, ...) -- with no shell-config
 #      juggling.
 #   2. /etc/direnv/direnvrc -> nix-direnv `use flake` for all users.
-#   3. (ENABLE_UV_CACHE=1) shared uv download cache at /srv/uv-cache, group
-#      $RSM_GROUP, setgid + default ACL — saves ~1.2 GB per student.
+#   3. uv download cache: PER-USER by default (each student's ~/.cache/uv). Opt
+#      into a shared cache (saves re-downloading wheels) with ENABLE_UV_CACHE=1
+#      + RSM_GROUP=<a dedicated group>; students are never added to a privileged
+#      group, and the shell only uses the shared cache when it is writable.
 #   4. (ENABLE_ZSH_HOOK=1) a chpwd hook in /etc/zsh/zshrc so the full
 #      oh-my-zsh/powerlevel10k shell loads in plain SSH terminals too (VS Code
 #      gets it via the workspace ZDOTDIR).
@@ -25,7 +27,14 @@
 # enabled, plus sudo. Determinate Nix is the supported installer:
 #   curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
 #
-# Then a user does: log in fresh -> `rsm-setup` (once) -> `cd ~/rsm-msba`.
+# Run this server setup (one-liner; idempotent — safe to re-run to update the
+# shell config / pick up changes). Run as a sudo-capable user:
+#   curl -fsSL https://raw.githubusercontent.com/radiant-ai-hub/rsm-nix/main/install/ubuntu-server-rsm-nix.sh | bash
+# To also refresh the rsm-* commands to the latest release afterward:
+#   sudo /nix/var/nix/profiles/default/bin/nix profile upgrade --profile /nix/var/nix/profiles/rsm --all
+#
+# Then EACH student does: log in fresh -> `rsm-setup` (once) -> `cd ~/rsm-msba`.
+# (`rsm-update` later re-runs setup + bumps their tools.)
 #
 # Reverse everything:
 #   sudo rm -f /etc/profile.d/rsm.sh /etc/direnv/direnvrc
@@ -40,10 +49,22 @@ set -euo pipefail
 
 PROFILE=/nix/var/nix/profiles/rsm
 FLAKE_REF="${FLAKE_REF:-github:radiant-ai-hub/rsm-nix}"
-RSM_GROUP="${RSM_GROUP:-rds_managed}"      # group every student already shares
 UV_CACHE="${UV_CACHE:-/srv/uv-cache}"
-ENABLE_UV_CACHE="${ENABLE_UV_CACHE:-1}"
+# Per-user uv caches by DEFAULT: each student's uv writes its own ~/.cache/uv.
+# No shared writable directory, and no student needs to be in any privileged
+# group. Opt into a SHARED cache only by setting ENABLE_UV_CACHE=1 together with
+# RSM_GROUP=<a-dedicated-group>. NEVER point RSM_GROUP at a group students must
+# not be able to write to (e.g. an admin/management group) — uv opens its cache
+# read-write, so every user of a shared cache can write it.
+ENABLE_UV_CACHE="${ENABLE_UV_CACHE:-0}"
+RSM_GROUP="${RSM_GROUP:-}"                  # required (and dedicated) iff ENABLE_UV_CACHE=1
 ENABLE_ZSH_HOOK="${ENABLE_ZSH_HOOK:-1}"
+
+if [ "$ENABLE_UV_CACHE" = "1" ] && [ -z "$RSM_GROUP" ]; then
+  echo "ENABLE_UV_CACHE=1 requires RSM_GROUP=<dedicated group> (a group made for" >&2
+  echo "the cache, NOT one students shouldn't be able to write). Aborting." >&2
+  exit 1
+fi
 
 log() { printf '\n==> %s\n' "$1"; }
 detail() { printf '    %s\n' "$1"; }
@@ -94,10 +115,18 @@ if command -v direnv >/dev/null 2>&1; then
   fi
 fi
 EOF
-if [ "$ENABLE_UV_CACHE" = "1" ]; then
-  # Appended after the truncating rewrite above, so it stays a single line on re-run.
-  echo "export UV_CACHE_DIR=\"$UV_CACHE\"" | sudo tee -a /etc/profile.d/rsm.sh >/dev/null
+# uv cache: per-user by default. Use the shared cache ONLY when it exists AND
+# this user can actually write it — so `uv` (uv run/sync/pip) and rsm-setup never
+# error out for students who aren't in the cache's group. Appended after the
+# truncating rewrite above (step 5 sets the same for non-login zsh).
+sudo tee -a /etc/profile.d/rsm.sh >/dev/null <<EOF
+
+if [ -w "$UV_CACHE" ]; then
+  export UV_CACHE_DIR="$UV_CACHE"
+else
+  export UV_CACHE_DIR="\$HOME/.cache/uv"
 fi
+EOF
 
 # --- 3. nix-direnv `use flake` for everyone --------------------------------
 log "/etc/direnv/direnvrc (nix-direnv use flake)"
@@ -135,7 +164,7 @@ if [ "$ENABLE_ZSH_HOOK" = "1" ] && [ -f /etc/zsh/zshrc ]; then
 # Non-login interactive zsh (VS Code terminals, `su`) doesn't source
 # /etc/profile.d, so set the shared cache + direnv hook here too. (The rsm-*
 # commands + direnv are already on PATH via /usr/local/bin symlinks.)
-[ -d /srv/uv-cache ] && export UV_CACHE_DIR="${UV_CACHE_DIR:-/srv/uv-cache}"
+if [ -w /srv/uv-cache ]; then export UV_CACHE_DIR="${UV_CACHE_DIR:-/srv/uv-cache}"; else export UV_CACHE_DIR="${UV_CACHE_DIR:-$HOME/.cache/uv}"; fi
 command -v direnv >/dev/null 2>&1 && eval "$(direnv hook zsh)"
 # Load the full oh-my-zsh + powerlevel10k shell on entering ~/rsm-msba (kitty/SSH;
 # VS Code gets it via the workspace ZDOTDIR).

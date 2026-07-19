@@ -79,7 +79,17 @@ in
     "d /srv/uv-cache 2775 root rsm - -"
     "a+ /srv/uv-cache - - - - d:g:rsm:rwx,g:rsm:rwx"
   ];
-  environment.sessionVariables.UV_CACHE_DIR = "/srv/uv-cache";
+  # Use the shared cache only when this user can actually write it (i.e. is in
+  # the `rsm` group); otherwise a per-user cache, so `uv` never errors out for a
+  # user who isn't in the group. Set via shell init (not sessionVariables) so the
+  # per-user fallback can be evaluated per login.
+  environment.interactiveShellInit = ''
+    if [ -w /srv/uv-cache ]; then
+      export UV_CACHE_DIR=/srv/uv-cache
+    else
+      export UV_CACHE_DIR="$HOME/.cache/uv"
+    fi
+  '';
 
   # --- Per-user Postgres port ------------------------------------------------
   # Handled in the env header (rsm-nix/bin/rsm-env.sh): PGPORT defaults to

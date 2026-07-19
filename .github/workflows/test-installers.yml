@@ -84,6 +84,11 @@ jobs:
       - name: Validate bash scripts
         run: |
           bash -n install/macos-arm-install-rsm-nix.sh
+          bash -n install/linux-install-rsm-nix.sh
+          bash -n install/ubuntu-server-rsm-nix.sh
+          bash -n bin/rsm-setup
+          bash -n bin/rsm-python-sync
+          bash -n bin/rsm-env.sh
           bash -n tests/check-default.sh
           bash -n tests/check-folders.sh
           bash -n tests/check-no-host-mutation.sh
