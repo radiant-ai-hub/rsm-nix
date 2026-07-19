@@ -64,21 +64,29 @@ fi
 #    Windows / VS Code Remote-SSH use the same identity as WSL. Best-effort.
 if grep -qi microsoft /proc/version 2>/dev/null; then
   ( set +e
-    cmd=/mnt/c/Windows/System32/cmd.exe
     icacls=/mnt/c/Windows/System32/icacls.exe
-    [ -x "$cmd" ] || exit 0
-    winup="$("$cmd" /c 'echo %USERPROFILE%' 2>/dev/null | tr -d '\r' || true)"
-    winuser="$("$cmd" /c 'echo %USERNAME%' 2>/dev/null | tr -d '\r' || true)"
-    [ -n "$winup" ] || exit 0
-    windir="$(wslpath "$winup" 2>/dev/null)/.ssh"
+    cmd=/mnt/c/Windows/System32/cmd.exe
+    # Find the Windows home WITHOUT launching a Windows binary where possible:
+    # the RSM WSL user is created from the Windows username, so /mnt/c/Users/<me>
+    # matches. (Launching cmd.exe from a non-console WSL session is flaky and
+    # warns on a UNC cwd.) Fall back to cmd.exe %USERPROFILE% run from /mnt/c.
+    winuser="$(id -un)"
+    winhome="/mnt/c/Users/$winuser"
+    if [ ! -d "$winhome" ] && [ -x "$cmd" ]; then
+      winup="$( (cd /mnt/c && "$cmd" /d /c 'echo %USERPROFILE%') 2>/dev/null | tr -d '\r' | head -1 || true)"
+      if [ -n "$winup" ]; then winhome="$(wslpath "$winup" 2>/dev/null)"; winuser="$(basename "$winhome")"; fi
+    fi
+    [ -d "$winhome" ] || exit 0
+    windir="$winhome/.ssh"
     mkdir -p "$windir" || exit 0
     cp -f "$KEY" "$KEY.pub" "$windir/" 2>/dev/null || true
     [ -f "$CFG" ] && cp -f "$CFG" "$windir/config" 2>/dev/null || true
-    # Windows OpenSSH refuses a private key readable by others — lock the ACL.
-    if [ -x "$icacls" ] && [ -n "$winuser" ]; then
+    # Windows OpenSSH refuses a private key readable by others — lock the ACL to
+    # just this user (one icacls call; the only Windows-binary launch here).
+    if [ -x "$icacls" ]; then
       wkey="$(wslpath -w "$windir/id_ed25519" 2>/dev/null || true)"
       [ -n "$wkey" ] && "$icacls" "$wkey" /inheritance:r /grant:r "${winuser}:F" >/dev/null 2>&1
     fi
-    echo "    ssh       : mirrored key + config to Windows ($winup\\.ssh)"
+    echo "    ssh       : mirrored key + config to Windows ($windir)"
   ) || true
 fi
