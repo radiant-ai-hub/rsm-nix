@@ -39,30 +39,30 @@ alias de=deactivate
 alias ..='cd ..'
 alias ...='cd ../..'
 alias ....='cd ../../..'
-if command -v eza >/dev/null 2>&1; then
+# --- Nix-env shell extras: eza aliases + zoxide (`z`) ----------------------
+# eza and zoxide come from the Nix env, which direnv loads AFTER this .zshrc is
+# sourced. So DON'T gate on them at source time (that silently skipped the eza
+# aliases, leaving the default `ls`) — set them on the first prompt once they
+# are on PATH, retrying each prompt until then. Running at precmd also means the
+# `ls` alias reliably wins over any default one set earlier.
+_rsm_env_extras_init() {
+  command -v eza >/dev/null 2>&1 || return 1   # env not loaded yet; retry next prompt
   alias ls='eza -lh --group-directories-first --icons=auto'
   alias lsa='eza -lah --group-directories-first --icons=auto'
   alias lt='eza --tree --level=2 --git --icons=auto'
-fi
-
-# --- zoxide (`z <name>` to jump to folders) -------------------------------
-# Init now if zoxide is on PATH; otherwise on the first prompt (once direnv has
-# loaded the environment that provides zoxide).
-_rsm_zoxide_init() {
-  command -v zoxide >/dev/null 2>&1 || return 1
-  eval "$(zoxide init zsh)"
-  # zoxide is provided by the Nix env (direnv). When you cd OUT of the workspace
-  # direnv unloads it and zoxide leaves PATH, but zoxide's chpwd hook stays
-  # registered and would print "__zoxide_hook: command not found" on every cd
-  # (seen in a plain terminal; VS Code's direnv keeps the env loaded so it does
-  # not). Wrap the hook so it quietly no-ops when zoxide isn't on PATH.
-  if (( $+functions[__zoxide_hook] )); then
-    functions[__rsm_zoxide_hook_orig]=$functions[__zoxide_hook]
-    __zoxide_hook() { command -v zoxide >/dev/null 2>&1 && __rsm_zoxide_hook_orig "$@"; }
+  if command -v zoxide >/dev/null 2>&1; then
+    eval "$(zoxide init zsh)"
+    # When you cd OUT of the workspace direnv unloads the env and zoxide leaves
+    # PATH, but its chpwd hook stays registered and would print
+    # "__zoxide_hook: command not found" on every cd. Wrap it to quietly no-op.
+    if (( $+functions[__zoxide_hook] )); then
+      functions[__rsm_zoxide_hook_orig]=$functions[__zoxide_hook]
+      __zoxide_hook() { command -v zoxide >/dev/null 2>&1 && __rsm_zoxide_hook_orig "$@"; }
+    fi
   fi
-  add-zsh-hook -d precmd _rsm_zoxide_init 2>/dev/null
+  add-zsh-hook -d precmd _rsm_env_extras_init 2>/dev/null
 }
-_rsm_zoxide_init || add-zsh-hook precmd _rsm_zoxide_init
+_rsm_env_extras_init || add-zsh-hook precmd _rsm_env_extras_init
 
 # Powerlevel10k prompt configuration.
 [[ ! -f "${ZDOTDIR}/.p10k.zsh" ]] || source "${ZDOTDIR}/.p10k.zsh"
