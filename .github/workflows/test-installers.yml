@@ -89,6 +89,8 @@ jobs:
           bash -n bin/rsm-setup
           bash -n bin/rsm-python-sync
           bash -n bin/rsm-env.sh
+          bash -n bin/rsm-ssh-setup
+          bash -n bin/github
           bash -n tests/check-default.sh
           bash -n tests/check-folders.sh
           bash -n tests/check-no-host-mutation.sh

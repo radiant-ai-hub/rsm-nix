@@ -1,0 +1,84 @@
+# rsm-ssh-setup: make sure a personal SSH key exists and add the RSM server to
+# ~/.ssh/config. Idempotent — safe to run repeatedly.
+#
+# Called automatically by the installers (creates the key silently) and by
+# `github` (which also knows your username, so it writes the server config).
+# On Windows/WSL it mirrors the key + config to the Windows-side ~/.ssh, so VS
+# Code Remote-WSL and native Windows / Remote-SSH use the SAME identity.
+#
+# The server login username is taken from $RSM_SSH_USER, else from the part of
+# your git email before @ucsd.edu. Without either, only the key is created and a
+# hint points you at `github`.
+
+SSH_DIR="$HOME/.ssh"
+KEY="$SSH_DIR/id_ed25519"
+CFG="$SSH_DIR/config"
+SC2_HOST="${RSM_SC2_HOST:-sc2-ubuntu.tail37260b.ts.net}"
+BEGIN="# >>> rsm-msba (managed) >>>"
+END="# <<< rsm-msba (managed) <<<"
+
+mkdir -p "$SSH_DIR"
+chmod 700 "$SSH_DIR" 2>/dev/null || true
+
+# 1) SSH key — create if absent (ed25519, no passphrase). Never clobbers.
+if [ ! -f "$KEY" ]; then
+  ssh-keygen -t ed25519 -f "$KEY" -C "rsm-msba" -N "" >/dev/null
+  chmod 600 "$KEY" 2>/dev/null || true
+  chmod 644 "$KEY.pub" 2>/dev/null || true
+  echo "    ssh       : created key $KEY"
+else
+  echo "    ssh       : reusing existing key $KEY"
+fi
+
+# 2) Server login username: explicit override, else derive from the git email.
+user="${RSM_SSH_USER:-}"
+if [ -z "$user" ]; then
+  email="$(git config --global user.email 2>/dev/null || true)"
+  case "$email" in
+    *@ucsd.edu) user="${email%@ucsd.edu}" ;;
+  esac
+fi
+
+# 3) ~/.ssh/config — write a managed 'Host sc2' block (only once we know the
+#    username). The marked block is replaced in place on every run.
+if [ -n "$user" ]; then
+  touch "$CFG"
+  chmod 600 "$CFG" 2>/dev/null || true
+  tmp="$(mktemp)"
+  awk -v b="$BEGIN" -v e="$END" '
+    $0==b {skip=1} skip && $0==e {skip=0; next} !skip {print}
+  ' "$CFG" >"$tmp"
+  {
+    cat "$tmp"
+    printf '%s\n' "$BEGIN"
+    printf 'Host sc2\n  HostName %s\n  User %s\n' "$SC2_HOST" "$user"
+    printf '%s\n' "$END"
+  } >"$CFG"
+  rm -f "$tmp"
+  echo "    ssh       : wrote 'Host sc2' (User $user) to $CFG"
+else
+  echo "    ssh       : run 'github' to add the server to $CFG (need your username)"
+fi
+
+# 4) Windows/WSL — mirror the key + config to the Windows-side ~/.ssh so native
+#    Windows / VS Code Remote-SSH use the same identity as WSL. Best-effort.
+if grep -qi microsoft /proc/version 2>/dev/null; then
+  ( set +e
+    cmd=/mnt/c/Windows/System32/cmd.exe
+    icacls=/mnt/c/Windows/System32/icacls.exe
+    [ -x "$cmd" ] || exit 0
+    winup="$("$cmd" /c 'echo %USERPROFILE%' 2>/dev/null | tr -d '\r' || true)"
+    winuser="$("$cmd" /c 'echo %USERNAME%' 2>/dev/null | tr -d '\r' || true)"
+    [ -n "$winup" ] || exit 0
+    windir="$(wslpath "$winup" 2>/dev/null)/.ssh"
+    mkdir -p "$windir" || exit 0
+    cp -f "$KEY" "$KEY.pub" "$windir/" 2>/dev/null || true
+    [ -f "$CFG" ] && cp -f "$CFG" "$windir/config" 2>/dev/null || true
+    # Windows OpenSSH refuses a private key readable by others — lock the ACL.
+    if [ -x "$icacls" ] && [ -n "$winuser" ]; then
+      wkey="$(wslpath -w "$windir/id_ed25519" 2>/dev/null || true)"
+      [ -n "$wkey" ] && "$icacls" "$wkey" /inheritance:r /grant:r "${winuser}:F" >/dev/null 2>&1
+    fi
+    echo "    ssh       : mirrored key + config to Windows ($winup\\.ssh)"
+  ) || true
+fi

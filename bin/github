@@ -50,15 +50,20 @@ case "$gh_status" in
     ;;
 esac
 
-# --- SSH key ---------------------------------------------------------------
-if [ -f "$HOME/.ssh/id_ed25519" ]; then
-  echo
-  echo "An SSH key already exists at ~/.ssh/id_ed25519 — reusing it."
+# --- SSH key + server config ----------------------------------------------
+# Delegate to rsm-ssh-setup: create the key if absent and add the RSM server to
+# ~/.ssh/config with your username (derived from the email above). On Windows it
+# also mirrors the key + config to the Windows-side ~/.ssh.
+echo
+if command -v rsm-ssh-setup >/dev/null 2>&1; then
+  RSM_SSH_USER="${git_email%@ucsd.edu}" rsm-ssh-setup
 else
-  mkdir -p "$HOME/.ssh"
-  chmod 700 "$HOME/.ssh"
-  ssh-keygen -t ed25519 -f "$HOME/.ssh/id_ed25519" -C "rsm-msba-github" -N ""
-  chmod 600 "$HOME/.ssh/id_ed25519"
+  # Fallback if rsm-ssh-setup isn't on PATH (older env): just the key.
+  if [ ! -f "$HOME/.ssh/id_ed25519" ]; then
+    mkdir -p "$HOME/.ssh"; chmod 700 "$HOME/.ssh"
+    ssh-keygen -t ed25519 -f "$HOME/.ssh/id_ed25519" -C "rsm-msba" -N ""
+    chmod 600 "$HOME/.ssh/id_ed25519"
+  fi
 fi
 
 echo

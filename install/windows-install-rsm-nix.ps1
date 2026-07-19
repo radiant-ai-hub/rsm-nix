@@ -948,6 +948,9 @@ fi
 # Bootstrap the workspace: creates $workspace + .envrc + nix-uv env + folders.
 RSM_WORKSPACE="$workspace" nix develop "$flake" -c rsm-setup
 direnv allow "$workspace" || true
+# Create the personal SSH key if absent and mirror it to the Windows-side
+# ~/.ssh (idempotent). `github` later adds the server + your username.
+RSM_WORKSPACE="$workspace" nix develop "$flake" -c rsm-ssh-setup || true
 RSM_WORKSPACE="$workspace" nix develop "$flake" -c bash "$flake/tests/check-default.sh"
 RSM_WORKSPACE="$workspace" nix develop "$flake" -c bash "$flake/tests/check-folders.sh"
 '@

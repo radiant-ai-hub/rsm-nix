@@ -140,7 +140,7 @@ all of this for you.
 | `rsm-pg-init` / `-start` / `-stop` / `-status` | Workspace-local PostgreSQL lifecycle                                                                                                       |
 | `rsm-pg-psql`                                  | `psql` into the `rsm-msba` database                                                                                                        |
 | `rsm-pgweb`                                    | pgweb UI at <http://127.0.0.1:8282>                                                                                                        |
-| `github`                                       | One-time setup of your Git identity + a GitHub SSH key                                                                                     |
+| `github`                                       | One-time setup of your Git identity, a GitHub SSH key, and `ssh sc2` server access (`Host sc2` in `~/.ssh/config`; key auto-created at install) |
 
 ## Flake interfaces
 

@@ -149,7 +149,7 @@ Code **or** a plain SSH terminal.
 
 **Git and GitHub**
 
-- `github` — one-time setup of your Git identity and a GitHub SSH key
+- `github` — one-time setup of your Git identity, a GitHub SSH key, and `ssh sc2` server access (adds a `Host sc2` block to `~/.ssh/config`). The SSH key is also created automatically during install.
   (run once).
 - `gh` — the GitHub CLI (`gh repo clone …`, `gh auth login`, …).
 
