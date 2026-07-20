@@ -33,3 +33,5 @@ __pycache__/
 # Local editor / OS noise
 .DS_Store
 *.swp
+result
+result-*

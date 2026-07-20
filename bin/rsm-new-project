@@ -56,7 +56,7 @@ fi
 # --- .envrc: load the RSM environment (+ a local .venv if present) ----------
 # Don't clobber a repo's OWN .envrc, but DO refresh an rsm-generated one (marked
 # "rsm-msba (managed)") so fixes land on re-run.
-if [ -e "$_here/.envrc" ] && ! grep -q "rsm-msba (managed)" "$_here/.envrc" 2>/dev/null; then
+if [ -e "$_here/.envrc" ] && ! grep -qE "rsm-msba \(managed\)|Load the RSM environment|Standalone RSM project" "$_here/.envrc" 2>/dev/null; then
   _kept_envrc=1
 else
   # Loader: nested folders inherit the workspace env via source_up; a standalone
