@@ -53,45 +53,52 @@ if [ "$_here" = "$RSM_WORKSPACE" ]; then
   exit 0
 fi
 
-# --- .envrc: load the RSM environment ---------------------------------------
-# NEVER clobber a repo's own .envrc (e.g. a clone that already ships its own
-# direnv config). Write ours only when there isn't one already.
-if [ -e "$_here/.envrc" ]; then
+# --- .envrc: load the RSM environment (+ a local .venv if present) ----------
+# Don't clobber a repo's OWN .envrc, but DO refresh an rsm-generated one (marked
+# "rsm-msba (managed)") so fixes land on re-run.
+if [ -e "$_here/.envrc" ] && ! grep -q "rsm-msba (managed)" "$_here/.envrc" 2>/dev/null; then
   _kept_envrc=1
-elif [ "$_inside" -eq 1 ]; then
-  cat > "$_here/.envrc" <<'EOF'
-# Load the RSM environment (Nix tools + rsm-* commands + the shared nix-uv
-# Python) from the parent ~/rsm-msba workspace. direnv walks up to find its .envrc.
+else
+  # Loader: nested folders inherit the workspace env via source_up; a standalone
+  # folder loads the flake directly with use flake.
+  if [ "$_inside" -eq 1 ]; then
+    cat > "$_here/.envrc" <<'EOF'
+# rsm-msba (managed) -- loads the RSM environment (Nix tools + rsm-* commands +
+# the shared nix-uv Python) from the parent ~/rsm-msba workspace. Delete this
+# file if you want plain direnv here.
 source_up
 EOF
-else
-  cat > "$_here/.envrc" <<'EOF'
-# Standalone RSM project — load the flake's tools (Nix + rsm-* commands + the
-# shared nix-uv Python) directly, without a parent ~/rsm-msba workspace.
+  else
+    cat > "$_here/.envrc" <<'EOF'
+# rsm-msba (managed) -- standalone RSM project: load the flake's tools (Nix +
+# rsm-* commands + the shared nix-uv Python) directly. Delete this file if you
+# want plain direnv here.
 export RSM_FLAKE="${RSM_FLAKE:-$HOME/rsm-nix}"
 use flake "$RSM_FLAKE"
 EOF
-fi
-
-if [ "$_use_venv" -eq 1 ] && [ -z "${_kept_envrc:-}" ]; then
-  # Layer a PROJECT-LOCAL venv on top, overriding the shared nix-uv activation.
-  # The override MUST come after the loader above (which activates the shared
-  # env), so re-point uv / VIRTUAL_ENV / PATH last. (Skipped if we kept a repo's
-  # own .envrc -- we don't edit it.)
+  fi
+  # A local ./.venv (from `rsm-mkdir --venv` or a manual `uv venv`) automatically
+  # takes over from the shared nix-uv env -- no `source .venv/bin/activate` / `sp`
+  # needed. watch_file so creating or removing it reloads direnv.
   cat >> "$_here/.envrc" <<'EOF'
 
-# Project-local venv (reproducible: pyproject.toml + uv.lock). Grow it with
-# `uv add <pkg>`; verify it with `rsm-project-check`.
-export UV_PROJECT_ENVIRONMENT="$PWD/.venv"
-[ -d .venv ] || uv venv .venv
-uv sync --quiet 2>/dev/null || true
-export VIRTUAL_ENV="$PWD/.venv"
-export VIRTUAL_ENV_PROMPT="($(basename "$PWD")) "
-export QUARTO_PYTHON="$PWD/.venv/bin/python"
-PATH_add "$PWD/.venv/bin"
-watch_file pyproject.toml uv.lock
+watch_file .venv/bin/activate
+if [ -f "$PWD/.venv/bin/activate" ]; then
+  export UV_PROJECT_ENVIRONMENT="$PWD/.venv"
+  export VIRTUAL_ENV="$PWD/.venv"
+  export VIRTUAL_ENV_PROMPT="($(basename "$PWD")) "
+  export QUARTO_PYTHON="$PWD/.venv/bin/python"
+  PATH_add "$PWD/.venv/bin"
+  watch_file pyproject.toml uv.lock
+fi
 EOF
-  # \$ keeps ${workspaceFolder} literal for VS Code (do not expand in the shell).
+fi
+
+if [ "$_use_venv" -eq 1 ]; then
+  # A project-local venv (reproducible: pyproject.toml + uv.lock; grow it with
+  # `uv add <pkg>`, verify with `rsm-project-check`). The .envrc above ALREADY
+  # auto-activates ./.venv, so here we just create the venv + a starter
+  # pyproject. \$ keeps ${workspaceFolder} literal for VS Code.
   _interp="\${workspaceFolder}/.venv/bin/python"
 
   # Starter pyproject.toml (minimal + reproducible). `package = false` makes uv

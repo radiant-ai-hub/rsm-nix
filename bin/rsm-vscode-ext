@@ -43,20 +43,30 @@ if [ -z "$code_bin" ]; then
   exit 1
 fi
 
-echo "==> Installing VS Code extensions into: $code_bin"
+echo "==> Syncing VS Code extensions into: $code_bin"
+# List what's already installed ONCE so re-runs (e.g. from rsm-setup on every
+# rsm-update) only install what's missing -- fast, no per-extension churn.
+_installed="$("$code_bin" --list-extensions 2>/dev/null | tr '[:upper:]' '[:lower:]')"
 count=0
 fail=0
+present=0
 while IFS= read -r line || [ -n "$line" ]; do
   ext="${line%%#*}"
   ext="$(printf '%s' "$ext" | tr -d '[:space:]')"
   [ -z "$ext" ] && continue
-  printf '    %s\n' "$ext"
-  if ! "$code_bin" --install-extension "$ext" --force >/dev/null 2>&1; then
+  count=$((count + 1))
+  if printf '%s\n' "$_installed" | grep -qxF "$(printf '%s' "$ext" | tr '[:upper:]' '[:lower:]')"; then
+    present=$((present + 1))
+    continue
+  fi
+  printf '    installing %s\n' "$ext"
+  if "$code_bin" --install-extension "$ext" --force >/dev/null 2>&1; then
+    present=$((present + 1))
+  else
     printf '      (skipped — not on the marketplace?)\n'
     fail=$((fail + 1))
   fi
-  count=$((count + 1))
 done < "$ext_file"
 
-echo "==> Done: $((count - fail))/$count extensions installed."
+echo "==> $present/$count extensions present."
 [ "$fail" -eq 0 ] || echo "    ($fail could not be installed; that is usually fine.)"
