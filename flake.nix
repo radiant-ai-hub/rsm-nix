@@ -214,6 +214,8 @@
           # rsm-mkdir: friendlier alias for rsm-new-course (make a direnv-ready
           # folder, or connect an existing/cloned one).
           rsm-mkdir = mk "rsm-mkdir" [ rsm-new-course pkgs.coreutils ];
+          # rsm-clone: git clone + make the clone direnv-ready in one step.
+          rsm-clone = mk "rsm-clone" [ pkgs.git rsm-new-project pkgs.coreutils ];
           # Prints the rsm-nix version (the flake's git commit) + platform/python,
           # so it is easy to confirm everyone is on the same environment.
           rsm-version = mk "rsm-version" [ pkgs.git pkgs.coreutils pkgs.gawk ];
