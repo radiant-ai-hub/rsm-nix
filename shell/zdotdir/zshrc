@@ -31,6 +31,26 @@ unset _f
 
 autoload -Uz add-zsh-hook
 
+# --- direnv ----------------------------------------------------------------
+# Hook direnv here so that `cd`-ing between folders loads/unloads the matching
+# environment -- crucially, leaving a project's local ./.venv reverts to the
+# shared nix-uv env instead of the venv "sticking". VS Code integrated terminals
+# point ZDOTDIR at this dir, so the user's ~/.zshrc -- which normally hooks
+# direnv -- is NOT read; without this hook, direnv never sees a `cd`. Guard so we
+# do NOT double-hook in terminals that already loaded it via ~/.zshrc (kitty,
+# plain ssh). direnv bootstraps the flake env, so it is normally already on PATH;
+# if a cold start hasn't put it there yet, retry on each prompt until it appears.
+_rsm_direnv_hook_init() {
+  if (( ${+functions[_direnv_hook]} )); then          # already hooked (e.g. ~/.zshrc)
+    add-zsh-hook -d precmd _rsm_direnv_hook_init 2>/dev/null; return 0
+  fi
+  command -v direnv >/dev/null 2>&1 || return 1        # not on PATH yet; retry next prompt
+  eval "$(direnv hook zsh)"
+  _direnv_hook 2>/dev/null                              # load the current dir's env now
+  add-zsh-hook -d precmd _rsm_direnv_hook_init 2>/dev/null
+}
+_rsm_direnv_hook_init || add-zsh-hook precmd _rsm_direnv_hook_init
+
 # --- aliases ---------------------------------------------------------------
 alias c="clear"
 alias sbase='source "$RSM_UV_ENV/bin/activate"'   # (re)activate the nix-uv env
