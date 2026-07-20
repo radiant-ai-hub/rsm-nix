@@ -1,9 +1,32 @@
-# rsm-mkdir NAME [NAME ...]: alias for rsm-new-course. Make one or more
-# direnv-ready folders in the workspace ($RSM_WORKSPACE, e.g. ~/rsm-msba) -- each
-# gets its own .envrc (source_up) + .vscode so VS Code and the terminal use the
-# shared nix-uv Python. Idempotent, so it also "connects" an EXISTING folder,
-# e.g. a repo you just cloned from GitHub:
+# rsm-mkdir [--venv] PATH [PATH ...]: make one or more folders direnv-ready (or
+# connect an existing / freshly cloned one) so VS Code and the terminal use the
+# shared nix-uv Python. Like `mkdir`, PATH is relative to the CURRENT directory,
+# so it works for course folders inside ~/rsm-msba AND for projects elsewhere:
 #
-#   cd ~/rsm-msba && git clone https://github.com/you/my-repo && rsm-mkdir my-repo
+#   rsm-mkdir mgta455            # ./mgta455 (nested under ~/rsm-msba: source_up)
+#   rsm-mkdir a b c             # several at once
+#   rsm-mkdir ../thesis        # a standalone project outside the workspace
+#   rsm-mkdir ~/projects/foo   # anywhere (absolute / ~ paths ok)
+#   rsm-mkdir --venv analysis  # give it its own reproducible venv (pyproject+uv)
+#
+# Each PATH gets .envrc + .vscode + `direnv allow`; an existing .envrc/.vscode is
+# kept. (rsm-new-project does the per-folder work: a folder inside ~/rsm-msba
+# loads the workspace env via source_up, elsewhere via `use flake`.)
 
-exec rsm-new-course "$@"
+_venv=""
+_have_path=0
+for _a in "$@"; do
+  if [ "$_a" = "--venv" ]; then _venv="--venv"; else _have_path=1; fi
+done
+
+if [ "$_have_path" -eq 0 ]; then
+  echo "usage: rsm-mkdir [--venv] PATH [PATH ...]" >&2
+  echo "  e.g. rsm-mkdir mgta455  |  rsm-mkdir ../my-project  |  rsm-mkdir --venv analysis" >&2
+  exit 1
+fi
+
+for _a in "$@"; do
+  if [ "$_a" = "--venv" ]; then continue; fi
+  # shellcheck disable=SC2086  # $_venv is intentionally split (empty or --venv)
+  rsm-new-project $_venv "$_a"
+done

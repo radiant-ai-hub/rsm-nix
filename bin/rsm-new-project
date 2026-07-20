@@ -122,8 +122,11 @@ EOF2
     && { [ -d .venv ] || uv venv .venv >/dev/null 2>&1; } \
     && uv sync --quiet 2>/dev/null ) || true
 else
-  # \$ keeps ${userHome} literal for VS Code (do not expand in the shell).
-  _interp="\${userHome}/rsm-msba/.rsm-msba/envs/nix-uv/bin/python"
+  # Absolute path to the shared nix-uv interpreter. VS Code does NOT expand
+  # ${userHome} in python.defaultInterpreterPath / terminal env, so a resolved
+  # path is required for a nested folder (a repo elsewhere still points at the
+  # workspace's shared env, which is what `use flake` provides).
+  _interp="$RSM_UV_ENV/bin/python"
 fi
 
 # Keep build/env artifacts out of git. Append any missing entries rather than
@@ -135,15 +138,19 @@ for _ig in '.venv/' '.direnv/' '__pycache__/' '*.pyc'; do
 done
 
 # VS Code config (interpreter + RSM terminal shell + curated settings), via the
-# shared generator that rsm-setup also uses. ${userHome} keeps the nix-uv paths
-# correct no matter how deep this folder is nested. Don't clobber a repo's own
-# VS Code settings -- write ours only when there is no .vscode/settings.json.
-if [ -e "$_here/.vscode/settings.json" ]; then
+# shared generator that rsm-setup also uses. Absolute paths (not ${userHome},
+# which VS Code does NOT expand here) so the nix-uv interpreter + ZDOTDIR resolve
+# no matter how deep this folder is nested.
+#
+# Don't clobber a repo's OWN VS Code settings -- but DO refresh an RSM-generated
+# one (so fixes like this land on re-run). Ours always references ".rsm-msba"; a
+# foreign settings.json won't.
+if [ -e "$_here/.vscode/settings.json" ] && ! grep -q "\.rsm-msba" "$_here/.vscode/settings.json" 2>/dev/null; then
   _kept_vscode=1
 else
   rsm-vscode-settings "$_here" \
     --interp "$_interp" \
-    --zdotdir "\${userHome}/rsm-msba/.rsm-msba/zsh"
+    --zdotdir "$RSMBASE/zsh"
 fi
 
 if command -v direnv >/dev/null 2>&1; then
