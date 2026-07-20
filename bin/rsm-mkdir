@@ -1,0 +1,9 @@
+# rsm-mkdir NAME [NAME ...]: alias for rsm-new-course. Make one or more
+# direnv-ready folders in the workspace ($RSM_WORKSPACE, e.g. ~/rsm-msba) -- each
+# gets its own .envrc (source_up) + .vscode so VS Code and the terminal use the
+# shared nix-uv Python. Idempotent, so it also "connects" an EXISTING folder,
+# e.g. a repo you just cloned from GitHub:
+#
+#   cd ~/rsm-msba && git clone https://github.com/you/my-repo && rsm-mkdir my-repo
+
+exec rsm-new-course "$@"

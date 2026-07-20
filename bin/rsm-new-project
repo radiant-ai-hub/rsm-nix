@@ -121,15 +121,13 @@ else
   _interp="\${userHome}/rsm-msba/.rsm-msba/envs/nix-uv/bin/python"
 fi
 
-# Keep build artifacts out of the student's git repo (harmless if no venv).
-if [ ! -e "$_here/.gitignore" ]; then
-  cat > "$_here/.gitignore" <<'EOF'
-.venv/
-.direnv/
-__pycache__/
-*.pyc
-EOF
-fi
+# Keep build/env artifacts out of git. Append any missing entries rather than
+# only creating the file, so a repo cloned from GitHub (which already has its
+# own .gitignore) still never commits the direnv cache / a local venv.
+touch "$_here/.gitignore"
+for _ig in '.venv/' '.direnv/' '__pycache__/' '*.pyc'; do
+  grep -qxF "$_ig" "$_here/.gitignore" 2>/dev/null || printf '%s\n' "$_ig" >> "$_here/.gitignore"
+done
 
 # VS Code config (interpreter + RSM terminal shell + curated settings), via the
 # shared generator that rsm-setup also uses. ${userHome} keeps the nix-uv paths

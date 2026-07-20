@@ -211,6 +211,9 @@
           # to the latest). It sets RSM_CLAUDE_LATEST so Claude is bumped.
           rsm-update = mk "rsm-update" [ rsm-setup pkgs.coreutils ];
           rsm-new-course = mk "rsm-new-course" [ rsm-new-project pkgs.coreutils pkgs.gnugrep ];
+          # rsm-mkdir: friendlier alias for rsm-new-course (make a direnv-ready
+          # folder, or connect an existing/cloned one).
+          rsm-mkdir = mk "rsm-mkdir" [ rsm-new-course pkgs.coreutils ];
           # Prints the rsm-nix version (the flake's git commit) + platform/python,
           # so it is easy to confirm everyone is on the same environment.
           rsm-version = mk "rsm-version" [ pkgs.git pkgs.coreutils pkgs.gawk ];
