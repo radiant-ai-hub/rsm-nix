@@ -1,8 +1,12 @@
 # rsm-pgweb: launch pgweb against the workspace-local PostgreSQL instance.
-# Web UI on http://127.0.0.1:8282 by default. Extra args pass through to pgweb.
+# Web UI on http://127.0.0.1:$PGWEB_PORT (per-user, so students on a shared
+# server don't collide on one port). Bound to loopback only; VS Code Remote-SSH
+# auto-forwards the port to your laptop (open the URL in the Ports panel).
+# Extra args pass through to pgweb.
 
+echo "pgweb: http://localhost:$PGWEB_PORT  (VS Code forwards this port to your laptop)"
 exec pgweb \
   --bind=127.0.0.1 \
-  --listen=8282 \
+  --listen="$PGWEB_PORT" \
   --url "postgresql://$PGUSER@127.0.0.1:$PGPORT/$PGDATABASE?sslmode=disable" \
   "$@"

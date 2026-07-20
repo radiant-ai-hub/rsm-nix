@@ -35,6 +35,11 @@ export PGHOST="${PGHOST:-$RSMBASE/postgres/socket}"
 export PGPORT="${PGPORT:-$(( 8765 + $(id -u) % 1000 ))}"
 export PGDATABASE="${PGDATABASE:-rsm-msba}"
 export PGUSER="${PGUSER:-$(id -un)}"
+# pgweb's web UI port, per-user for the same reason as PGPORT (on a shared server
+# every student would otherwise collide on one 127.0.0.1 port). Kept clear of the
+# PGPORT range (8765-9764) so a student's pgweb port can never clash with another
+# student's Postgres port. VS Code Remote-SSH auto-forwards it to the laptop.
+export PGWEB_PORT="${PGWEB_PORT:-$(( 9800 + $(id -u) % 1000 ))}"
 
 # Claude Code (and any other npm global) installs into a USER-WRITABLE prefix so
 # students and Claude can upgrade it themselves. It is intentionally NOT pinned
