@@ -227,9 +227,14 @@
           pg = mk "pg" [ rsm-pg-start rsm-pg-stop rsm-pg-status rsm-pg-psql rsm-pgweb rsm-pg-init pkgs.postgresql_16 pkgs.coreutils ];
           # Ensures ~/.ssh/id_ed25519 exists and adds the RSM server to
           # ~/.ssh/config (idempotent). Run by the installers (key) and by
-          # `github` (key + server config); mirrors both to Windows on WSL.
+          # `rsm-github` (key + server config); mirrors both to Windows on WSL.
           rsm-ssh-setup = mk "rsm-ssh-setup" [ pkgs.openssh pkgs.git pkgs.gawk pkgs.coreutils ];
-          github = mk "github" [ pkgs.git pkgs.openssh pkgs.curl rsm-ssh-setup ];
+          # One-time Git identity + GitHub SSH key setup. Named rsm-github (not
+          # `github`) so a browser-opening `github` alias -- oh-my-zsh's
+          # web-search plugin, GitHub Desktop -- cannot shadow it (aliases beat
+          # PATH). `github` is kept as a thin back-compat wrapper that execs this.
+          rsm-github = mk "rsm-github" [ pkgs.git pkgs.openssh pkgs.curl rsm-ssh-setup ];
+          github = mk "github" [ rsm-github ];
           # Installs the curated VS Code extensions (vscode/extensions.txt) into
           # the remote `code` is connected to — run from the VS Code WSL/SSH
           # integrated terminal so they land in the remote, not just the laptop.

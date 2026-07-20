@@ -149,7 +149,7 @@ Code **or** a plain SSH terminal.
 
 **Git and GitHub**
 
-- `github` — one-time setup of your Git identity, a GitHub SSH key, and `ssh sc2` server access (adds a `Host sc2` block to `~/.ssh/config`). The SSH key is also created automatically during install.
+- `rsm-github` — one-time setup of your Git identity, a GitHub SSH key, and `ssh sc2` server access (adds a `Host sc2` block to `~/.ssh/config`). The SSH key is also created automatically during install. (`github` still works as an alias, but prefer `rsm-github` — a plain `github` can be shadowed by oh-my-zsh's web-search plugin or GitHub Desktop.)
   (run once).
 - `gh` — the GitHub CLI (`gh repo clone …`, `gh auth login`, …).
 

@@ -53,6 +53,11 @@ _rsm_direnv_hook_init || add-zsh-hook precmd _rsm_direnv_hook_init
 
 # --- aliases ---------------------------------------------------------------
 alias c="clear"
+# The GitHub setup command is `rsm-github`. oh-my-zsh's web-search plugin and
+# GitHub Desktop both define a browser-opening `github` alias that would shadow
+# it (aliases beat PATH), so point the old name at the real command here -- this
+# runs after oh-my-zsh, so it wins.
+alias github='rsm-github'
 alias sbase='source "$RSM_UV_ENV/bin/activate"'   # (re)activate the nix-uv env
 alias sp='source .venv/bin/activate'              # activate a project .venv
 alias de=deactivate
