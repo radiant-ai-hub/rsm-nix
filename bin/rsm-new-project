@@ -54,7 +54,11 @@ if [ "$_here" = "$RSM_WORKSPACE" ]; then
 fi
 
 # --- .envrc: load the RSM environment ---------------------------------------
-if [ "$_inside" -eq 1 ]; then
+# NEVER clobber a repo's own .envrc (e.g. a clone that already ships its own
+# direnv config). Write ours only when there isn't one already.
+if [ -e "$_here/.envrc" ]; then
+  _kept_envrc=1
+elif [ "$_inside" -eq 1 ]; then
   cat > "$_here/.envrc" <<'EOF'
 # Load the RSM environment (Nix tools + rsm-* commands + the shared nix-uv
 # Python) from the parent ~/rsm-msba workspace. direnv walks up to find its .envrc.
@@ -69,10 +73,11 @@ use flake "$RSM_FLAKE"
 EOF
 fi
 
-if [ "$_use_venv" -eq 1 ]; then
+if [ "$_use_venv" -eq 1 ] && [ -z "${_kept_envrc:-}" ]; then
   # Layer a PROJECT-LOCAL venv on top, overriding the shared nix-uv activation.
   # The override MUST come after the loader above (which activates the shared
-  # env), so re-point uv / VIRTUAL_ENV / PATH last.
+  # env), so re-point uv / VIRTUAL_ENV / PATH last. (Skipped if we kept a repo's
+  # own .envrc -- we don't edit it.)
   cat >> "$_here/.envrc" <<'EOF'
 
 # Project-local venv (reproducible: pyproject.toml + uv.lock). Grow it with
@@ -131,19 +136,31 @@ done
 
 # VS Code config (interpreter + RSM terminal shell + curated settings), via the
 # shared generator that rsm-setup also uses. ${userHome} keeps the nix-uv paths
-# correct no matter how deep this folder is nested.
-rsm-vscode-settings "$_here" \
-  --interp "$_interp" \
-  --zdotdir "\${userHome}/rsm-msba/.rsm-msba/zsh"
+# correct no matter how deep this folder is nested. Don't clobber a repo's own
+# VS Code settings -- write ours only when there is no .vscode/settings.json.
+if [ -e "$_here/.vscode/settings.json" ]; then
+  _kept_vscode=1
+else
+  rsm-vscode-settings "$_here" \
+    --interp "$_interp" \
+    --zdotdir "\${userHome}/rsm-msba/.rsm-msba/zsh"
+fi
 
 if command -v direnv >/dev/null 2>&1; then
   direnv allow "$_here" || true
 fi
 
 echo "rsm-new-project: '$_here' is ready to open directly in VS Code or a terminal."
-if [ "$_use_venv" -eq 1 ]; then
-  echo "  Python : a local ./.venv you own — add packages with 'uv add <pkg>', check with 'rsm-project-check'."
-else
-  echo "  Python : the shared nix-uv environment."
+if [ -n "${_kept_envrc:-}" ] || [ -n "${_kept_vscode:-}" ]; then
+  [ -n "${_kept_envrc:-}" ]  && echo "  kept   : the repo's existing .envrc (unchanged)."
+  [ -n "${_kept_vscode:-}" ] && echo "  kept   : the repo's existing .vscode/settings.json (unchanged)."
+  echo "           (to use the RSM setup instead, delete that file and re-run.)"
 fi
-echo "  Tools  : uv, quarto, psql, git, gh and the rsm-* commands are on PATH via direnv."
+if [ -z "${_kept_envrc:-}" ]; then
+  if [ "$_use_venv" -eq 1 ]; then
+    echo "  Python : a local ./.venv you own — add packages with 'uv add <pkg>', check with 'rsm-project-check'."
+  else
+    echo "  Python : the shared nix-uv environment."
+  fi
+  echo "  Tools  : uv, quarto, psql, git, gh and the rsm-* commands are on PATH via direnv."
+fi
