@@ -84,8 +84,12 @@ NIXFLAGS=(--extra-experimental-features 'nix-command flakes')
 # --- 1. system profile: rsm tools + direnv/nix-direnv ----------------------
 log "rsm system profile ($PROFILE)"
 if [ -e "$PROFILE" ]; then
-  detail "already present — leaving as-is"
-  detail "update later with: sudo $NIX profile upgrade --profile $PROFILE --all"
+  # Present already -> UPGRADE it to the latest so re-running this one-liner
+  # actually updates the server (rsm-setup/rsm-update etc. re-resolve their
+  # `github:radiant-ai-hub/rsm-nix` ref to the newest main). The /usr/local/bin
+  # symlinks point at $PROFILE/bin, so they follow the upgrade automatically.
+  detail "already present — upgrading to the latest $FLAKE_REF"
+  sudo "$NIX" "${NIXFLAGS[@]}" profile upgrade --profile "$PROFILE" --all
 else
   detail "installing rsm-setup/rsm-msba/rsm-update/rsm-new-project/rsm-project-check + direnv + nix-direnv"
   sudo "$NIX" "${NIXFLAGS[@]}" profile install --profile "$PROFILE" \
@@ -206,5 +210,12 @@ EOF
 fi
 
 log "done"
+# Self-check: confirm the profile's rsm-setup is a RECENT one (has the data-seed
+# + self-update features), so re-running this really did update the server.
+if grep -q 'rsm_seed_dir' "$PROFILE/bin/rsm-setup" 2>/dev/null; then
+  detail "server profile is current: rsm-setup seeds data/ and self-updates in one run"
+else
+  detail "WARNING: profile rsm-setup still looks old — the upgrade may not have fetched the latest ($FLAKE_REF)"
+fi
 detail "Users: log in fresh, run 'rsm-setup' once, then 'cd ~/rsm-msba'."
 detail "Verify: zsh -lic 'command -v rsm-setup; echo \$UV_CACHE_DIR'"
