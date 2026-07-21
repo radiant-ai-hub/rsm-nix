@@ -1,45 +1,30 @@
 /*
-  PostgreSQL test for VS Code (workspace-local Nix/direnv database)
-  =================================================================
+  -- PostgreSQL test for VS Code (workspace-local Nix/direnv database)
+  -- =================================================================
 
-  1. Start the database first, in a workspace terminal:
+  -- 1. Start the database first, in a workspace terminal:
 
-         rsm-pg-start
+  --    rsm-pg-start
 
-  2. Install the PostgreSQL VS Code extension by Chris Kolkman
-     (extension id: ckolkman.vscode-postgres).
+  -- 2. Install the PostgreSQL VS Code extension by Chris Kolkman
+  -- (extension id: ckolkman.vscode-postgres).
 
-  3. Add a connection (PostgreSQL Explorer -> "+"), using:
+  -- 3. Add a connection (PostgreSQL Explorer -> "+"), using:
 
-         host     : 127.0.0.1
-         user     : <your username>      (the output of:  whoami)
-         password : (leave blank — local "trust" auth)
-         port     : 8765
-         database : rsm-msba
-         display  : rsm-msba
+      -- host     : 127.0.0.1
+      -- user     : <your username>      (the output of:  whoami)
+      -- password : (leave blank — local "trust" auth)
+      -- port     : (see output from pg)
+      -- database : Northwind (or WestCoastImporters)
+      -- display  : Northwind (or WestCoastImporters)
 
-     The user is your OS login name (e.g. the result of `id -un`), NOT
-     "jovyan" — that was the old Docker image. There is no password.
+  -- The user is your OS login name (e.g. the result of `id -un`). This is a practice database for learning purposes so there is no password.
 
-  4. Click "Select Postgres Server" in the bottom VS Code status bar, choose
-     the rsm-msba connection, then run the statements below with F5
-     (or right-click -> "Run Query").
+  -- 4. Click "Select Postgres Server" in the bottom VS Code status bar, choose the Northwind (or WestCoastImporters) connection, then run the statements below with F5 (or right-click -> "Run Query").
 */
 
--- Confirm WHICH server you are connected to (port 8765 + your username = the
--- workspace-local Nix database, not /opt/base-uv or a container).
-SELECT current_database() AS db,
-       current_user       AS usr,
-       inet_server_port() AS port;
+/* choose Northwind as the active server and check if the below statement works */
+SELECT * FROM "products" LIMIT 5;
 
--- Create a small table, insert rows, and read them back.
-DROP TABLE IF EXISTS films;
-CREATE TABLE films (title text, director text, year int);
-INSERT INTO films (title, director, year) VALUES
-  ('Dune: Part Two', 'Denis Villeneuve', 2024),
-  ('Oppenheimer',    'Christopher Nolan', 2023);
-
-SELECT * FROM films ORDER BY year;
-
--- Clean up (optional)
-DROP TABLE films;
+/* choose WestCoastImporter as the active server and check if the below statement works */
+-- SELECT * FROM "buyinggroup" LIMIT 5;
