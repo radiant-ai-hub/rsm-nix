@@ -210,7 +210,6 @@
           # (pull the flake, re-sync, refresh shell/examples, update Claude Code
           # to the latest). It sets RSM_CLAUDE_LATEST so Claude is bumped.
           rsm-update = mk "rsm-update" [ rsm-setup pkgs.coreutils ];
-          rsm-new-course = mk "rsm-new-course" [ rsm-new-project pkgs.coreutils pkgs.gnugrep ];
           # rsm-mkdir: the general "make a direnv-ready folder anywhere" command
           # (CWD-relative like mkdir; nested or standalone; multi-path; --venv).
           rsm-mkdir = mk "rsm-mkdir" [ rsm-new-project pkgs.coreutils ];

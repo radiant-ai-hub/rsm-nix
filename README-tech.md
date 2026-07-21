@@ -133,14 +133,14 @@ all of this for you.
 | `rsm-msba`                                     | Bootstrap/reset: clone the flake if missing, then `rsm-setup`                                                                              |
 | `rsm-version`                                  | Print the environment version (the flake’s git commit) + platform                                                                          |
 | `rsm-python-sync`                              | Refresh the base env from `uv.lock`                                                                                                        |
-| `rsm-new-course NAME...`                       | Create course folder(s) under `~/rsm-msba` that share the one nix-uv env                                                                   |
+| `rsm-mkdir NAME...`                            | Create course folder(s) under `~/rsm-msba` that share the one nix-uv env                                                                   |
 | `rsm-new-project [--venv] [PATH]`              | Set up a folder (nested or standalone) to open directly in VS Code; `--venv` gives it its **own** reproducible env (the conda alternative) |
 | `rsm-project-check`                            | In a `--venv` folder, import each declared package and flag anything that fails to load                                                    |
 | `rsm-vscode-ext`                               | Install the curated VS Code extensions into the connected (WSL/SSH) window                                                                 |
 | `rsm-pg-init` / `-start` / `-stop` / `-status` | Workspace-local PostgreSQL lifecycle                                                                                                       |
 | `rsm-pg-psql`                                  | `psql` into the `rsm-msba` database                                                                                                        |
 | `rsm-pgweb`                                    | pgweb UI at <http://127.0.0.1:8282>                                                                                                        |
-| `rsm-github` (alias: `github`)                 | One-time setup of your Git identity, a GitHub SSH key, and `ssh sc2` server access (`Host sc2` in `~/.ssh/config`; key auto-created at install). Named `rsm-github` so a browser-opening `github` alias (oh-my-zsh web-search, GitHub Desktop) can't shadow it |
+| `rsm-github` (alias `github`)                  | One-time setup of your Git identity + a GitHub SSH key                                                                                     |
 
 ## Flake interfaces
 
@@ -148,7 +148,7 @@ all of this for you.
   16, pgweb, git/git-lfs, gh, notebook support, the `rsm-*` commands.
 - `devShells.<system>.spark-hadoop` — adds Java + Spark 3.5 + Hadoop +
   PySpark.
-- `packages.<system>.{rsm-setup,rsm-python-sync,rsm-pg-*,rsm-pgweb,rsm-new-course,quarto-bin,spark-hadoop-env,spark-hadoop-proof}`
+- `packages.<system>.{rsm-setup,rsm-python-sync,rsm-pg-*,rsm-pgweb,quarto-bin,spark-hadoop-env,spark-hadoop-proof}`
 - `apps.<system>.{check,check-spark-hadoop,rsm-setup}`
 
 Supported systems: `aarch64-darwin`, `x86_64-darwin`, `aarch64-linux`,

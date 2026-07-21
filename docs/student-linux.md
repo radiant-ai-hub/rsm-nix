@@ -148,7 +148,7 @@ inside `mgta403` with no nesting conflict.
 Create more course/project folders any time:
 
 ```bash
-rsm-new-course mgta455 mgta495
+rsm-mkdir mgta455 mgta495
 ```
 
 In VS Code, **File → Open Folder** on `~/rsm-msba`. With the direnv

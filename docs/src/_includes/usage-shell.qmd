@@ -22,7 +22,7 @@ terminal.
 
 **Git and GitHub**
 
-- `github` — one-time setup of your Git identity and a GitHub SSH key (run once).
+- `rsm-github` — one-time setup of your Git identity and a GitHub SSH key (run once; `github` also works but a shell alias can shadow it, so prefer `rsm-github`).
 - `gh` — the GitHub CLI (`gh repo clone …`, `gh auth login`, …).
 
 **PostgreSQL**
