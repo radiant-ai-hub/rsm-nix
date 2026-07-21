@@ -54,7 +54,7 @@ jobs:
             "VirtualMachinePlatform",
             "Microsoft.WSL",
             "wsl --install --no-distribution",
-            "require a reboot"
+            "reboot is required"
           )) {
             if ($out -notmatch [regex]::Escape($needle)) {
               throw "WSL-install regression: expected '$needle' in the missing-WSL install path, but it was absent."

@@ -90,6 +90,42 @@ Assert-Equal @("Ubuntu") $p.StrayUbuntu "nul/space: stray parsed despite NUL"
 $p = Get-WslDistroPlan -Installed @("UBUNTU") -Target $target
 Assert-True $p.HasStray               "case: UBUNTU matched case-insensitively"
 
+Write-Host "== UNIT: reboot-decision + delete-confirm helpers =="
+
+# Test-FeatureStatesEnabled: all features must be fully 'Enabled'.
+Assert-True (Test-FeatureStatesEnabled @("Enabled","Enabled"))              "feat: both Enabled => true"
+Assert-True (-not (Test-FeatureStatesEnabled @("Enabled","EnablePending"))) "feat: one EnablePending => false"
+Assert-True (-not (Test-FeatureStatesEnabled @("Enabled","Disabled")))      "feat: one Disabled => false"
+Assert-True (-not (Test-FeatureStatesEnabled @()))                          "feat: empty => false"
+
+# Test-RebootRequiredAfterEnable: only skip reboot when features were already
+# active AND WSL is ready -- never trust 'ready' right after enabling.
+Assert-True (Test-RebootRequiredAfterEnable -FeaturesWereAlreadyEnabled $false -WslReadyNow $false)       "reboot: fresh-enable, not ready => reboot"
+Assert-True (Test-RebootRequiredAfterEnable -FeaturesWereAlreadyEnabled $false -WslReadyNow $true)        "reboot: fresh-enable, 'ready' => still reboot"
+Assert-True (Test-RebootRequiredAfterEnable -FeaturesWereAlreadyEnabled $true  -WslReadyNow $false)       "reboot: active, not ready => reboot"
+Assert-True (-not (Test-RebootRequiredAfterEnable -FeaturesWereAlreadyEnabled $true -WslReadyNow $true))  "reboot: active + ready => NO 2nd reboot"
+
+# Test-ConfirmedRemoval: only an explicit yes deletes.
+Assert-True (Test-ConfirmedRemoval "y")            "confirm: y => delete"
+Assert-True (Test-ConfirmedRemoval "yes")          "confirm: yes => delete"
+Assert-True (Test-ConfirmedRemoval "Y")            "confirm: Y => delete"
+Assert-True (-not (Test-ConfirmedRemoval ""))      "confirm: empty (Enter) => keep"
+Assert-True (-not (Test-ConfirmedRemoval "n"))     "confirm: n => keep"
+Assert-True (-not (Test-ConfirmedRemoval "no"))    "confirm: no => keep"
+Assert-True (-not (Test-ConfirmedRemoval "yeah"))  "confirm: yeah => keep"
+Assert-True (-not (Test-ConfirmedRemoval "Ubuntu")) "confirm: distro name => keep"
+
+# Get-RebootInstructions: student restarts themselves; no auto-reboot language.
+$msg = (Get-RebootInstructions -Reason "MY_REASON") -join "`n"
+Assert-Contains $msg "restart your computer yourself"    "reboot-msg: student restarts themselves"
+Assert-Contains $msg "run the same install command again" "reboot-msg: rerun instruction"
+Assert-Contains $msg "MY_REASON"                          "reboot-msg: includes the reason"
+
+# STATIC: the installer must NEVER auto-reboot or prompt to reboot.
+$src = Get-Content $installer -Raw
+Assert-NotContains $src "Restart-Computer" "static: no Restart-Computer (never auto-reboots)"
+Assert-NotContains $src "Reboot now?"      "static: no 'Reboot now?' prompt"
+
 # --- INTEGRATION (function-level, cross-platform) -----------------------------
 # Drive the two changed dry-run code paths directly, bypassing the Windows-only
 # early steps (VS Code/winget). The dot-sourced script params are in this scope,
@@ -119,7 +155,7 @@ $out = (Ensure-WslFeature 6>&1 2>&1 | Out-String)
 Assert-Contains    $out "Microsoft-Windows-Subsystem-Linux" "reboot-path: enables WSL feature"
 Assert-Contains    $out "VirtualMachinePlatform"            "reboot-path: enables VM Platform"
 Assert-Contains    $out "Microsoft.WSL"                     "reboot-path: installs WSL runtime"
-Assert-Contains    $out "require a reboot"                  "reboot-path: announces required reboot"
+Assert-Contains    $out "reboot is required"                "reboot-path: announces required reboot"
 $SimulateMissingWsl = $false
 
 # NOTE: full-script dry-run integration (invoking the whole installer end-to-end)

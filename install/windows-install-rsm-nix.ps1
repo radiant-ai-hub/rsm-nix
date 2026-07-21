@@ -505,33 +505,35 @@ function Enable-WslOptionalFeatures {
     }
 }
 
+function Get-RebootInstructions {
+    # Pure (returns the message lines) so it can be unit-tested. We NEVER reboot
+    # for the student -- rebooting is disruptive and could lose their open work.
+    # We just tell them, plainly, to restart Windows themselves and rerun.
+    param([string]$Reason)
+    return @(
+        "============================================================",
+        "  ACTION NEEDED: please restart Windows to finish setting up WSL.",
+        "",
+        "  $Reason",
+        "",
+        "  1. Save your work and restart your computer yourself",
+        "     (Start > Power > Restart).",
+        "  2. After it restarts, run the same install command again.",
+        "     It picks up automatically from where it stopped.",
+        "============================================================"
+    )
+}
+
 function Stop-ForReboot {
     param([string]$Reason)
-    # A reboot-required stop is a normal step, not a failure. A plain script can't
-    # continue across a reboot on its own, so we offer to reboot now (only when
-    # genuinely interactive -- never headless/CI) and tell the user to rerun this
-    # installer afterward; it is idempotent and resumes from where it left off.
+    # A reboot-required stop is a normal step, not a failure. The installer can't
+    # continue across a reboot on its own, so it stops and asks the student to
+    # restart and rerun (it is idempotent and resumes). It NEVER reboots for them.
     Write-BlankLine
-    Write-Host "============================================================" -ForegroundColor Yellow
-    Write-Host " $Reason" -ForegroundColor Yellow
-    Write-Host " Windows must reboot to finish enabling WSL. After it restarts," -ForegroundColor Yellow
-    Write-Host " run this installer again to continue -- it resumes automatically." -ForegroundColor Yellow
-    Write-Host "============================================================" -ForegroundColor Yellow
-    Write-BlankLine
-
-    # Only prompt/auto-reboot for a real interactive console. A redirected or
-    # non-interactive session (piped, CI, scheduled) must never reboot on its own.
-    if ([Environment]::UserInteractive -and -not [Console]::IsInputRedirected) {
-        $answer = Read-Host "Reboot now? [Y/n]"
-        if ([string]::IsNullOrWhiteSpace($answer) -or $answer -match '^(y|yes)$') {
-            Write-Host "Save any open work -- rebooting now..." -ForegroundColor Yellow
-            Restart-Computer -Force
-            exit 0
-        }
-        Write-Host "OK -- reboot when you're ready, then rerun this installer to continue." -ForegroundColor Yellow
-    } else {
-        Write-Host "Reboot Windows, then rerun this installer to continue." -ForegroundColor Yellow
+    foreach ($line in (Get-RebootInstructions -Reason $Reason)) {
+        Write-Host $line -ForegroundColor Yellow
     }
+    Write-BlankLine
     exit 0
 }
 
@@ -556,29 +558,78 @@ function Install-WslRuntime {
     }
 }
 
+function Test-FeatureStatesEnabled {
+    # PURE (unit-testable): are ALL given feature states fully "Enabled"? A state
+    # of "EnablePending" (staged by DISM /norestart but not yet active) or
+    # "Disabled" means not-yet-usable. Empty input => not enabled.
+    param([string[]]$States)
+    if (-not $States -or @($States).Count -eq 0) { return $false }
+    foreach ($s in $States) { if ("$s" -ne "Enabled") { return $false } }
+    return $true
+}
+
+function Test-WslFeaturesEnabled {
+    # Are BOTH WSL Windows features fully ACTIVE right now (State=Enabled, i.e.
+    # already rebooted)? This is how we tell "the student just enabled these and
+    # must reboot" (EnablePending) from "these are active, only the runtime was
+    # missing" (Enabled) -- so a rerun does NOT trigger a needless 2nd reboot.
+    # Returns $false if the state can't be queried (then we fall back to a reboot).
+    $states = @()
+    foreach ($feature in @("Microsoft-Windows-Subsystem-Linux", "VirtualMachinePlatform")) {
+        try {
+            $states += (Get-WindowsOptionalFeature -Online -FeatureName $feature -ErrorAction Stop).State
+        } catch {
+            return $false
+        }
+    }
+    return (Test-FeatureStatesEnabled -States $states)
+}
+
+function Test-RebootRequiredAfterEnable {
+    # PURE (unit-testable): after enabling features + installing the runtime,
+    # decide whether a reboot is required. Only skip the reboot when the features
+    # were ALREADY active before this run (so VirtualMachinePlatform is live) AND
+    # WSL is functional now. If we just enabled them, never trust a "ready" result
+    # -- VirtualMachinePlatform is not active until a restart.
+    param([bool]$FeaturesWereAlreadyEnabled, [bool]$WslReadyNow)
+    return -not ($FeaturesWereAlreadyEnabled -and $WslReadyNow)
+}
+
 function Install-WslPlatform {
-    # Enable the WSL Windows features AND install the WSL runtime package, then
-    # continue if WSL works now, or STOP for a reboot if it doesn't. The features
-    # being Enabled is NOT sufficient -- the runtime (Microsoft.WSL) must be
-    # present too. If the features were only just enabled, VirtualMachinePlatform
-    # needs a reboot to activate before WSL can run.
+    # Enable the WSL Windows features AND install the WSL runtime package. Whether
+    # a reboot is then required depends on the ACTUAL feature state (checked with
+    # Get-WindowsOptionalFeature), not just `wsl --status`:
+    #   * Features were just enabled (Disabled/EnablePending) -> a reboot is
+    #     required; VirtualMachinePlatform is not active until the restart.
+    #   * Features were already active (Enabled, e.g. the student rebooted and
+    #     reran) and only the runtime/kernel was missing -> finish WITHOUT a
+    #     reboot after a `wsl --update`, so the student is never sent into a
+    #     second reboot.
     if (-not (Test-IsAdministrator)) {
         throw "WSL is not installed, and installing it requires Administrator. Right-click PowerShell, choose 'Run as Administrator', then rerun this installer."
     }
     Assert-WslPrerequisites
+
+    $featuresAlreadyEnabled = Test-WslFeaturesEnabled
     Write-Detail "Enabling the WSL Windows features..."
     Enable-WslOptionalFeatures
     Install-WslRuntime
-
-    # ALWAYS reboot after enabling/installing, then have the student rerun the
-    # one-liner. Even when `wsl --status` looks fine, a just-enabled
-    # VirtualMachinePlatform is not actually active until a reboot -- so trying to
-    # continue in the same run is exactly what made the distro step fail
-    # (0x80370114 / "The Virtual Machine Platform is not enabled") until students
-    # rebooted and reran. Stop cleanly here instead; the installer is idempotent
-    # and resumes from where it left off.
     & wsl.exe --shutdown 2>$null
-    Stop-ForReboot "WSL has been installed and enabled. A reboot is required to finish."
+
+    # If the platform was already active and only the runtime lagged, a kernel
+    # update can finish the job in-place -- try it before deciding on a reboot.
+    $ready = Test-WslReady
+    if (-not $ready -and $featuresAlreadyEnabled) {
+        Write-Detail "WSL platform is active; fetching the WSL kernel update..."
+        & wsl.exe --update --web-download 2>&1 | Out-Host
+        $ready = Test-WslReady
+    }
+
+    if (-not (Test-RebootRequiredAfterEnable -FeaturesWereAlreadyEnabled $featuresAlreadyEnabled -WslReadyNow $ready)) {
+        Write-Detail "WSL is active; continuing without a reboot."
+        return
+    }
+    Stop-ForReboot "WSL has been installed and enabled, but Windows has not activated it yet."
 }
 
 function Test-WslReady {
@@ -612,7 +663,7 @@ function Ensure-WslFeature {
             Write-Detail "[dry-run] Would run: dism /online /enable-feature Microsoft-Windows-Subsystem-Linux /all /norestart"
             Write-Detail "[dry-run] Would run: dism /online /enable-feature VirtualMachinePlatform /all /norestart"
             Write-Detail "[dry-run] Would run: winget install --id Microsoft.WSL (fallback: wsl --install --no-distribution)"
-            Write-Detail "[dry-run] Would then STOP and require a reboot before continuing; rerun the installer afterward."
+            Write-Detail "[dry-run] If the features were newly enabled, a reboot is required next: the installer would stop and ask you to restart, then rerun (it never reboots for you)."
         } else {
             Write-Detail "[dry-run] Would verify WSL readiness by running wsl --status."
             Write-Detail "[dry-run] Would run: wsl --update --web-download"
@@ -682,12 +733,21 @@ function Download-UbuntuWslImage {
     return $imagePath
 }
 
+function Test-ConfirmedRemoval {
+    # PURE (unit-testable): only an explicit "y"/"yes" confirms a deletion.
+    # Anything else -- including empty (just pressing Enter) -- means KEEP. This
+    # is the guard that a distro is NEVER deleted without the student saying yes.
+    param([string]$Answer)
+    return ("$Answer".Trim() -match '^(y|yes)$')
+}
+
 function Remove-StrayUbuntuDistros {
     # Detect Ubuntu distros that are NOT the target -- typically a plain "Ubuntu"
-    # from someone running `wsl --install` -- and offer to remove them so only
-    # $DistroName remains. `wsl --unregister` DELETES that distro's whole
-    # filesystem, so this PROMPTS before removing (never silently) unless -Force.
-    # In a non-interactive session it only warns and points at the manual command.
+    # from someone running `wsl --install` -- and PROPOSE removing them so only
+    # $DistroName remains. `wsl --unregister` permanently DELETES that distro's
+    # whole filesystem, so we NEVER delete automatically: we always ask, and even
+    # -Force does not bypass the confirmation. In a non-interactive session we
+    # cannot ask, so we only warn and leave the distro in place.
     $plan = Get-WslDistroPlan -Installed (Get-InstalledWslDistros) -Target $DistroName
     if (-not $plan.HasStray) { return }
 
@@ -697,18 +757,18 @@ function Remove-StrayUbuntuDistros {
     Write-Host "  (This usually happens when 'wsl --install' was run -- it installs the" -ForegroundColor Yellow
     Write-Host "   default Ubuntu, not $DistroName.)" -ForegroundColor Yellow
 
+    $canPrompt = [Environment]::UserInteractive -and -not [Console]::IsInputRedirected
+
     foreach ($name in $plan.StrayUbuntu) {
-        $remove = $false
-        if ($Force) {
-            $remove = $true
-        } elseif ([Environment]::UserInteractive -and -not [Console]::IsInputRedirected) {
-            Write-Host "  Removing '$name' will DELETE that distro and everything inside it." -ForegroundColor Yellow
-            $answer = Read-Host "  Unregister '$name'? [y/N]"
-            $remove = ($answer -match '^(y|yes)$')
-        } else {
-            Write-Detail "Leaving '$name' in place (non-interactive). Remove it later with: wsl --unregister $name"
+        if (-not $canPrompt) {
+            Write-Detail "Leaving '$name' in place. If you want only $DistroName, remove it yourself with: wsl --unregister $name"
+            continue
         }
-        if ($remove) {
+        Write-BlankLine
+        Write-Host "  Removing '$name' will PERMANENTLY DELETE that distro and everything" -ForegroundColor Yellow
+        Write-Host "  inside it (files, packages). This cannot be undone." -ForegroundColor Yellow
+        $answer = Read-Host "  Delete '$name' now? Type y to delete, or press Enter to keep it [y/N]"
+        if (Test-ConfirmedRemoval -Answer $answer) {
             Write-Detail "Unregistering '$name'..."
             & wsl.exe --unregister $name
             if ($LASTEXITCODE -ne 0) {
@@ -716,6 +776,8 @@ function Remove-StrayUbuntuDistros {
             } else {
                 Write-Detail "Removed '$name'."
             }
+        } else {
+            Write-Detail "Keeping '$name'. (You can remove it later with: wsl --unregister $name)"
         }
     }
     Write-BlankLine
@@ -732,7 +794,7 @@ function Install-UbuntuDistro {
         $plan = Get-WslDistroPlan -Installed $simDistros -Target $DistroName
         if ($plan.HasStray) {
             Write-Detail "[dry-run] Found other Ubuntu distro(s), not $($DistroName): $($plan.StrayUbuntu -join ', ')"
-            Write-Detail "[dry-run] Likely from 'wsl --install'. Would offer to 'wsl --unregister' them (deletes that distro)."
+            Write-Detail "[dry-run] Likely from 'wsl --install'. Would ASK you to confirm before 'wsl --unregister' -- never deletes a distro automatically."
         }
         if ($plan.TargetInstalled) {
             Write-Detail "[dry-run] $DistroName is already installed; would reuse it."
