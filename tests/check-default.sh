@@ -57,7 +57,7 @@ fi
 
 echo "== rsm commands present =="
 for c in rsm-setup rsm-python-sync rsm-pg-init rsm-pg-start rsm-pg-stop \
-         rsm-pg-status rsm-pg-psql rsm-pgweb rsm-new-course; do
+         rsm-pg-status rsm-pg-psql rsm-pgweb rsm-mkdir rsm-clone; do
   if have "$c"; then ok "$c"; else bad "$c not on PATH"; fi
 done
 
