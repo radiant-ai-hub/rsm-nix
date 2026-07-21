@@ -119,8 +119,13 @@ jobs:
           bash -n bin/rsm-env.sh
           bash -n bin/rsm-ssh-setup
           bash -n bin/github
+          bash -n bin/rsm-github
           bash -n tests/check-default.sh
           bash -n tests/check-folders.sh
           bash -n tests/check-no-host-mutation.sh
           bash -n tests/check-postgres.sh
           bash -n tests/check-spark-hadoop.sh
+          bash -n tests/check-data-seed.sh
+
+      - name: Data-seed no-clobber test
+        run: bash tests/check-data-seed.sh

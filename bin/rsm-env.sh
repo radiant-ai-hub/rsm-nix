@@ -64,3 +64,15 @@ case ":${PYTHONPATH:-}:" in
   *":$RSMBASE/pythonpath:"*) ;;
   *) PYTHONPATH="$RSMBASE/pythonpath${PYTHONPATH:+:$PYTHONPATH}"; export PYTHONPATH ;;
 esac
+
+# rsm_seed_dir SRC DST: seed files from SRC into DST WITHOUT overwriting anything
+# already in DST. Used to drop the flake's starter folders (e.g. data/) into the
+# workspace on first setup and to add newly-shipped files on later runs, while
+# never clobbering a student's own files. Creates DST as needed; a missing SRC is
+# a no-op. Best-effort: it never fails the caller.
+rsm_seed_dir() {
+  [ -d "$1" ] || return 0
+  mkdir -p "$2" || return 0
+  cp -Rn "$1/." "$2/" 2>/dev/null || true
+  return 0
+}

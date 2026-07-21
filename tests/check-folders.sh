@@ -42,4 +42,13 @@ if [ -f "$RSM_FLAKE/courses.txt" ]; then
   done < "$RSM_FLAKE/courses.txt"
 fi
 
+echo "== data folder seeded from the flake (under the workspace) =="
+if [ -d "$RSM_FLAKE/data" ]; then
+  if [ -d "$RSM_WORKSPACE/data" ]; then ok "data/"; else bad "missing $RSM_WORKSPACE/data (run rsm-setup)"; fi
+  # every file shipped in the flake's data/ should be present in the workspace
+  while IFS= read -r rel; do
+    if [ -e "$RSM_WORKSPACE/data/$rel" ]; then ok "data/$rel"; else bad "missing data/$rel in the workspace"; fi
+  done < <(cd "$RSM_FLAKE/data" && find . -type f | sed 's#^\./##')
+fi
+
 [ "$fail" -eq 0 ] && echo "Folder layout looks good." || { echo "Folder layout check FAILED." >&2; exit 1; }
