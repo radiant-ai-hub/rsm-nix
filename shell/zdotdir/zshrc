@@ -64,30 +64,33 @@ alias de=deactivate
 alias ..='cd ..'
 alias ...='cd ../..'
 alias ....='cd ../../..'
-# --- Nix-env shell extras: eza aliases + zoxide (`z`) ----------------------
+# --- Nix-env shell extras: eza-backed ls + zoxide (`z`) --------------------
 # eza and zoxide come from the Nix env, which direnv loads AFTER this .zshrc is
-# sourced. So DON'T gate on them at source time (that silently skipped the eza
-# aliases, leaving the default `ls`) — set them on the first prompt once they
-# are on PATH, retrying each prompt until then. Running at precmd also means the
-# `ls` alias reliably wins over any default one set earlier.
-_rsm_env_extras_init() {
-  command -v eza >/dev/null 2>&1 || return 1   # env not loaded yet; retry next prompt
-  alias ls='eza -lh --group-directories-first --icons=auto'
-  alias lsa='eza -lah --group-directories-first --icons=auto'
-  alias lt='eza --tree --level=2 --git --icons=auto'
-  if command -v zoxide >/dev/null 2>&1; then
-    eval "$(zoxide init zsh)"
-    # When you cd OUT of the workspace direnv unloads the env and zoxide leaves
-    # PATH, but its chpwd hook stays registered and would print
-    # "__zoxide_hook: command not found" on every cd. Wrap it to quietly no-op.
-    if (( $+functions[__zoxide_hook] )); then
-      functions[__rsm_zoxide_hook_orig]=$functions[__zoxide_hook]
-      __zoxide_hook() { command -v zoxide >/dev/null 2>&1 && __rsm_zoxide_hook_orig "$@"; }
-    fi
+# sourced, and UNLOADS when you cd out of the workspace. So `ls`/`lsa`/`lt` are
+# FUNCTIONS that check for eza at CALL time and fall back to the system `ls` --
+# they never break, whether the env hasn't loaded yet or eza has left PATH (an
+# alias set once would instead fail with "command not found: eza" the moment eza
+# is gone). eza's flags are ignored by the plain-ls fallback, which is fine.
+# >>> rsm-ls-functions >>>  (extracted + tested by tests/check-shell-ls.sh)
+ls()  { if command -v eza >/dev/null 2>&1; then eza -lh  --group-directories-first --icons=auto "$@"; else command ls "$@"; fi; }
+lsa() { if command -v eza >/dev/null 2>&1; then eza -lah --group-directories-first --icons=auto "$@"; else command ls -la "$@"; fi; }
+lt()  { if command -v eza >/dev/null 2>&1; then eza --tree --level=2 --git --icons=auto "$@"; else command ls "$@"; fi; }
+# <<< rsm-ls-functions <<<
+
+# zoxide (`z`) also comes from the Nix env; initialize it once it is on PATH
+# (retry each prompt until then). After you cd OUT of the workspace zoxide leaves
+# PATH but its chpwd hook stays registered and would print "__zoxide_hook:
+# command not found" on every cd, so wrap it to quietly no-op.
+_rsm_zoxide_init() {
+  command -v zoxide >/dev/null 2>&1 || return 1   # env not loaded yet; retry next prompt
+  eval "$(zoxide init zsh)"
+  if (( $+functions[__zoxide_hook] )); then
+    functions[__rsm_zoxide_hook_orig]=$functions[__zoxide_hook]
+    __zoxide_hook() { command -v zoxide >/dev/null 2>&1 && __rsm_zoxide_hook_orig "$@"; }
   fi
-  add-zsh-hook -d precmd _rsm_env_extras_init 2>/dev/null
+  add-zsh-hook -d precmd _rsm_zoxide_init 2>/dev/null
 }
-_rsm_env_extras_init || add-zsh-hook precmd _rsm_env_extras_init
+_rsm_zoxide_init || add-zsh-hook precmd _rsm_zoxide_init
 
 # Powerlevel10k prompt configuration.
 [[ ! -f "${ZDOTDIR}/.p10k.zsh" ]] || source "${ZDOTDIR}/.p10k.zsh"

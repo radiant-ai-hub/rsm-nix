@@ -133,13 +133,14 @@ all of this for you.
 | `rsm-msba`                                     | Bootstrap/reset: clone the flake if missing, then `rsm-setup`                                                                              |
 | `rsm-version`                                  | Print the environment version (the flake’s git commit) + platform                                                                          |
 | `rsm-python-sync`                              | Refresh the base env from `uv.lock`                                                                                                        |
-| `rsm-mkdir NAME...`                            | Create course folder(s) under `~/rsm-msba` that share the one nix-uv env                                                                   |
+| `rsm-mkdir PATH...`                            | Make folder(s) direnv-ready so they share the one nix-uv env (CWD-relative; `--venv` for a project-local env)                              |
+| `rsm-clone URL [DIR]`                          | `git clone` a repo AND set it up (direnv + nix-uv) so it opens directly in VS Code                                                         |
 | `rsm-new-project [--venv] [PATH]`              | Set up a folder (nested or standalone) to open directly in VS Code; `--venv` gives it its **own** reproducible env (the conda alternative) |
 | `rsm-project-check`                            | In a `--venv` folder, import each declared package and flag anything that fails to load                                                    |
 | `rsm-vscode-ext`                               | Install the curated VS Code extensions into the connected (WSL/SSH) window                                                                 |
 | `rsm-pg-init` / `-start` / `-stop` / `-status` | Workspace-local PostgreSQL lifecycle                                                                                                       |
 | `rsm-pg-psql`                                  | `psql` into the `rsm-msba` database                                                                                                        |
-| `rsm-pgweb`                                    | pgweb UI at <http://127.0.0.1:8282>                                                                                                        |
+| `rsm-pgweb`                                    | Browser-based database viewer (opens the exact per-user URL it prints)                                                                     |
 | `rsm-github` (alias `github`)                  | One-time setup of your Git identity + a GitHub SSH key                                                                                     |
 
 ## Flake interfaces
