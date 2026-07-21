@@ -76,3 +76,31 @@ rsm_seed_dir() {
   cp -Rn "$1/." "$2/" 2>/dev/null || true
   return 0
 }
+
+# rsm_maybe_reexec HEAD_BEFORE HEAD_AFTER: if a `git pull` of the flake brought
+# NEW commits, hand off to the freshly-pulled rsm-setup so a SINGLE `rsm-update`
+# applies everything -- including changes to rsm-setup/rsm-env.sh themselves. The
+# running copy can't apply those (a program can't swap its own code mid-run), so
+# we re-run the new build via `nix develop`. On a successful hand-off this EXITS
+# and never returns. It is a no-op (returns 0) when:
+#   - we ARE already the re-run (RSM_SETUP_REEXECED set) -- the loop guard,
+#   - no new commits were pulled (HEAD unchanged),
+#   - or the new version can't be built/run (falls back to the current one).
+# RSM_SETUP_REEXEC_CMD overrides the hand-off command (used by the tests only).
+rsm_maybe_reexec() {
+  if [ -n "${RSM_SETUP_REEXECED:-}" ]; then return 0; fi   # we are the re-run
+  if [ "$1" = "$2" ]; then return 0; fi                     # no new commits
+  if [ -n "${RSM_SETUP_REEXEC_CMD:-}" ]; then
+    set -- "$RSM_SETUP_REEXEC_CMD"                           # test hook
+  elif command -v nix >/dev/null 2>&1; then
+    set -- nix develop "$RSM_FLAKE" -c rsm-setup
+  else
+    return 0                                                 # can't rebuild; keep going
+  fi
+  echo "==> A newer version was downloaded -- applying it now (one moment)..."
+  if RSM_SETUP_REEXECED=1 "$@"; then
+    exit 0
+  fi
+  echo "    (could not run the new version; continuing with the current one)" >&2
+  return 0
+}
