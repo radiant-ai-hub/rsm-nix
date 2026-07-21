@@ -69,9 +69,16 @@ alias ....='cd ../../..'
 # sourced, and UNLOADS when you cd out of the workspace. So `ls`/`lsa`/`lt` are
 # FUNCTIONS that check for eza at CALL time and fall back to the system `ls` --
 # they never break, whether the env hasn't loaded yet or eza has left PATH (an
-# alias set once would instead fail with "command not found: eza" the moment eza
-# is gone). eza's flags are ignored by the plain-ls fallback, which is fine.
-# >>> rsm-ls-functions >>>  (extracted + tested by tests/check-shell-ls.sh)
+# alias fixed to eza would instead fail "command not found: eza" once eza is gone).
+#
+# CRITICAL: oh-my-zsh already set `alias ls='ls --color=tty'` above. With that
+# alias live, `ls() { ... }` alias-EXPANDS to `ls --color=tty () { ... }` and
+# fails to PARSE -- which aborts the REST of this file (p10k, etc.). So unalias
+# ls/lsa/lt FIRST (must be its own command so it runs before the next line is
+# parsed), then define the functions. (`zsh -n` can't catch this: it never runs
+# the earlier `source oh-my-zsh.sh`, so the alias isn't set at parse time.)
+# >>> rsm-ls-functions >>>  (extracted + tested by tests/check-shell-ls.zsh)
+unalias ls lsa lt 2>/dev/null || true
 ls()  { if command -v eza >/dev/null 2>&1; then eza -lh  --group-directories-first --icons=auto "$@"; else command ls "$@"; fi; }
 lsa() { if command -v eza >/dev/null 2>&1; then eza -lah --group-directories-first --icons=auto "$@"; else command ls -la "$@"; fi; }
 lt()  { if command -v eza >/dev/null 2>&1; then eza --tree --level=2 --git --icons=auto "$@"; else command ls "$@"; fi; }
