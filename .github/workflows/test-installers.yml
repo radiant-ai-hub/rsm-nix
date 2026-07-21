@@ -126,6 +126,10 @@ jobs:
           bash -n tests/check-postgres.sh
           bash -n tests/check-spark-hadoop.sh
           bash -n tests/check-data-seed.sh
+          bash -n tests/check-reexec.sh
 
       - name: Data-seed no-clobber test
         run: bash tests/check-data-seed.sh
+
+      - name: Self-update re-exec test
+        run: bash tests/check-reexec.sh

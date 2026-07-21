@@ -19,6 +19,7 @@ echo "    state     : $RSMBASE"
 # after deleting ~/rsm-nix), and fast-forwards it to the latest otherwise (so
 # `rsm-setup` doubles as the update command). All environment content
 # (packages, examples, zsh, scripts) then comes from this one place.
+_head_before="$(git -C "$RSM_FLAKE" rev-parse HEAD 2>/dev/null || echo none)"
 if [ ! -e "$RSM_FLAKE/flake.nix" ]; then
   echo "    flake     : cloning rsm-nix -> $RSM_FLAKE"
   git clone https://github.com/radiant-ai-hub/rsm-nix.git "$RSM_FLAKE"
@@ -49,6 +50,12 @@ elif [ -d "$RSM_FLAKE/.git" ]; then
     fi
   fi
 fi
+
+# If the pull above brought new commits, hand off to the freshly-pulled rsm-setup
+# so ONE run applies everything -- including changes to rsm-setup itself (the
+# running copy can't). No-op when nothing changed / already re-run / can't build.
+_head_after="$(git -C "$RSM_FLAKE" rev-parse HEAD 2>/dev/null || echo none)"
+rsm_maybe_reexec "$_head_before" "$_head_after"
 
 mkdir -p "$RSM_WORKSPACE"
 
