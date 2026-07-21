@@ -289,6 +289,16 @@ if [ -d "$RSM_FLAKE/examples" ]; then
   echo "    examples  : refreshed $RSM_WORKSPACE/examples"
 fi
 
+# 4b. Seed the flake's data/ folder into the workspace. Unlike examples/ (which
+#     we refresh/overwrite every run), students may drop their OWN files in
+#     data/, so we only ADD what's missing and NEVER overwrite existing files
+#     (rsm_seed_dir uses `cp -n`). This gives every new workspace the starter
+#     datasets and picks up newly-shipped ones on later runs.
+if [ -d "$RSM_FLAKE/data" ]; then
+  rsm_seed_dir "$RSM_FLAKE/data" "$RSM_WORKSPACE/data"
+  echo "    data      : seeded $RSM_WORKSPACE/data (kept any files you added)"
+fi
+
 # 5. README: a live shortcut to the flake's README, so the workspace always
 #    shows the current usage/testing docs (updated whenever the flake is pulled).
 #    A symlink (not a copy) keeps it in sync; it is a file, so there is no
