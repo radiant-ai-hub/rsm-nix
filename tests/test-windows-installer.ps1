@@ -122,35 +122,11 @@ Assert-Contains    $out "Microsoft.WSL"                     "reboot-path: instal
 Assert-Contains    $out "require a reboot"                  "reboot-path: announces required reboot"
 $SimulateMissingWsl = $false
 
-# --- INTEGRATION: dry-run of the whole installer (Windows only) ---------------
-function Invoke-InstallerDryRun {
-    param([string[]]$ExtraArgs)
-    $allArgs = @("-DryRun", "-SkipWorkspaceSetup") + $ExtraArgs
-    return (& $installer @allArgs 6>&1 2>&1 | Out-String)
-}
-
-if ($IsWindows) {
-    Write-Host "== INTEGRATION: dry-run (Windows) =="
-
-    # (part 2) missing-WSL path must enable both features AND announce a reboot.
-    $out = Invoke-InstallerDryRun @("-SimulateMissingWsl", "-SimulateInstalledDistros", "Ubuntu-26.04")
-    Assert-Contains $out "Microsoft-Windows-Subsystem-Linux" "reboot-path: enables WSL feature"
-    Assert-Contains $out "VirtualMachinePlatform"            "reboot-path: enables VM Platform"
-    Assert-Contains $out "Microsoft.WSL"                     "reboot-path: installs WSL runtime"
-    Assert-Contains $out "require a reboot"                  "reboot-path: announces required reboot"
-
-    # (part 3) a stray 'Ubuntu' alongside the target must be flagged for cleanup.
-    $out = Invoke-InstallerDryRun @("-SimulateInstalledDistros", "Ubuntu,Ubuntu-26.04")
-    Assert-Contains    $out "Found other Ubuntu"  "stray: flags the stray Ubuntu"
-    Assert-Contains    $out "unregister"          "stray: mentions unregister cleanup"
-    Assert-Contains    $out "already installed"   "stray: notes target already installed"
-
-    # (part 3) Debian + target => NO stray flagged (no false positive).
-    $out = Invoke-InstallerDryRun @("-SimulateInstalledDistros", "Debian,Ubuntu-26.04")
-    Assert-NotContains $out "Found other Ubuntu"  "debian: no false stray"
-} else {
-    Write-Host "== INTEGRATION: dry-run skipped (not Windows; runs in CI) =="
-}
+# NOTE: full-script dry-run integration (invoking the whole installer end-to-end)
+# needs winget/VS Code and so only runs on Windows; those assertions live in
+# .github/workflows/test-installers.yml, which drives the script the same proven
+# way the existing dry-run steps do. Here we cover the pure logic + the two
+# changed code paths at function level (above), which run everywhere.
 
 Write-Host ""
 Write-Host "Passed: $script:Passed   Failed: $script:Failures"

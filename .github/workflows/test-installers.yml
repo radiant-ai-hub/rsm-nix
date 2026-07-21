@@ -53,13 +53,33 @@ jobs:
             "Microsoft-Windows-Subsystem-Linux",
             "VirtualMachinePlatform",
             "Microsoft.WSL",
-            "wsl --install --no-distribution"
+            "wsl --install --no-distribution",
+            "require a reboot"
           )) {
             if ($out -notmatch [regex]::Escape($needle)) {
               throw "WSL-install regression: expected '$needle' in the missing-WSL install path, but it was absent."
             }
           }
-          Write-Host "OK: missing-WSL path installs WSL (both features + wsl --install)."
+          Write-Host "OK: missing-WSL path installs WSL (both features + wsl --install) and requires a reboot."
+
+      - name: Regression - detects a stray Ubuntu distro
+        shell: powershell
+        run: |
+          Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
+          # A stray 'Ubuntu' (e.g. from 'wsl --install') alongside the target must
+          # be flagged for cleanup; a non-Ubuntu distro (Debian) must NOT be.
+          $out = .\install\windows-install-rsm-nix.ps1 -DryRun -SkipWorkspaceSetup -SimulateInstalledDistros "Ubuntu,Ubuntu-26.04" 6>&1 | Out-String
+          Write-Host $out
+          foreach ($needle in @("Found other Ubuntu", "unregister")) {
+            if ($out -notmatch [regex]::Escape($needle)) {
+              throw "stray-Ubuntu regression: expected '$needle' when a stray Ubuntu is present, but it was absent."
+            }
+          }
+          $out2 = .\install\windows-install-rsm-nix.ps1 -DryRun -SkipWorkspaceSetup -SimulateInstalledDistros "Debian,Ubuntu-26.04" 6>&1 | Out-String
+          if ($out2 -match "Found other Ubuntu") {
+            throw "stray-Ubuntu regression: Debian must NOT be flagged as a stray Ubuntu."
+          }
+          Write-Host "OK: stray Ubuntu flagged for cleanup; Debian left alone."
 
       - name: Installer unit + integration tests (PowerShell 7)
         shell: pwsh
