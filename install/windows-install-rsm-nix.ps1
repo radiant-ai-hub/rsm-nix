@@ -21,7 +21,10 @@ param(
     # Test hook: force the "wsl.exe is missing" install path even when wsl.exe
     # exists, so CI can regression-test WSL installation on a runner that already
     # has WSL. Not for normal use.
-    [switch]$SimulateMissingWsl
+    [switch]$SimulateMissingWsl,
+    # Test hook: pretend this comma-separated set of distros is installed, so a
+    # dry run can exercise the stray-Ubuntu detection/cleanup without real WSL.
+    [string]$SimulateInstalledDistros = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -158,6 +161,39 @@ function Get-InstalledWslDistros {
             ForEach-Object { ($_ -replace "`0", "").Trim() } |
             Where-Object { $_ }
     )
+}
+
+function Get-WslDistroPlan {
+    # PURE decision helper (no WSL calls) so it can be unit-tested: given the set
+    # of installed distros and the target, report whether the target is present
+    # and which OTHER Ubuntu distros are "strays" to clean up. A stray is any
+    # Ubuntu-family distro that is not the target -- typically a plain "Ubuntu"
+    # (or "Ubuntu-24.04") left behind by `wsl --install`, which installs the
+    # DEFAULT Ubuntu, not the required Ubuntu-26.04. Non-Ubuntu distros (Debian,
+    # kali, ...) and WSL system distros (docker-desktop, docker-desktop-data) are
+    # deliberately never matched, so they are left untouched.
+    param(
+        [string[]]$Installed,
+        [string]$Target
+    )
+
+    $clean = @(
+        @($Installed) |
+            ForEach-Object { ($_ -replace "`0", "").Trim() } |
+            Where-Object { $_ }
+    )
+
+    $stray = @(
+        @($clean) | Where-Object {
+            $_ -ne $Target -and $_ -match '^ubuntu($|[-\s\d])'
+        }
+    )
+
+    return [pscustomobject]@{
+        TargetInstalled = [bool](@($clean) -contains $Target)
+        StrayUbuntu     = $stray
+        HasStray        = [bool]$stray.Count
+    }
 }
 
 function Get-WslDistroVersion {
@@ -534,15 +570,15 @@ function Install-WslPlatform {
     Enable-WslOptionalFeatures
     Install-WslRuntime
 
-    # Continue without a disruptive reboot if WSL is functional now (features were
-    # already active); otherwise the freshly enabled VirtualMachinePlatform needs
-    # a reboot to activate.
+    # ALWAYS reboot after enabling/installing, then have the student rerun the
+    # one-liner. Even when `wsl --status` looks fine, a just-enabled
+    # VirtualMachinePlatform is not actually active until a reboot -- so trying to
+    # continue in the same run is exactly what made the distro step fail
+    # (0x80370114 / "The Virtual Machine Platform is not enabled") until students
+    # rebooted and reran. Stop cleanly here instead; the installer is idempotent
+    # and resumes from where it left off.
     & wsl.exe --shutdown 2>$null
-    if (Test-WslReady) {
-        Write-Detail "WSL is installed and functional."
-        return
-    }
-    Stop-ForReboot "WSL has been installed. Reboot to finish enabling it, then rerun this installer to continue."
+    Stop-ForReboot "WSL has been installed and enabled. A reboot is required to finish."
 }
 
 function Test-WslReady {
@@ -576,6 +612,7 @@ function Ensure-WslFeature {
             Write-Detail "[dry-run] Would run: dism /online /enable-feature Microsoft-Windows-Subsystem-Linux /all /norestart"
             Write-Detail "[dry-run] Would run: dism /online /enable-feature VirtualMachinePlatform /all /norestart"
             Write-Detail "[dry-run] Would run: winget install --id Microsoft.WSL (fallback: wsl --install --no-distribution)"
+            Write-Detail "[dry-run] Would then STOP and require a reboot before continuing; rerun the installer afterward."
         } else {
             Write-Detail "[dry-run] Would verify WSL readiness by running wsl --status."
             Write-Detail "[dry-run] Would run: wsl --update --web-download"
@@ -645,11 +682,61 @@ function Download-UbuntuWslImage {
     return $imagePath
 }
 
+function Remove-StrayUbuntuDistros {
+    # Detect Ubuntu distros that are NOT the target -- typically a plain "Ubuntu"
+    # from someone running `wsl --install` -- and offer to remove them so only
+    # $DistroName remains. `wsl --unregister` DELETES that distro's whole
+    # filesystem, so this PROMPTS before removing (never silently) unless -Force.
+    # In a non-interactive session it only warns and points at the manual command.
+    $plan = Get-WslDistroPlan -Installed (Get-InstalledWslDistros) -Target $DistroName
+    if (-not $plan.HasStray) { return }
+
+    Write-BlankLine
+    Write-Host "  A different Ubuntu is installed, but this course needs '$DistroName'." -ForegroundColor Yellow
+    Write-Host "  Found: $($plan.StrayUbuntu -join ', ')" -ForegroundColor Yellow
+    Write-Host "  (This usually happens when 'wsl --install' was run -- it installs the" -ForegroundColor Yellow
+    Write-Host "   default Ubuntu, not $DistroName.)" -ForegroundColor Yellow
+
+    foreach ($name in $plan.StrayUbuntu) {
+        $remove = $false
+        if ($Force) {
+            $remove = $true
+        } elseif ([Environment]::UserInteractive -and -not [Console]::IsInputRedirected) {
+            Write-Host "  Removing '$name' will DELETE that distro and everything inside it." -ForegroundColor Yellow
+            $answer = Read-Host "  Unregister '$name'? [y/N]"
+            $remove = ($answer -match '^(y|yes)$')
+        } else {
+            Write-Detail "Leaving '$name' in place (non-interactive). Remove it later with: wsl --unregister $name"
+        }
+        if ($remove) {
+            Write-Detail "Unregistering '$name'..."
+            & wsl.exe --unregister $name
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "  Could not unregister '$name' (continuing anyway)." -ForegroundColor Yellow
+            } else {
+                Write-Detail "Removed '$name'."
+            }
+        }
+    }
+    Write-BlankLine
+}
+
 function Install-UbuntuDistro {
     Write-Section "Step 3: Checking Ubuntu 26.04 WSL distro..."
 
     if ($DryRun) {
-        if (Test-WslOnlineDistroAvailable -Name $DistroName) {
+        $simDistros = @()
+        if ($SimulateInstalledDistros) {
+            $simDistros = @($SimulateInstalledDistros -split '\s*,\s*' | Where-Object { $_ })
+        }
+        $plan = Get-WslDistroPlan -Installed $simDistros -Target $DistroName
+        if ($plan.HasStray) {
+            Write-Detail "[dry-run] Found other Ubuntu distro(s), not $($DistroName): $($plan.StrayUbuntu -join ', ')"
+            Write-Detail "[dry-run] Likely from 'wsl --install'. Would offer to 'wsl --unregister' them (deletes that distro)."
+        }
+        if ($plan.TargetInstalled) {
+            Write-Detail "[dry-run] $DistroName is already installed; would reuse it."
+        } elseif (Test-WslOnlineDistroAvailable -Name $DistroName) {
             Write-Detail "[dry-run] $DistroName is available from 'wsl --list --online'."
         } else {
             $image = Get-UbuntuWslImageInfo -Name $DistroName
@@ -659,6 +746,10 @@ function Install-UbuntuDistro {
         Write-BlankLine
         return
     }
+
+    # Remove any stray non-target Ubuntu (e.g. a plain "Ubuntu" from wsl --install)
+    # BEFORE (re)installing, so the student ends up with only $DistroName.
+    Remove-StrayUbuntuDistros
 
     $installedDistros = Get-InstalledWslDistros
     if ($installedDistros -contains $DistroName) {
@@ -1017,29 +1108,34 @@ bash "$flake/bin/rsm-vscode-ext" || true
     Write-BlankLine
 }
 
-$script:EffectiveWslUser = Get-SafeWslUser -Candidate $WslUser
+# Run the installer. Tests set RSM_INSTALLER_NOEXEC=1 and dot-source this file to
+# unit-test the functions above WITHOUT running an install. Normal runs -- both
+# `-File` and the `iwr ... | iex` one-liner -- never set it, so main always runs.
+if ($env:RSM_INSTALLER_NOEXEC -ne '1') {
+    $script:EffectiveWslUser = Get-SafeWslUser -Candidate $WslUser
 
-Write-Host "Rady School of Management @ UCSD" -ForegroundColor Cyan
-Write-Host "RSM-MSBA Nix Installer for Windows + WSL2" -ForegroundColor Cyan
-Write-Host "=========================================" -ForegroundColor Cyan
-Write-BlankLine
-Write-Detail "Distro: $DistroName"
-Write-Detail "WSL user: $script:EffectiveWslUser"
-Write-Detail "Workspace: $WorkspacePath"
-if ($DryRun) {
-    Write-Detail "Mode: dry-run (no host mutations)"
+    Write-Host "Rady School of Management @ UCSD" -ForegroundColor Cyan
+    Write-Host "RSM-MSBA Nix Installer for Windows + WSL2" -ForegroundColor Cyan
+    Write-Host "=========================================" -ForegroundColor Cyan
+    Write-BlankLine
+    Write-Detail "Distro: $DistroName"
+    Write-Detail "WSL user: $script:EffectiveWslUser"
+    Write-Detail "Workspace: $WorkspacePath"
+    if ($DryRun) {
+        Write-Detail "Mode: dry-run (no host mutations)"
+    }
+    Write-BlankLine
+
+    Install-VSCodeAndExtensions
+    Install-NerdFont
+    Install-Tailscale
+    Ensure-WslFeature
+    Install-UbuntuDistro
+    Initialize-WslDistro
+    Configure-UbuntuUser
+    Install-RsmWorkspace
+    Install-WslRemoteExtensions
+
+    Write-Host "Installation complete." -ForegroundColor Green
+    Write-Host "Open VS Code, choose 'Connect to WSL', then open $WorkspacePath in $DistroName."
 }
-Write-BlankLine
-
-Install-VSCodeAndExtensions
-Install-NerdFont
-Install-Tailscale
-Ensure-WslFeature
-Install-UbuntuDistro
-Initialize-WslDistro
-Configure-UbuntuUser
-Install-RsmWorkspace
-Install-WslRemoteExtensions
-
-Write-Host "Installation complete." -ForegroundColor Green
-Write-Host "Open VS Code, choose 'Connect to WSL', then open $WorkspacePath in $DistroName."

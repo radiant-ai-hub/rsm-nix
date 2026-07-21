@@ -61,6 +61,14 @@ jobs:
           }
           Write-Host "OK: missing-WSL path installs WSL (both features + wsl --install)."
 
+      - name: Installer unit + integration tests (PowerShell 7)
+        shell: pwsh
+        run: ./tests/test-windows-installer.ps1
+
+      - name: Installer tests under Windows PowerShell 5.1
+        shell: powershell
+        run: .\tests\test-windows-installer.ps1
+
   macos:
     name: macOS ARM installer dry run
     runs-on: macos-26
