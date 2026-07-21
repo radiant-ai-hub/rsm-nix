@@ -127,7 +127,6 @@ jobs:
           bash -n tests/check-spark-hadoop.sh
           bash -n tests/check-data-seed.sh
           bash -n tests/check-reexec.sh
-          bash -n tests/check-shell-ls.sh
 
       - name: Data-seed no-clobber test
         run: bash tests/check-data-seed.sh
@@ -135,5 +134,7 @@ jobs:
       - name: Self-update re-exec test
         run: bash tests/check-reexec.sh
 
-      - name: Shell ls/eza fallback test
-        run: bash tests/check-shell-ls.sh
+      - name: Shell ls/eza + oh-my-zsh-alias regression test (zsh)
+        run: |
+          command -v zsh >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq zsh; }
+          zsh tests/check-shell-ls.zsh
