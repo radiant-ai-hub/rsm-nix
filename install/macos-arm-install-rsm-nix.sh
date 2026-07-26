@@ -9,6 +9,7 @@ WORKSPACE_PATH="$HOME/rsm-msba"   # your coursework + state (not a git repo)
 SKIP_VSCODE=0
 SKIP_WORKSPACE_SETUP=0
 DRY_RUN=0
+SIMULATE_BROKEN_NIX_VOLUME=0   # test hook: pretend a half-created Nix volume exists
 
 # Fallback extension list, used only if vscode/extensions.txt can't be fetched.
 # The curated list lives in vscode/extensions.txt in the repo.
@@ -32,6 +33,8 @@ Options:
   --skip-vscode              Do not install VS Code or extensions.
   --skip-workspace-setup     Do not clone/build the RSM workspace.
   --dry-run                  Check requirements without changing the host.
+  --simulate-broken-nix-volume  (testing) Exercise the half-created Nix-volume
+                             recovery path without touching real APFS volumes.
   -h, --help                 Show this help.
 EOF
 }
@@ -56,6 +59,12 @@ while [ "$#" -gt 0 ]; do
       ;;
     --dry-run)
       DRY_RUN=1
+      shift
+      ;;
+    --simulate-broken-nix-volume)
+      # Test/demo only: force the "a previous run left an unmounted Nix Store
+      # volume" branch so the recovery UX can be exercised without real APFS.
+      SIMULATE_BROKEN_NIX_VOLUME=1
       shift
       ;;
     -h|--help)
@@ -350,22 +359,206 @@ install_tailscale() {
   log_detail "OWN account, then accept the instructor's share link to reach the server."
 }
 
+# --- Determinate Nix install + half-created-volume recovery ----------------
+# On some Macs (seen on brand-new machines that have effectively never rebooted)
+# the Determinate installer creates the encrypted "Nix Store" APFS volume but
+# cannot mount it at /nix ("Volume on disk3sX failed to mount"), then aborts.
+# It leaves the volume plus /etc/synthetic.conf and /etc/fstab entries behind,
+# so every re-run fails identically. The functions below detect that state,
+# offer to clean it up (never without confirmation), and tell the student to
+# restart and re-run -- a restart activates the /nix mount point.
+
+is_yes() {
+  case "$1" in
+    [Yy]|[Yy][Ee][Ss]) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+prompt_yes_no() {
+  # Ask a y/N question on the controlling terminal. stdin is the `curl | bash`
+  # pipe, so read from /dev/tty. RSM_ASSUME_ANSWER overrides for tests/CI. With
+  # no answer and no tty we return "no" -- destructive steps never run silently.
+  local prompt="$1" ans=""
+  if [ -n "${RSM_ASSUME_ANSWER:-}" ]; then
+    ans="$RSM_ASSUME_ANSWER"
+  elif [ -r /dev/tty ]; then
+    printf '%s ' "$prompt" > /dev/tty
+    IFS= read -r ans < /dev/tty || ans=""
+  else
+    return 1
+  fi
+  is_yes "$ans"
+}
+
+nix_install_state() {
+  # Pure decision helper. Args: nix_present volume_exists nix_mounted (each 1/0).
+  #   skip    -- nix already works, do nothing
+  #   cleanup -- a half-created volume exists but isn't mounted; recover first
+  #   install -- clean slate, install normally
+  local nix_present="$1" vol_exists="$2" mounted="$3"
+  if [ "$nix_present" = "1" ]; then echo skip; return; fi
+  if [ "$vol_exists" = "1" ] && [ "$mounted" != "1" ]; then echo cleanup; return; fi
+  echo install
+}
+
+nix_store_volume_id() {
+  # Device identifier (diskXsY) of the 'Nix Store' APFS volume, or empty.
+  # When the volume doesn't exist `diskutil info` exits non-zero; capture it in
+  # its own substitution (no pipe) so `set -e -o pipefail` doesn't abort here --
+  # a missing volume is the normal case, not an error.
+  if [ "${SIMULATE_BROKEN_NIX_VOLUME:-0}" = "1" ]; then
+    printf 'disk9s9\n'
+    return 0
+  fi
+  local info
+  info="$(diskutil info "Nix Store" 2>/dev/null)" || return 0
+  printf '%s\n' "$info" \
+    | awk -F: '/Device Identifier/ { gsub(/[[:space:]]/, "", $2); print $2; exit }'
+}
+
+nix_is_mounted() {
+  if [ "${SIMULATE_BROKEN_NIX_VOLUME:-0}" = "1" ]; then return 1; fi
+  mount 2>/dev/null | grep -q ' /nix '
+}
+
+strip_lines_privileged() {
+  # Remove lines matching extended-regex $1 from file $2 (needs root in prod;
+  # tests shim `sudo`). Portable rewrite-via-temp so it works with GNU and BSD
+  # sed alike. Missing file is a no-op.
+  local pattern="$1" file="$2" tmp
+  [ -e "$file" ] || return 0
+  tmp="$(mktemp)"
+  grep -vE "$pattern" "$file" > "$tmp" 2>/dev/null || true
+  sudo cp "$tmp" "$file"
+  rm -f "$tmp"
+}
+
+remove_stale_nix_volume() {
+  # Undo a half-created Determinate install. Prefer Determinate's own uninstaller
+  # when it's reachable (it usually isn't -- it lives under the /nix that never
+  # mounted), then delete the leftover volume and clear ONLY the /nix mount
+  # config so a fresh install can recreate everything.
+  local vol_id="$1"
+  if [ -x /nix/nix-installer ]; then
+    log_detail "Removing the partial install with the Determinate uninstaller..."
+    sudo /nix/nix-installer uninstall --no-confirm \
+      || log_detail "  uninstaller reported an error; continuing with manual cleanup."
+  fi
+  if [ -n "$vol_id" ]; then
+    log_detail "Deleting APFS volume $vol_id ('Nix Store')..."
+    sudo diskutil apfs deleteVolume "$vol_id" \
+      || log_detail "  could not delete $vol_id automatically; remove it in Disk Utility."
+  fi
+  log_detail "Clearing the leftover /nix mount configuration..."
+  # synthetic.conf: the firmlink line is exactly 'nix' (optionally 'nix<TAB>...').
+  # Anchored so paths like /data/nixcache or 'nixpkgs' are left untouched.
+  strip_lines_privileged '^nix([[:space:]].*)?$' "${RSM_SYNTHETIC_CONF:-/etc/synthetic.conf}"
+  # fstab: only the '/nix apfs ...' entry, not other apfs volumes or /opt/nix*.
+  strip_lines_privileged '(^|[[:space:]])/nix[[:space:]]+apfs' "${RSM_FSTAB:-/etc/fstab}"
+  sudo security delete-generic-password -s "Nix Store" \
+    /Library/Keychains/System.keychain >/dev/null 2>&1 || true
+}
+
+print_restart_instructions() {
+  cat <<'EOF'
+
+    Next step: restart your Mac yourself, then run the same install command
+    again. The restart activates the /nix mount point, after which Nix installs
+    cleanly:
+
+      curl -fsSL https://raw.githubusercontent.com/radiant-ai-hub/rsm-nix/main/install/macos-arm-install-rsm-nix.sh | bash
+EOF
+}
+
+print_manual_cleanup_instructions() {
+  local vol_id="$1"
+  cat <<EOF
+
+    Leaving it in place. To finish Nix setup later, remove the volume, restart
+    your Mac, and run the install command again:
+
+      sudo diskutil apfs deleteVolume $vol_id
+      # then restart your Mac and re-run the installer
+EOF
+}
+
+handle_stale_nix_volume() {
+  local vol_id="$1"
+  log_detail "A previous Nix install left an unmounted 'Nix Store' volume ($vol_id)."
+  log_detail "This is why the install failed and why re-running keeps failing. It is"
+  log_detail "safe to remove -- Nix recreates it on the next run."
+
+  if [ "$DRY_RUN" -eq 1 ]; then
+    log_detail "[dry-run] Would ask to remove volume $vol_id and clear its"
+    log_detail "[dry-run] /etc/synthetic.conf and /etc/fstab entries."
+    print_restart_instructions
+    return
+  fi
+
+  if ! prompt_yes_no "Remove the leftover 'Nix Store' volume $vol_id now? [y/N]"; then
+    print_manual_cleanup_instructions "$vol_id"
+    exit 1
+  fi
+
+  remove_stale_nix_volume "$vol_id"
+  print_restart_instructions
+  # A restart is required before Nix can be reinstalled, so stop here.
+  exit 1
+}
+
+install_determinate_nix() {
+  # Single point that runs the upstream installer; kept in its own function so
+  # `if ! install_determinate_nix` can capture failure (set -e is suppressed for
+  # a function used as a condition).
+  curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix \
+    | sh -s -- install --no-confirm
+}
+
 install_nix() {
   log_section "Checking Determinate Nix"
 
   source_nix_profile
-  if command_exists nix; then
-    log_detail "Nix already installed: $(nix --version)"
+
+  if [ "${SIMULATE_BROKEN_NIX_VOLUME:-0}" = "1" ]; then
+    handle_stale_nix_volume "$(nix_store_volume_id)"
     return
   fi
+
+  local nix_present=0 vol_exists=0 mounted=0 vol_id state
+  command_exists nix && nix_present=1
+  vol_id="$(nix_store_volume_id)"
+  [ -n "$vol_id" ] && vol_exists=1
+  nix_is_mounted && mounted=1
+  state="$(nix_install_state "$nix_present" "$vol_exists" "$mounted")"
+
+  case "$state" in
+    skip)
+      log_detail "Nix already installed: $(nix --version)"
+      return
+      ;;
+    cleanup)
+      handle_stale_nix_volume "$vol_id"
+      return
+      ;;
+  esac
 
   if [ "$DRY_RUN" -eq 1 ]; then
     log_detail "[dry-run] Would install Determinate Nix."
     return
   fi
 
-  curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix \
-    | sh -s -- install --no-confirm
+  if ! install_determinate_nix; then
+    # The common first-run failure IS the mount failure above: the volume got
+    # created but couldn't mount. Re-detect and route into the same recovery.
+    vol_id="$(nix_store_volume_id)"
+    if [ -n "$vol_id" ] && ! nix_is_mounted; then
+      handle_stale_nix_volume "$vol_id"
+      return
+    fi
+    echo "Determinate Nix installation failed." >&2
+    exit 1
+  fi
 
   source_nix_profile
   if ! command_exists nix; then
@@ -481,23 +674,28 @@ setup_workspace() {
   RSM_WORKSPACE="$workspace" nix develop "$flake" -c bash "$flake/tests/check-folders.sh"
 }
 
-printf '%s\n' "Rady School of Management @ UCSD"
-printf '%s\n' "RSM-MSBA Nix Installer for macOS Apple Silicon"
-printf '%s\n' "=============================================="
+# RSM_INSTALLER_NOEXEC=1 lets tests source this file (defining the functions
+# above) without running the installer -- safe for `curl | bash`, which never
+# sets it.
+if [ "${RSM_INSTALLER_NOEXEC:-0}" != "1" ]; then
+  printf '%s\n' "Rady School of Management @ UCSD"
+  printf '%s\n' "RSM-MSBA Nix Installer for macOS Apple Silicon"
+  printf '%s\n' "=============================================="
 
-if [ "$DRY_RUN" -eq 1 ]; then
-  log_detail "Mode: dry-run (no host mutations)"
+  if [ "$DRY_RUN" -eq 1 ]; then
+    log_detail "Mode: dry-run (no host mutations)"
+  fi
+  log_detail "Workspace: $(expand_workspace_path)"
+
+  ensure_supported_system
+  ensure_xcode_command_line_tools
+  install_vscode
+  install_nerd_font
+  install_tailscale
+  install_nix
+  configure_direnv
+  setup_workspace
+
+  printf '\n%s\n' "Installation complete."
+  printf '%s\n' "Open VS Code and use File > Open Folder for $(expand_workspace_path)."
 fi
-log_detail "Workspace: $(expand_workspace_path)"
-
-ensure_supported_system
-ensure_xcode_command_line_tools
-install_vscode
-install_nerd_font
-install_tailscale
-install_nix
-configure_direnv
-setup_workspace
-
-printf '\n%s\n' "Installation complete."
-printf '%s\n' "Open VS Code and use File > Open Folder for $(expand_workspace_path)."
