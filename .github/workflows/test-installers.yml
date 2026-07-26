@@ -102,6 +102,19 @@ jobs:
       - name: Run dry-run validation
         run: bash install/macos-arm-install-rsm-nix.sh --dry-run --skip-workspace-setup
 
+      - name: Regression - recovers a half-created Nix Store volume
+        run: |
+          # -simulate-broken-nix-volume forces the "a previous run left an
+          # unmounted Nix Store volume" branch. In --dry-run it must PROPOSE
+          # cleanup and tell the student to restart, and must NOT delete anything.
+          out="$(bash install/macos-arm-install-rsm-nix.sh --dry-run --skip-vscode --skip-workspace-setup --simulate-broken-nix-volume 2>&1)"
+          echo "$out"
+          for needle in "Nix Store" "restart your Mac"; do
+            echo "$out" | grep -qi "$needle" || { echo "FAIL: expected '$needle' in the recovery dry-run output"; exit 1; }
+          done
+          echo "$out" | grep -qi "deleteVolume" && { echo "FAIL: dry-run must not run diskutil deleteVolume"; exit 1; } || true
+          echo "OK: half-created Nix Store volume is detected, cleanup proposed, no auto-delete/reboot."
+
   linux:
     name: Shell syntax
     runs-on: ubuntu-26.04
@@ -127,12 +140,16 @@ jobs:
           bash -n tests/check-spark-hadoop.sh
           bash -n tests/check-data-seed.sh
           bash -n tests/check-reexec.sh
+          bash -n tests/check-macos-nix-recovery.sh
 
       - name: Data-seed no-clobber test
         run: bash tests/check-data-seed.sh
 
       - name: Self-update re-exec test
         run: bash tests/check-reexec.sh
+
+      - name: macOS half-created Nix-volume recovery test
+        run: bash tests/check-macos-nix-recovery.sh
 
       - name: Shell ls/eza + oh-my-zsh-alias regression test (zsh)
         run: |
