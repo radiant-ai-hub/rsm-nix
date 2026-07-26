@@ -143,6 +143,7 @@ jobs:
           bash -n tests/check-macos-nix-recovery.sh
           bash -n tests/check-vscode-keybindings.sh
           bash -n tests/check-vscode-ext.sh
+          bash -n tests/check-vscode-settings.sh
 
       - name: Data-seed no-clobber test
         run: bash tests/check-data-seed.sh
@@ -158,6 +159,9 @@ jobs:
 
       - name: VS Code extension sync (headless code-server) test
         run: bash tests/check-vscode-ext.sh
+
+      - name: VS Code per-folder settings/keybindings test
+        run: bash tests/check-vscode-settings.sh
 
       - name: Shell ls/eza + oh-my-zsh-alias regression test (zsh)
         run: |
