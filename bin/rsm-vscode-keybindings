@@ -1,0 +1,90 @@
+# rsm-vscode-keybindings: merge the curated VS Code keybindings
+# (vscode/keybindings.json in the flake) into a User keybindings.json.
+#
+#   rsm-vscode-keybindings <vscode-user-dir>
+#
+# VS Code keybindings are USER-scoped -- there is NO per-workspace keybindings
+# file -- so this targets the platform User dir (.../Code/User), not a folder's
+# .vscode/. On a headless server it is a no-op caller-side (rsm-setup only calls
+# it on a laptop): VS Code runs on the student's laptop over Remote-SSH and uses
+# the laptop's keybindings, so server-side ones would never apply.
+#
+# Non-destructive and idempotent: the curated bindings win (any existing entry
+# with the same key+command+when is replaced), bindings the student added are
+# kept, and a file that isn't plain JSON (e.g. it has // comments) is left
+# untouched rather than clobbered.
+
+_dir="${1:-}"
+if [ -z "$_dir" ]; then
+  echo "usage: rsm-vscode-keybindings <vscode-user-dir>" >&2
+  exit 2
+fi
+
+_curated="$RSM_FLAKE/vscode/keybindings.json"
+if [ ! -f "$_curated" ]; then
+  echo "rsm-vscode-keybindings: no curated keybindings at $_curated" >&2
+  exit 0
+fi
+
+mkdir -p "$_dir"
+_dest="$_dir/keybindings.json"
+
+# Prefer the nix-uv python (always present after rsm-python-sync); fall back to a
+# system python3 so this still works standalone in a test/CI shell.
+if [ -x "$RSM_UV_ENV/bin/python" ]; then
+  _py="$RSM_UV_ENV/bin/python"
+elif command -v python3 >/dev/null 2>&1; then
+  _py="python3"
+else
+  _py=""
+fi
+
+if [ -n "$_py" ]; then
+  if "$_py" - "$_dest" "$_curated" <<'PY'
+import json, os, sys
+
+dest, curated = sys.argv[1], sys.argv[2]
+with open(curated) as f:
+    ours = json.load(f)
+
+existing = []
+if os.path.isfile(dest):
+    try:
+        with open(dest) as f:
+            text = f.read().strip()
+        existing = json.loads(text) if text else []
+    except Exception:
+        # // comments or otherwise not plain JSON -> do not touch the student's file
+        sys.exit(3)
+    if not isinstance(existing, list):
+        existing = []
+
+def ident(b):
+    return (b.get("key"), b.get("command"), b.get("when"))
+
+ours_ids = {ident(b) for b in ours if isinstance(b, dict)}
+# Drop any existing binding our curated set overrides, then append ours (later
+# entries win in VS Code), so re-runs are idempotent and ours stay authoritative.
+merged = [b for b in existing
+          if not (isinstance(b, dict) and ident(b) in ours_ids)]
+merged.extend(ours)
+
+with open(dest, "w") as f:
+    json.dump(merged, f, indent=2)
+    f.write("\n")
+print("keybindings: merged %d RSM bindings -> %s" % (len(ours), dest))
+PY
+  then
+    :
+  else
+    echo "keybindings: left $_dest untouched (has // comments or isn't plain JSON); add the RSM bindings manually" >&2
+  fi
+else
+  # No python available to merge: only create when there is nothing to preserve.
+  if [ ! -s "$_dest" ]; then
+    cp -f "$_curated" "$_dest"
+    echo "keybindings: installed -> $_dest"
+  else
+    echo "keybindings: skipped ($_dest exists and no python is available to merge)" >&2
+  fi
+fi

@@ -4,9 +4,15 @@
 # Why this exists: VS Code's Remote-WSL / Remote-SSH splits extensions into a
 # local (UI) side and a remote side. The installer's host-side install only
 # covers the UI side, so Python/Jupyter/etc. are missing in the WSL/server
-# host. Run this command from the VS Code integrated terminal that is connected
-# to WSL (or to the server) — there `code` is the remote CLI, so the extensions
-# install in that remote, which is where coursework actually runs.
+# host. This resolves a CLI that installs into that remote (~/.vscode-server):
+# the integrated terminal's `code`, or -- when run from a PLAIN server/WSL shell
+# where `code` is not on PATH -- the bundled headless `code-server`, which
+# installs to ~/.vscode-server/extensions WITHOUT a running VS Code window. So a
+# student gets the extensions whether or not they run this inside VS Code.
+
+# Silence Node's url.parse/DEP0169 deprecation noise that the bundled
+# code-server prints on every invocation.
+export NODE_NO_WARNINGS=1
 
 ext_file="$RSM_FLAKE/vscode/extensions.txt"
 
@@ -15,31 +21,50 @@ if [ ! -f "$ext_file" ]; then
   exit 1
 fi
 
-# Resolve the `code` CLI. In a VS Code integrated terminal it's on PATH (the
-# remote CLI). In a plain WSL shell it may not be — the installer disables
-# Windows PATH interop (so a Windows node/claude can't shadow the WSL ones),
-# which also drops the Windows `code` from PATH. Fall back to an explicit path
-# ($RSM_CODE_BIN, set by the Windows installer) or the Windows VS Code Linux
-# shim under /mnt/c; invoked from within WSL it still installs into the WSL
-# remote (~/.vscode-server), which is what we want.
+# Newest bundled VS Code *server* CLI under ~/.vscode-server. Unlike the
+# remote-cli `code` (which needs a live window via VSCODE_IPC_HOOK_CLI), this
+# `code-server` installs headlessly straight into ~/.vscode-server/extensions,
+# so it works from ANY server/WSL shell. Both server layouts are covered. The
+# `|| true` keeps a non-matching glob (ls exits non-zero under pipefail) from
+# aborting the caller.
+find_server_code() {
+  # ls -dt sorts the glob matches by mtime; the paths are fixed VS Code layouts
+  # with no odd characters, so SC2012's find-instead-of-ls caveat doesn't apply.
+  # shellcheck disable=SC2012
+  ls -dt \
+    "$HOME"/.vscode-server/cli/servers/*/server/bin/code-server \
+    "$HOME"/.vscode-server/bin/*/bin/code-server \
+    2>/dev/null | head -n1 || true
+}
+
+# Resolve a `code`-like CLI. Priority: an explicit path ($RSM_CODE_BIN, set by
+# the Windows installer) -> the integrated-terminal `code` on PATH (does a live
+# install) -> the headless bundled code-server (plain server/WSL shell) -> the
+# Windows VS Code Linux shim under /mnt/c (installs into the WSL remote).
 code_bin=""
 if [ -n "${RSM_CODE_BIN:-}" ] && [ -x "${RSM_CODE_BIN}" ]; then
   code_bin="$RSM_CODE_BIN"
 elif command -v code >/dev/null 2>&1; then
   code_bin="code"
 else
-  for c in /mnt/c/Users/*/AppData/Local/Programs/"Microsoft VS Code"/bin/code \
-           "/mnt/c/Program Files/Microsoft VS Code/bin/code" \
-           "/mnt/c/Program Files (x86)/Microsoft VS Code/bin/code"; do
-    if [ -x "$c" ]; then code_bin="$c"; break; fi
-  done
+  _server_code="$(find_server_code)"
+  if [ -n "$_server_code" ] && [ -x "$_server_code" ]; then
+    code_bin="$_server_code"
+  else
+    for c in /mnt/c/Users/*/AppData/Local/Programs/"Microsoft VS Code"/bin/code \
+             "/mnt/c/Program Files/Microsoft VS Code/bin/code" \
+             "/mnt/c/Program Files (x86)/Microsoft VS Code/bin/code"; do
+      if [ -x "$c" ]; then code_bin="$c"; break; fi
+    done
+  fi
 fi
 
 if [ -z "$code_bin" ]; then
-  echo "rsm-vscode-ext: the 'code' command is not available in this terminal." >&2
-  echo "  Open ~/rsm-msba in VS Code and run 'rsm-vscode-ext' in ITS integrated" >&2
-  echo "  terminal — that 'code' targets the WSL/SSH remote, so the extensions" >&2
-  echo "  install there (not just on your laptop)." >&2
+  echo "rsm-vscode-ext: no VS Code CLI found (neither 'code' on PATH nor a" >&2
+  echo "  ~/.vscode-server install)." >&2
+  echo "  Connect to this machine once with VS Code (Remote-SSH or Remote-WSL)," >&2
+  echo "  then re-run 'rsm-vscode-ext' — extensions install into that remote" >&2
+  echo "  (not just on your laptop), even from a plain SSH shell." >&2
   exit 1
 fi
 

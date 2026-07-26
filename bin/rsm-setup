@@ -97,7 +97,8 @@ rsm-python-sync
 #     config is generated in one place. ${workspaceFolder} keeps the file identical
 #     for every student/OS; running after the sync gives the curated-settings merge
 #     the nix-uv python. (VS Code reads workspace settings.json on the remote;
-#     keybindings are user-scoped and installed on the laptop by the installer.)
+#     keybindings are user-scoped -- there is no per-workspace keybindings file --
+#     so they are installed into the User dir on a laptop by step 1e below.)
 rsm-vscode-settings "$RSM_WORKSPACE" \
   --interp "\${workspaceFolder}/.rsm-msba/envs/nix-uv/bin/python" \
   --zdotdir "\${workspaceFolder}/.rsm-msba/zsh"
@@ -164,6 +165,28 @@ PY
   else
     echo "    note      : left local VS Code User settings.json untouched (unparseable JSON); set python.defaultInterpreterPath to $RSM_UV_ENV/bin/python manually" >&2
   fi
+fi
+
+# 1e. VS Code keybindings (User-scoped -- VS Code has NO per-workspace
+#     keybindings, so these cannot live in a workspace .vscode/). Merge the
+#     curated bindings (vscode/keybindings.json) into the LOCAL User dir when
+#     this is a laptop with VS Code. SKIPPED on a headless server: there VS Code
+#     runs on the student's laptop over Remote-SSH and uses the laptop's
+#     keybindings, so a server-side file would never apply. Detect "laptop" by
+#     an existing local Code User dir (never present on a headless server), plus
+#     the app itself on macOS so a fresh install gets them before first launch.
+case "$(uname -s)" in
+  Darwin) _kb_user_dir="$HOME/Library/Application Support/Code/User" ;;
+  *)      _kb_user_dir="$HOME/.config/Code/User" ;;
+esac
+_kb_local=0
+[ -d "$_kb_user_dir" ] && _kb_local=1
+if [ "$(uname -s)" = "Darwin" ] &&
+   { [ -d "/Applications/Visual Studio Code.app" ] || [ -d "$HOME/Applications/Visual Studio Code.app" ]; }; then
+  _kb_local=1
+fi
+if [ "$_kb_local" = "1" ] && command -v rsm-vscode-keybindings >/dev/null 2>&1; then
+  rsm-vscode-keybindings "$_kb_user_dir" 2>&1 | sed 's/^/    /' || true
 fi
 
 # 2. Jupyter kernelspec so VS Code / Jupyter can find the nix-uv environment.
@@ -373,20 +396,19 @@ if [ -n "${RSM_SKILLS_SRC:-}" ] && [ -d "$RSM_SKILLS_SRC" ]; then
   done
 fi
 
-# 6c. VS Code extensions into the CONNECTED remote. rsm-vscode-ext needs `code`
-#     on PATH, which is only true in the VS Code integrated terminal (Remote-SSH
-#     on the server, or Remote-WSL) where `code` is the remote CLI. When rsm-setup
-#     is run there, install the curated extensions automatically -- so on a server
-#     no separate `rsm-vscode-ext` step is needed. From a plain SSH shell `code`
-#     isn't present, so we skip and point at the manual command. Non-fatal, and
-#     fast on re-runs (rsm-vscode-ext only installs what's missing).
+# 6c. VS Code extensions into the connected/served remote. rsm-vscode-ext finds
+#     the right CLI itself: the remote `code` when run in a VS Code integrated
+#     terminal (a live install), or -- when run from a PLAIN server/WSL shell --
+#     the bundled headless `code-server` under ~/.vscode-server, which installs
+#     into ~/.vscode-server/extensions with no running window. So a student on
+#     the server gets the curated extensions whether or not they run rsm-setup
+#     inside VS Code (they must have connected with VS Code at least once, which
+#     creates ~/.vscode-server). Non-fatal; fast on re-runs (installs only what's
+#     missing). Its stderr is shown (not swallowed) so a "connect once" hint is
+#     visible when there is no ~/.vscode-server yet.
 if command -v rsm-vscode-ext >/dev/null 2>&1; then
-  if command -v code >/dev/null 2>&1; then
-    echo "    vscode    : syncing extensions into the connected VS Code remote..."
-    rsm-vscode-ext 2>/dev/null | sed 's/^/    vscode    : /' || true
-  else
-    echo "    vscode    : open this workspace in VS Code, or run 'rsm-vscode-ext' in its terminal, to add extensions"
-  fi
+  echo "    vscode    : syncing extensions into the VS Code remote..."
+  rsm-vscode-ext 2>&1 | sed 's/^/    vscode    : /' || true
 fi
 
 # 7. Approve the generated workspace .envrc so entering ~/rsm-msba "just works"

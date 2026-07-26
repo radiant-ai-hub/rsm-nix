@@ -192,7 +192,7 @@
           # the assembled zsh assets + the ZDOTDIR template it installs.
           rsm-setup = pkgs.writeShellApplication {
             name = "rsm-setup";
-            runtimeInputs = [ pythonSync pkgs.uv pkgs.python313 pkgs.coreutils pkgs.git pkgs.nodejs_22 rsm-version rsm-vscode-settings rsm-vscode-ext ];
+            runtimeInputs = [ pythonSync pkgs.uv pkgs.python313 pkgs.coreutils pkgs.git pkgs.nodejs_22 rsm-version rsm-vscode-settings rsm-vscode-ext rsm-vscode-keybindings ];
             excludeShellChecks = [ "SC1090" "SC1091" "SC2164" ];
             text = rsmEnvHeader + "\n" + nativeEnvHook pkgs + ''
               export RSM_OMZ_SRC="${zshOmz}"
@@ -242,6 +242,10 @@
           # RSM terminal shell, curated settings). Shared by rsm-setup +
           # rsm-new-project.
           rsm-vscode-settings = mk "rsm-vscode-settings" [ pkgs.coreutils pkgs.gnused pkgs.gnugrep ];
+          # Merges the curated VS Code keybindings (vscode/keybindings.json) into
+          # the User keybindings.json. User-scoped (VS Code has no per-workspace
+          # keybindings); called by rsm-setup on a laptop only.
+          rsm-vscode-keybindings = mk "rsm-vscode-keybindings" [ pkgs.coreutils ];
           # Makes a folder a first-class RSM project (nested under ~/rsm-msba via
           # source_up, or standalone anywhere via `use flake`): writes .envrc +
           # .vscode config and `direnv allow`s it, so opening it directly in VS
