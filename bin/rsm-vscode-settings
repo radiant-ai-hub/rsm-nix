@@ -83,3 +83,11 @@ cat > "$_target/.vscode/extensions.json" <<EOF
   "recommendations": [$_recs]
 }
 EOF
+
+# keybindings.json: copy the curated RSM bindings into every folder's .vscode/,
+# so each folder created by rsm-setup / rsm-new-project / rsm-mkdir / rsm-clone
+# carries them. Refreshed each run like settings.json above.
+_kb_file="$RSM_FLAKE/vscode/keybindings.json"
+if [ -f "$_kb_file" ]; then
+  cp -f "$_kb_file" "$_target/.vscode/keybindings.json"
+fi
