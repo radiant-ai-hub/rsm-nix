@@ -141,6 +141,8 @@ jobs:
           bash -n tests/check-data-seed.sh
           bash -n tests/check-reexec.sh
           bash -n tests/check-macos-nix-recovery.sh
+          bash -n tests/check-vscode-keybindings.sh
+          bash -n tests/check-vscode-ext.sh
 
       - name: Data-seed no-clobber test
         run: bash tests/check-data-seed.sh
@@ -150,6 +152,12 @@ jobs:
 
       - name: macOS half-created Nix-volume recovery test
         run: bash tests/check-macos-nix-recovery.sh
+
+      - name: VS Code keybindings merge test
+        run: bash tests/check-vscode-keybindings.sh
+
+      - name: VS Code extension sync (headless code-server) test
+        run: bash tests/check-vscode-ext.sh
 
       - name: Shell ls/eza + oh-my-zsh-alias regression test (zsh)
         run: |
