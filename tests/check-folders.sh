@@ -33,12 +33,24 @@ for d in envs uv-cache jupyter postgres zsh logs; do
 done
 if [ -x "$RSM_UV_ENV/bin/python" ]; then ok "nix-uv env (envs/nix-uv)"; else bad "missing nix-uv env (run rsm-setup)"; fi
 
-echo "== course folders from courses.txt (under the workspace) =="
+echo "== course folders from courses.txt (first-class, like rsm-mkdir) =="
 if [ -f "$RSM_FLAKE/courses.txt" ]; then
   while IFS= read -r course || [ -n "$course" ]; do
     course="${course%%#*}"; course="$(printf '%s' "$course" | tr -d '[:space:]')"
     [ -z "$course" ] && continue
-    if [ -d "$RSM_WORKSPACE/$course" ]; then ok "$course/"; else bad "missing course folder $course/ (run rsm-setup)"; fi
+    cdir="$RSM_WORKSPACE/$course"
+    if [ ! -d "$cdir" ]; then bad "missing course folder $course/ (run rsm-setup)"; continue; fi
+    ok "$course/"
+    # Set up like rsm-mkdir: a source_up .envrc (inherits nix-uv) + full .vscode
+    # so the folder opens directly in VS Code with the RSM config.
+    if [ -f "$cdir/.envrc" ] && grep -q '^source_up' "$cdir/.envrc"; then
+      ok "$course/.envrc (source_up -> shared nix-uv)"
+    else
+      bad "$course/.envrc missing or not source_up (course folder not first-class)"
+    fi
+    for vf in settings.json keybindings.json; do
+      if [ -f "$cdir/.vscode/$vf" ]; then ok "$course/.vscode/$vf"; else bad "missing $course/.vscode/$vf"; fi
+    done
   done < "$RSM_FLAKE/courses.txt"
 fi
 

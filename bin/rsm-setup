@@ -19,43 +19,55 @@ echo "    state     : $RSMBASE"
 # after deleting ~/rsm-nix), and fast-forwards it to the latest otherwise (so
 # `rsm-setup` doubles as the update command). All environment content
 # (packages, examples, zsh, scripts) then comes from this one place.
-_head_before="$(git -C "$RSM_FLAKE" rev-parse HEAD 2>/dev/null || echo none)"
-if [ ! -e "$RSM_FLAKE/flake.nix" ]; then
-  echo "    flake     : cloning rsm-nix -> $RSM_FLAKE"
-  git clone https://github.com/radiant-ai-hub/rsm-nix.git "$RSM_FLAKE"
-elif [ -d "$RSM_FLAKE/.git" ]; then
-  if git -C "$RSM_FLAKE" pull --ff-only >/dev/null 2>&1; then
-    echo "    flake     : updated $RSM_FLAKE to latest"
-  else
-    # Fast-forward failed. This clone is meant to be PRISTINE -- every student
-    # edit lives in ~/rsm-msba, never here -- so a non-ff almost always means the
-    # upstream history was rewritten (a force-push) and this clone has diverged.
-    # Left alone, `git pull` keeps failing silently and the student is stranded on
-    # an old commit forever (never receiving fixes). Re-sync HARD to the upstream
-    # default branch. Guarded so we never nuke a clone that isn't ours or that has
-    # uncommitted edits; the discarded commits are still reachable via the backup
-    # tag for a while, just in case.
-    _origin="$(git -C "$RSM_FLAKE" remote get-url origin 2>/dev/null || true)"
-    if printf '%s' "$_origin" | grep -q 'radiant-ai-hub/rsm-nix' &&
-       [ -z "$(git -C "$RSM_FLAKE" status --porcelain 2>/dev/null)" ] &&
-       git -C "$RSM_FLAKE" fetch --quiet origin 2>/dev/null; then
-      _defbranch="$(git -C "$RSM_FLAKE" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')"
-      [ -n "$_defbranch" ] || _defbranch=main
-      git -C "$RSM_FLAKE" tag -f rsm-presync-backup HEAD >/dev/null 2>&1 || true
-      if git -C "$RSM_FLAKE" reset --hard "origin/$_defbranch" >/dev/null 2>&1; then
-        echo "    flake     : re-synced $RSM_FLAKE to origin/$_defbranch (upstream history had diverged)"
-      fi
+# RSM_SKIP_FLAKE_UPDATE=1 uses $RSM_FLAKE EXACTLY as-is: no clone, no git pull,
+# no self-update re-exec. CI sets it (with RSM_FLAKE pointed at the checkout) so
+# the E2E exercises the branch's own rsm-setup -- otherwise this would clone main
+# into ~/rsm-nix and hand off to main's copy, and a PR's rsm-setup changes would
+# never actually run. Also handy for an offline or deliberately pinned flake.
+if [ -z "${RSM_SKIP_FLAKE_UPDATE:-}" ]; then
+  # Make sure the flake is present and current. This makes `rsm-setup` the single
+  # command for everything: it clones the flake if it is missing (so it works even
+  # after deleting ~/rsm-nix), and fast-forwards it to the latest otherwise (so
+  # `rsm-setup` doubles as the update command). All environment content
+  # (packages, examples, zsh, scripts) then comes from this one place.
+  _head_before="$(git -C "$RSM_FLAKE" rev-parse HEAD 2>/dev/null || echo none)"
+  if [ ! -e "$RSM_FLAKE/flake.nix" ]; then
+    echo "    flake     : cloning rsm-nix -> $RSM_FLAKE"
+    git clone https://github.com/radiant-ai-hub/rsm-nix.git "$RSM_FLAKE"
+  elif [ -d "$RSM_FLAKE/.git" ]; then
+    if git -C "$RSM_FLAKE" pull --ff-only >/dev/null 2>&1; then
+      echo "    flake     : updated $RSM_FLAKE to latest"
     else
-      echo "    flake     : WARNING — could not update $RSM_FLAKE (diverged, or has local changes); leaving it untouched" >&2
+      # Fast-forward failed. This clone is meant to be PRISTINE -- every student
+      # edit lives in ~/rsm-msba, never here -- so a non-ff almost always means the
+      # upstream history was rewritten (a force-push) and this clone has diverged.
+      # Left alone, `git pull` keeps failing silently and the student is stranded on
+      # an old commit forever (never receiving fixes). Re-sync HARD to the upstream
+      # default branch. Guarded so we never nuke a clone that isn't ours or that has
+      # uncommitted edits; the discarded commits are still reachable via the backup
+      # tag for a while, just in case.
+      _origin="$(git -C "$RSM_FLAKE" remote get-url origin 2>/dev/null || true)"
+      if printf '%s' "$_origin" | grep -q 'radiant-ai-hub/rsm-nix' &&
+         [ -z "$(git -C "$RSM_FLAKE" status --porcelain 2>/dev/null)" ] &&
+         git -C "$RSM_FLAKE" fetch --quiet origin 2>/dev/null; then
+        _defbranch="$(git -C "$RSM_FLAKE" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')"
+        [ -n "$_defbranch" ] || _defbranch=main
+        git -C "$RSM_FLAKE" tag -f rsm-presync-backup HEAD >/dev/null 2>&1 || true
+        if git -C "$RSM_FLAKE" reset --hard "origin/$_defbranch" >/dev/null 2>&1; then
+          echo "    flake     : re-synced $RSM_FLAKE to origin/$_defbranch (upstream history had diverged)"
+        fi
+      else
+        echo "    flake     : WARNING — could not update $RSM_FLAKE (diverged, or has local changes); leaving it untouched" >&2
+      fi
     fi
   fi
-fi
 
-# If the pull above brought new commits, hand off to the freshly-pulled rsm-setup
-# so ONE run applies everything -- including changes to rsm-setup itself (the
-# running copy can't). No-op when nothing changed / already re-run / can't build.
-_head_after="$(git -C "$RSM_FLAKE" rev-parse HEAD 2>/dev/null || echo none)"
-rsm_maybe_reexec "$_head_before" "$_head_after"
+  # If the pull above brought new commits, hand off to the freshly-pulled rsm-setup
+  # so ONE run applies everything -- including changes to rsm-setup itself (the
+  # running copy can't). No-op when nothing changed / already re-run / can't build.
+  _head_after="$(git -C "$RSM_FLAKE" rev-parse HEAD 2>/dev/null || echo none)"
+  rsm_maybe_reexec "$_head_before" "$_head_after"
+fi
 
 mkdir -p "$RSM_WORKSPACE"
 
@@ -293,14 +305,30 @@ if [ -n "${RSM_OMZ_SRC:-}" ] && [ -d "$RSM_OMZ_SRC" ]; then
   echo "    zsh       : oh-my-zsh + powerlevel10k -> $zdotdir (ZDOTDIR)"
 fi
 
-# 3. Pre-create course folders from the flake's courses.txt, under the workspace.
+# 3. Pre-create course folders from the flake's courses.txt, under the workspace,
+#    and set each up as a FIRST-CLASS RSM folder -- exactly like `rsm-mkdir`
+#    (rsm-new-project). So opening a course folder DIRECTLY in VS Code (not just
+#    the workspace root) gets the interpreter, the RSM zsh terminal, the curated
+#    settings, the recommended extensions and the keybindings -- and a plain
+#    `cd` still works via direnv. `source_up` keeps the shared nix-uv Python by
+#    default; a local ./.venv the student later creates auto-activates instead.
+#    Idempotent + non-destructive: a folder the student has turned into their own
+#    repo keeps its own .envrc/.vscode, and folders older runs left plain get
+#    upgraded here. Falls back to a bare mkdir if rsm-new-project isn't available.
 courses_file="$RSM_FLAKE/courses.txt"
 if [ -f "$courses_file" ]; then
   while IFS= read -r course || [ -n "$course" ]; do
     course="${course%%#*}"
     course="$(printf '%s' "$course" | tr -d '[:space:]')"
     [ -z "$course" ] && continue
-    if [ ! -d "$RSM_WORKSPACE/$course" ]; then
+    if command -v rsm-new-project >/dev/null 2>&1; then
+      if rsm-new-project "$RSM_WORKSPACE/$course" >/dev/null 2>&1; then
+        echo "    course    : $course/ ready (direnv + .vscode, shared nix-uv)"
+      else
+        mkdir -p "$RSM_WORKSPACE/$course"
+        echo "    course    : $course/ created (full setup skipped; rsm-new-project failed)" >&2
+      fi
+    elif [ ! -d "$RSM_WORKSPACE/$course" ]; then
       mkdir -p "$RSM_WORKSPACE/$course"
       echo "    course    : created $RSM_WORKSPACE/$course"
     fi

@@ -21,6 +21,13 @@ jobs:
           - name: macOS 26 ARM64
             runner: macos-26
 
+    # Exercise the CHECKED-OUT branch's rsm-setup, not main. Without these,
+    # rsm-setup clones main into ~/rsm-nix and self-update re-execs into it, so a
+    # PR's rsm-setup/content changes would never actually run in the E2E.
+    env:
+      RSM_FLAKE: ${{ github.workspace }}
+      RSM_SKIP_FLAKE_UPDATE: '1'
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
