@@ -1,5 +1,5 @@
 # rsm-clone URL [DIR]: git clone URL, then make the cloned repo direnv-ready
-# (rsm-new-project) so VS Code and the terminal use the shared nix-uv Python.
+# (rsm-mkdir) so VS Code and the terminal use the shared nix-uv Python.
 #
 # Like `git clone`, DIR defaults to the repo name and is relative to the CURRENT
 # directory -- run it inside ~/rsm-msba (the usual case) to nest it there:
@@ -30,4 +30,4 @@ fi
 
 git clone "$url" "$dir" || exit 1
 # Set up .envrc + .vscode + `direnv allow` on the freshly cloned folder.
-rsm-new-project "$dir"
+rsm-mkdir "$dir"

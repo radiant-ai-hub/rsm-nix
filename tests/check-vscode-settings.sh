@@ -3,7 +3,7 @@
 #
 # Guards bin/rsm-vscode-settings -- the shared helper that writes a folder's
 # .vscode/{settings,extensions,keybindings}.json (used by rsm-setup,
-# rsm-new-project, rsm-mkdir, rsm-clone). Requirements:
+# rsm-mkdir, rsm-clone). Requirements:
 #   * writes .vscode/keybindings.json byte-identical to the curated
 #     vscode/keybindings.json (so every created folder carries the RSM bindings)
 #   * still writes settings.json + extensions.json

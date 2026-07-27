@@ -195,11 +195,11 @@ activation step needed.
 
 **Opening one folder on its own.** To open a single course/assignment
 folder directly (its own VS Code window and git repo) with the right
-interpreter, run `rsm-new-project` in it once. Add `--venv` to give that
-folder its **own** isolated packages (`uv add …`, checked with
-`rsm-project-check`) — the conda alternative. You can also just ask
-Claude in the editor; the `rsm-project` skill handles setting up folders
-and adding/verifying packages.
+interpreter, run `rsm-mkdir .` in it once (or `rsm-mkdir <name>`). Add
+`--venv` to give that folder its **own** isolated packages (`uv add …`,
+checked with `rsm-project-check`) — the conda alternative. You can also
+just ask Claude in the editor; the `rsm-project` skill handles setting
+up folders and adding/verifying packages.
 
 > Tip: keep one VS Code window open on `~/rsm-msba` so every course
 > folder shares the same Explorer, environment, PostgreSQL, and kernel.

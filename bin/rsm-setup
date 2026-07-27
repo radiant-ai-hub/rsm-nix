@@ -105,7 +105,7 @@ mkdir -p \
 rsm-python-sync
 
 # 1b. Workspace VS Code config (.vscode/settings.json + extensions.json), via the
-#     shared helper that `rsm-new-project` also uses to scaffold nested folders -- so the
+#     shared helper that `rsm-mkdir` also uses to scaffold nested folders -- so the
 #     config is generated in one place. ${workspaceFolder} keeps the file identical
 #     for every student/OS; running after the sync gives the curated-settings merge
 #     the nix-uv python. (VS Code reads workspace settings.json on the remote;
@@ -122,7 +122,7 @@ echo "    vscode    : wrote $RSM_WORKSPACE/.vscode/{settings,extensions}.json"
 #     a leftover base-uv env. VS Code (Remote-SSH) reads this file on the server.
 #     Merge, never clobber: keep any other machine settings the student has set.
 #     Harmless if they never connect with Remote-SSH. A workspace .vscode/ (root
-#     or `rsm-new-project`) and any auto-detected ./.venv still override this fallback.
+#     or `rsm-mkdir`) and any auto-detected ./.venv still override this fallback.
 _vscode_machine="$HOME/.vscode-server/data/Machine/settings.json"
 if [ -x "$RSM_UV_ENV/bin/python" ]; then
   mkdir -p "$(dirname "$_vscode_machine")"
@@ -307,26 +307,27 @@ fi
 
 # 3. Pre-create course folders from the flake's courses.txt, under the workspace,
 #    and set each up as a FIRST-CLASS RSM folder -- exactly like `rsm-mkdir`
-#    (rsm-new-project). So opening a course folder DIRECTLY in VS Code (not just
-#    the workspace root) gets the interpreter, the RSM zsh terminal, the curated
-#    settings, the recommended extensions and the keybindings -- and a plain
-#    `cd` still works via direnv. `source_up` keeps the shared nix-uv Python by
-#    default; a local ./.venv the student later creates auto-activates instead.
-#    Idempotent + non-destructive: a folder the student has turned into their own
-#    repo keeps its own .envrc/.vscode, and folders older runs left plain get
-#    upgraded here. Falls back to a bare mkdir if rsm-new-project isn't available.
+#    (which does the per-folder work). So opening a course folder DIRECTLY in VS
+#    Code (not just the workspace root) gets the interpreter, the RSM zsh
+#    terminal, the curated settings, the recommended extensions and the
+#    keybindings -- and a plain `cd` still works via direnv. `source_up` keeps
+#    the shared nix-uv Python by default; a local ./.venv the student later
+#    creates auto-activates instead. Idempotent + non-destructive: a folder the
+#    student has turned into their own repo keeps its own .envrc/.vscode, and
+#    folders older runs left plain get upgraded here. Falls back to a bare mkdir
+#    if rsm-mkdir isn't available.
 courses_file="$RSM_FLAKE/courses.txt"
 if [ -f "$courses_file" ]; then
   while IFS= read -r course || [ -n "$course" ]; do
     course="${course%%#*}"
     course="$(printf '%s' "$course" | tr -d '[:space:]')"
     [ -z "$course" ] && continue
-    if command -v rsm-new-project >/dev/null 2>&1; then
-      if rsm-new-project "$RSM_WORKSPACE/$course" >/dev/null 2>&1; then
+    if command -v rsm-mkdir >/dev/null 2>&1; then
+      if rsm-mkdir "$RSM_WORKSPACE/$course" >/dev/null 2>&1; then
         echo "    course    : $course/ ready (direnv + .vscode, shared nix-uv)"
       else
         mkdir -p "$RSM_WORKSPACE/$course"
-        echo "    course    : $course/ created (full setup skipped; rsm-new-project failed)" >&2
+        echo "    course    : $course/ created (full setup skipped; rsm-mkdir failed)" >&2
       fi
     elif [ ! -d "$RSM_WORKSPACE/$course" ]; then
       mkdir -p "$RSM_WORKSPACE/$course"
@@ -407,7 +408,7 @@ if rsm_have_native npm; then
 fi
 
 # 6b. Install the RSM Claude Code skills user-level (~/.claude/skills), so they
-#     are available in the workspace AND in folders set up with `rsm-new-project`
+#     are available in the workspace AND in folders set up with `rsm-mkdir`
 #     anywhere. Assets come from the flake (RSM_SKILLS_SRC); refreshed each run,
 #     and only the rsm-* skills are touched (a student's own skills are left alone).
 if [ -n "${RSM_SKILLS_SRC:-}" ] && [ -d "$RSM_SKILLS_SRC" ]; then

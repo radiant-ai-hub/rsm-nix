@@ -56,7 +56,7 @@ fi
 # deprecated /opt/base-uv that /etc/zsh/zshrc auto-activates — would otherwise
 # hijack every render, silently, whenever its packages happen to overlap. A
 # project-local venv re-exports QUARTO_PYTHON AFTER this hook (see
-# rsm-new-project), so per-project overrides still win.
+# rsm-mkdir), so per-project overrides still win.
 export QUARTO_PYTHON="$RSM_UV_ENV/bin/python"
 
 # Convenience aliases (available under `nix develop`; bash).

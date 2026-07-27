@@ -4,7 +4,7 @@
 # terminal" bug on macOS, across EVERY way a student runs Python in a terminal:
 #
 #   1. the shared nix-uv environment (~/rsm-msba)
-#   2. an isolated per-project .venv (rsm-new-project --venv, sub-dir or standalone)
+#   2. an isolated per-project .venv (rsm-mkdir --venv, sub-dir or standalone)
 #
 # xgboost dlopen()s @rpath/libomp.dylib; we supply the OpenMP runtime from Nix.
 # In a terminal, macOS SIP strips DYLD_* from the environment a protected shell
@@ -73,7 +73,7 @@ else
   fail=1
 fi
 
-# --- Case 2: an isolated per-project .venv (rsm-new-project --venv) ---------
+# --- Case 2: an isolated per-project .venv (rsm-mkdir --venv) ---------
 # Emulate a project venv: a fresh uv venv (its own site-packages) with its own
 # xgboost wheel. The direnv env still exports PYTHONPATH + RSM_OMP_LIBDIR (the
 # --venv override re-points only PATH/VIRTUAL_ENV), so this .venv's python must

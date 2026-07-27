@@ -39,8 +39,9 @@
 # Reverse everything:
 #   sudo rm -f /etc/profile.d/rsm.sh /etc/direnv/direnvrc
 #   sudo rm -f /usr/local/bin/rsm-setup /usr/local/bin/rsm-msba \
-#              /usr/local/bin/rsm-update /usr/local/bin/rsm-new-project \
-#              /usr/local/bin/rsm-project-check /usr/local/bin/direnv
+#              /usr/local/bin/rsm-update /usr/local/bin/rsm-mkdir \
+#              /usr/local/bin/rsm-clone /usr/local/bin/rsm-project-check \
+#              /usr/local/bin/direnv
 #   sudo rm /nix/var/nix/profiles/rsm /nix/var/nix/profiles/rsm-*   # profile + generations
 #   # and delete the "rsm-msba (managed)" block from /etc/zsh/zshrc
 #   # (the /srv/uv-cache directory can stay or be removed)
@@ -83,19 +84,35 @@ NIXFLAGS=(--extra-experimental-features 'nix-command flakes')
 
 # --- 1. system profile: rsm tools + direnv/nix-direnv ----------------------
 log "rsm system profile ($PROFILE)"
+# The commands the server profile provides (rsm-clone/rsm-mkdir are the folder
+# commands students actually use; rsm-new-project was merged into rsm-mkdir).
+RSM_CMDS=(rsm-setup rsm-msba rsm-update rsm-mkdir rsm-clone rsm-project-check)
+
 if [ -e "$PROFILE" ]; then
   # Present already -> UPGRADE it to the latest so re-running this one-liner
   # actually updates the server (rsm-setup/rsm-update etc. re-resolve their
   # `github:radiant-ai-hub/rsm-nix` ref to the newest main). The /usr/local/bin
   # symlinks point at $PROFILE/bin, so they follow the upgrade automatically.
   detail "already present — upgrading to the latest $FLAKE_REF"
+  # rsm-new-project was merged into rsm-mkdir. Drop the now-removed element FIRST,
+  # else `profile upgrade --all` fails re-resolving an output the flake no longer
+  # has. Removing a name that isn't installed is a harmless no-op.
+  sudo "$NIX" "${NIXFLAGS[@]}" profile remove --profile "$PROFILE" rsm-new-project >/dev/null 2>&1 || true
   sudo "$NIX" "${NIXFLAGS[@]}" profile upgrade --profile "$PROFILE" --all
+  # Add any commands an older install predates (e.g. rsm-mkdir/rsm-clone). Only
+  # install the ones not already in the profile, so this stays idempotent.
+  for _cmd in "${RSM_CMDS[@]}"; do
+    if ! sudo "$NIX" "${NIXFLAGS[@]}" profile list --profile "$PROFILE" 2>/dev/null | grep -q -- "$_cmd"; then
+      detail "adding missing command: $_cmd"
+      sudo "$NIX" "${NIXFLAGS[@]}" profile install --profile "$PROFILE" "${FLAKE_REF}#${_cmd}"
+    fi
+  done
 else
-  detail "installing rsm-setup/rsm-msba/rsm-update/rsm-new-project/rsm-project-check + direnv + nix-direnv"
+  detail "installing ${RSM_CMDS[*]} + direnv + nix-direnv"
+  _refs=()
+  for _cmd in "${RSM_CMDS[@]}"; do _refs+=("${FLAKE_REF}#${_cmd}"); done
   sudo "$NIX" "${NIXFLAGS[@]}" profile install --profile "$PROFILE" \
-    "${FLAKE_REF}#rsm-setup" "${FLAKE_REF}#rsm-msba" "${FLAKE_REF}#rsm-update" \
-    "${FLAKE_REF}#rsm-new-project" "${FLAKE_REF}#rsm-project-check" \
-    'nixpkgs#direnv' 'nixpkgs#nix-direnv'
+    "${_refs[@]}" 'nixpkgs#direnv' 'nixpkgs#nix-direnv'
 fi
 
 # --- 1b. Commands on PATH for EVERY shell, the simple way ------------------
@@ -103,9 +120,11 @@ fi
 # terminals, `su`, subshells), so a symlink here beats juggling profile.d vs
 # /etc/zsh/zshrc. Points at the gc-rooted profile, so it survives upgrades.
 log "symlinks in /usr/local/bin"
-for t in rsm-setup rsm-msba rsm-update rsm-new-project rsm-project-check direnv; do
+for t in "${RSM_CMDS[@]}" direnv; do
   sudo ln -sfn "$PROFILE/bin/$t" "/usr/local/bin/$t"
 done
+# Drop a stale rsm-new-project symlink from an older install (now merged into rsm-mkdir).
+sudo rm -f /usr/local/bin/rsm-new-project
 
 # --- 2. direnv hook (+ shared cache) for login shells ----------------------
 log "/etc/profile.d/rsm.sh (direnv hook + uv cache)"
