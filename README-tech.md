@@ -110,12 +110,13 @@ direnv activates it automatically in every subfolder, at any depth, so
 most coursework needs nothing extra. To open a single folder
 **directly** in VS Code (e.g. an assignment that is its own git repo)
 with the right interpreter, or to give a folder its **own** isolated
-packages, use `rsm-new-project`:
+packages, use `rsm-mkdir`:
 
 ```bash
-rsm-new-project                   # set up the CURRENT folder (shared nix-uv Python)
-rsm-new-project ~/projects/thesis # a standalone folder anywhere (created if needed)
-rsm-new-project --venv            # give this folder its OWN reproducible .venv
+rsm-mkdir mgta455              # set up ./mgta455 (nested under ~/rsm-msba)
+rsm-mkdir .                    # set up the CURRENT folder (shared nix-uv Python)
+rsm-mkdir ~/projects/thesis    # a standalone folder anywhere (created if needed)
+rsm-mkdir --venv analysis      # give ./analysis its OWN reproducible .venv
 ```
 
 `--venv` is the alternative to a conda environment: a project-local
@@ -126,22 +127,21 @@ all of this for you.
 
 ## Commands
 
-| Command                                        | What it does                                                                                                                               |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `rsm-setup`                                    | Bootstrap: uv base env, Jupyter kernel, course folders                                                                                     |
-| `rsm-update`                                   | Same as `rsm-setup` + bump Claude Code to latest (the “update” name)                                                                       |
-| `rsm-msba`                                     | Bootstrap/reset: clone the flake if missing, then `rsm-setup`                                                                              |
-| `rsm-version`                                  | Print the environment version (the flake’s git commit) + platform                                                                          |
-| `rsm-python-sync`                              | Refresh the base env from `uv.lock`                                                                                                        |
-| `rsm-mkdir PATH...`                            | Make folder(s) direnv-ready so they share the one nix-uv env (CWD-relative; `--venv` for a project-local env)                              |
-| `rsm-clone URL [DIR]`                          | `git clone` a repo AND set it up (direnv + nix-uv) so it opens directly in VS Code                                                         |
-| `rsm-new-project [--venv] [PATH]`              | Set up a folder (nested or standalone) to open directly in VS Code; `--venv` gives it its **own** reproducible env (the conda alternative) |
-| `rsm-project-check`                            | In a `--venv` folder, import each declared package and flag anything that fails to load                                                    |
-| `rsm-vscode-ext`                               | Install the curated VS Code extensions into the connected (WSL/SSH) window                                                                 |
-| `rsm-pg-init` / `-start` / `-stop` / `-status` | Workspace-local PostgreSQL lifecycle                                                                                                       |
-| `rsm-pg-psql`                                  | `psql` into the `rsm-msba` database                                                                                                        |
-| `rsm-pgweb`                                    | Browser-based database viewer (opens the exact per-user URL it prints)                                                                     |
-| `rsm-github` (alias `github`)                  | One-time setup of your Git identity + a GitHub SSH key                                                                                     |
+| Command                                        | What it does                                                                                                                                                                                                                     |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rsm-setup`                                    | Bootstrap: uv base env, Jupyter kernel, course folders                                                                                                                                                                           |
+| `rsm-update`                                   | Same as `rsm-setup` + bump Claude Code to latest (the “update” name)                                                                                                                                                             |
+| `rsm-msba`                                     | Bootstrap/reset: clone the flake if missing, then `rsm-setup`                                                                                                                                                                    |
+| `rsm-version`                                  | Print the environment version (the flake’s git commit) + platform                                                                                                                                                                |
+| `rsm-python-sync`                              | Refresh the base env from `uv.lock`                                                                                                                                                                                              |
+| `rsm-mkdir [--venv] PATH...`                   | Make folder(s) first-class RSM projects to open directly in VS Code — nested or standalone, sharing the one nix-uv env (CWD-relative like `mkdir`); `--venv` gives a folder its **own** reproducible env (the conda alternative) |
+| `rsm-clone URL [DIR]`                          | `git clone` a repo AND set it up (direnv + nix-uv) so it opens directly in VS Code                                                                                                                                               |
+| `rsm-project-check`                            | In a `--venv` folder, import each declared package and flag anything that fails to load                                                                                                                                          |
+| `rsm-vscode-ext`                               | Install the curated VS Code extensions into the connected (WSL/SSH) window                                                                                                                                                       |
+| `rsm-pg-init` / `-start` / `-stop` / `-status` | Workspace-local PostgreSQL lifecycle                                                                                                                                                                                             |
+| `rsm-pg-psql`                                  | `psql` into the `rsm-msba` database                                                                                                                                                                                              |
+| `rsm-pgweb`                                    | Browser-based database viewer (opens the exact per-user URL it prints)                                                                                                                                                           |
+| `rsm-github` (alias `github`)                  | One-time setup of your Git identity + a GitHub SSH key                                                                                                                                                                           |
 
 ## Flake interfaces
 

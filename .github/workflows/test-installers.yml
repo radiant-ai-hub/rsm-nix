@@ -144,6 +144,7 @@ jobs:
           bash -n tests/check-vscode-keybindings.sh
           bash -n tests/check-vscode-ext.sh
           bash -n tests/check-vscode-settings.sh
+          bash -n tests/check-mkdir.sh
 
       - name: Data-seed no-clobber test
         run: bash tests/check-data-seed.sh

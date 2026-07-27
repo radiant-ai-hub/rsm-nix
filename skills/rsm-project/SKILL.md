@@ -11,7 +11,7 @@ description: >-
 
 RSM-MSBA students do coursework in `~/rsm-msba`, where every subfolder shares one
 big `nix-uv` Python environment (direnv activates it automatically at any depth).
-The `rsm-new-project` command sets up an individual folder so it can be opened
+The `rsm-mkdir` command sets up an individual folder so it can be opened
 **directly** in VS Code (or a terminal) with the full Nix toolchain and the right
 Python — and, optionally, its **own** isolated packages (like a conda env).
 
@@ -21,13 +21,13 @@ install / remove / check Python packages in one.
 ## Set up a folder
 
 ```bash
-rsm-new-project                 # the CURRENT folder, shared nix-uv Python
-rsm-new-project PATH            # that folder instead (created if needed); anywhere,
-                                #   nested under ~/rsm-msba OR standalone
-rsm-new-project --venv [PATH]   # give it its OWN reproducible .venv (conda alternative)
+rsm-mkdir .                 # the CURRENT folder, shared nix-uv Python
+rsm-mkdir PATH...           # that folder(s) instead (created if needed); anywhere,
+                            #   nested under ~/rsm-msba OR standalone
+rsm-mkdir --venv PATH       # give it its OWN reproducible .venv (conda alternative)
 ```
 
-`rsm-new-project` writes `.envrc`, `.vscode/` settings (interpreter + terminal), and — with
+`rsm-mkdir` writes `.envrc`, `.vscode/` settings (interpreter + terminal), and — with
 `--venv` — a starter `pyproject.toml` (minimal: just `ipykernel`) and `.gitignore`,
 then `direnv allow`s it. Open the folder in VS Code; the interpreter/kernel is
 already selected. With `--venv` the prompt shows `(folder)` and `python` is the

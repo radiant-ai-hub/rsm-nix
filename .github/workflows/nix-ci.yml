@@ -52,6 +52,9 @@ jobs:
       - name: Run default smoke checks
         run: nix develop -c bash tests/check-default.sh
 
+      - name: rsm-mkdir folder setup (multi-path, --venv, standalone, kept-foreign)
+        run: nix develop -c bash tests/check-mkdir.sh
+
       - name: Check xgboost/libomp in a terminal — shared env + isolated venv (macOS SIP)
         run: nix develop -c bash tests/check-macos-omp.sh
 

@@ -18,7 +18,7 @@ fi
 
 if [ ! -f "$PWD/pyproject.toml" ]; then
   echo "rsm-project-check: no pyproject.toml in $PWD" >&2
-  echo "  run this inside a project folder created by rsm-new-project." >&2
+  echo "  run this inside a project folder created by rsm-mkdir." >&2
   exit 1
 fi
 

@@ -192,7 +192,7 @@
           # the assembled zsh assets + the ZDOTDIR template it installs.
           rsm-setup = pkgs.writeShellApplication {
             name = "rsm-setup";
-            runtimeInputs = [ pythonSync pkgs.uv pkgs.python313 pkgs.coreutils pkgs.git pkgs.nodejs_22 rsm-version rsm-vscode-settings rsm-vscode-ext rsm-vscode-keybindings rsm-new-project ];
+            runtimeInputs = [ pythonSync pkgs.uv pkgs.python313 pkgs.coreutils pkgs.git pkgs.nodejs_22 rsm-version rsm-vscode-settings rsm-vscode-ext rsm-vscode-keybindings rsm-mkdir ];
             excludeShellChecks = [ "SC1090" "SC1091" "SC2164" ];
             text = rsmEnvHeader + "\n" + nativeEnvHook pkgs + ''
               export RSM_OMZ_SRC="${zshOmz}"
@@ -210,11 +210,14 @@
           # (pull the flake, re-sync, refresh shell/examples, update Claude Code
           # to the latest). It sets RSM_CLAUDE_LATEST so Claude is bumped.
           rsm-update = mk "rsm-update" [ rsm-setup pkgs.coreutils ];
-          # rsm-mkdir: the general "make a direnv-ready folder anywhere" command
-          # (CWD-relative like mkdir; nested or standalone; multi-path; --venv).
-          rsm-mkdir = mk "rsm-mkdir" [ rsm-new-project pkgs.coreutils ];
-          # rsm-clone: git clone + make the clone direnv-ready in one step.
-          rsm-clone = mk "rsm-clone" [ pkgs.git rsm-new-project pkgs.coreutils ];
+          # rsm-mkdir: the "make a first-class RSM folder anywhere" command
+          # (CWD-relative like mkdir; nested via source_up or standalone via
+          # `use flake`; multi-path; --venv for an own reproducible venv). Does
+          # the per-folder work directly (writes .envrc + .vscode + direnv allow);
+          # rsm-clone and rsm-setup call it too.
+          rsm-mkdir = mk "rsm-mkdir" [ rsm-vscode-settings pkgs.uv pkgs.direnv pkgs.coreutils ];
+          # rsm-clone: git clone + make the clone direnv-ready (rsm-mkdir) in one step.
+          rsm-clone = mk "rsm-clone" [ pkgs.git rsm-mkdir pkgs.coreutils ];
           # Prints the rsm-nix version (the flake's git commit) + platform/python,
           # so it is easy to confirm everyone is on the same environment.
           rsm-version = mk "rsm-version" [ pkgs.git pkgs.coreutils pkgs.gawk ];
@@ -238,20 +241,14 @@
           # the remote `code` is connected to — run from the VS Code WSL/SSH
           # integrated terminal so they land in the remote, not just the laptop.
           rsm-vscode-ext = mk "rsm-vscode-ext" [ pkgs.coreutils ];
-          # Writes a folder's .vscode/{settings,extensions}.json (interpreter,
-          # RSM terminal shell, curated settings). Shared by rsm-setup +
-          # rsm-new-project.
+          # Writes a folder's .vscode/{settings,extensions,keybindings}.json
+          # (interpreter, RSM terminal shell, curated settings). Shared by
+          # rsm-setup + rsm-mkdir.
           rsm-vscode-settings = mk "rsm-vscode-settings" [ pkgs.coreutils pkgs.gnused pkgs.gnugrep ];
           # Merges the curated VS Code keybindings (vscode/keybindings.json) into
           # the User keybindings.json. User-scoped (VS Code has no per-workspace
           # keybindings); called by rsm-setup on a laptop only.
           rsm-vscode-keybindings = mk "rsm-vscode-keybindings" [ pkgs.coreutils ];
-          # Makes a folder a first-class RSM project (nested under ~/rsm-msba via
-          # source_up, or standalone anywhere via `use flake`): writes .envrc +
-          # .vscode config and `direnv allow`s it, so opening it directly in VS
-          # Code keeps every Nix tool + the right Python. `--venv` gives it its
-          # own reproducible venv (pyproject.toml + uv).
-          rsm-new-project = mk "rsm-new-project" [ rsm-vscode-settings pkgs.uv pkgs.direnv pkgs.coreutils ];
           # Verifies a project's env: imports each declared dependency and flags
           # anything that fails to load (missing package or missing system lib).
           rsm-project-check = mk "rsm-project-check" [ pkgs.coreutils ];

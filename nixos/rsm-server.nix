@@ -7,7 +7,8 @@ let
   system = pkgs.stdenv.hostPlatform.system; # e.g. "x86_64-linux"
   rsmSetup = rsm-nix.packages.${system}.rsm-setup;
   rsmMsba = rsm-nix.packages.${system}.rsm-msba;
-  rsmNewProject = rsm-nix.packages.${system}.rsm-new-project;
+  rsmMkdir = rsm-nix.packages.${system}.rsm-mkdir;
+  rsmClone = rsm-nix.packages.${system}.rsm-clone;
   rsmProjectCheck = rsm-nix.packages.${system}.rsm-project-check;
 in
 {
@@ -114,7 +115,8 @@ in
     direnv
     rsmSetup # `rsm-setup` available system-wide
     rsmMsba # `rsm-msba` — clone-if-missing + rsm-setup, for full reset
-    rsmNewProject # `rsm-new-project` — set up a folder (nested or standalone) as a project
+    rsmMkdir # `rsm-mkdir` — set up a folder (nested or standalone) as a project
+    rsmClone # `rsm-clone` — git clone + set the clone up as a project
     rsmProjectCheck # `rsm-project-check` — verify a project's imports
   ];
 
