@@ -127,10 +127,11 @@ rsm-claude-settings "$RSM_WORKSPACE"
 #      copy needed), and its recipes run in the folder you invoke `just` from.
 #      Refresh the RSM-managed file (new marker or the old RSM signature), but keep
 #      a user's own edited justfile untouched.
+# (Operate on the lowercase `justfile` only. A capital `Justfile` check is unsafe on
+# macOS's case-insensitive filesystem -- it would match this very file and skip the
+# refresh forever. The marker/signature test already protects a user's own file.)
 _rsm_jf="$RSM_WORKSPACE/justfile"
-if [ -e "$RSM_WORKSPACE/Justfile" ]; then
-  echo "    justfile  : kept your own $RSM_WORKSPACE/Justfile"
-elif [ ! -e "$_rsm_jf" ] || grep -qE '_rsmManaged|Provided by the RSM-MSBA environment' "$_rsm_jf" 2>/dev/null; then
+if [ ! -e "$_rsm_jf" ] || grep -qE '_rsmManaged|Provided by the RSM-MSBA environment' "$_rsm_jf" 2>/dev/null; then
   cp -f "$RSM_FLAKE/claude/justfile" "$_rsm_jf"
   echo "    justfile  : $_rsm_jf (RSM-managed; just finds it from any subfolder)"
 else

@@ -122,7 +122,11 @@ for r in test check review save verify hooks-off hooks-on hooks-status status-li
   echo "$recipes" | grep -qw "$r" && ok "justfile recipe: $r" || bad "justfile missing recipe: $r"
 done
 here=$( cd "$ws/sub/deep" && just --evaluate _here 2>/dev/null )
-[ "$here" = "$ws/sub/deep" ] && ok "just from a subfolder targets the invocation dir" || bad "invocation_directory wrong: [$here] != [$ws/sub/deep]"
+# compare canonical paths: on macOS just returns /private/tmp/... while $ws is the
+# /tmp symlink, so resolve both with `pwd -P` before comparing.
+want=$( cd "$ws/sub/deep" && pwd -P )
+here_c=$( cd "$here" 2>/dev/null && pwd -P || printf '%s' "$here" )
+[ "$here_c" = "$want" ] && ok "just from a subfolder targets the invocation dir" || bad "invocation_directory wrong: [$here_c] != [$want]"
 # hooks toggle must run in the INVOCATION dir (writes settings.local.json there, not at the justfile)
 ( cd "$ws/sub/deep" && just hooks-off >/dev/null 2>&1 )
 grep -q '"disableAllHooks"[[:space:]]*:[[:space:]]*true' "$ws/sub/deep/.claude/settings.local.json" 2>/dev/null \
@@ -151,8 +155,7 @@ grep -q 'my own rules' "$g/CLAUDE.md" && ok "kept foreign CLAUDE.md" || bad "clo
 
 echo "== workspace justfile deploy: refresh RSM-managed, keep a user's own (mirrors rsm-setup 1b3) =="
 _deploy_wsjf() {  # mirrors the deploy decision in bin/rsm-setup step 1b3
-  _wsdir="$1"; _jf="$1/justfile"
-  [ -e "$_wsdir/Justfile" ] && return 0
+  _jf="$1/justfile"
   if [ ! -e "$_jf" ] || grep -qE '_rsmManaged|Provided by the RSM-MSBA environment' "$_jf" 2>/dev/null; then
     cp -f "$jf_src" "$_jf"
   fi
