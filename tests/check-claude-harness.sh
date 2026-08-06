@@ -120,9 +120,8 @@ sl="${RSM_FLAKE:-$HOME/rsm-nix}/claude/statusline.sh"
 _r=$(( $(date +%s 2>/dev/null || printf '%(%s)T' -1) + 8000 ))
 slout=$(printf '%s' '{"model":{"display_name":"Opus X"},"workspace":{"current_dir":"'"$HOME"'/x"},"context_window":{"remaining_percentage":60},"rate_limits":{"five_hour":{"used_percentage":10,"resets_at":'"$_r"'},"seven_day":{"used_percentage":50}}}' | bash "$sl" 2>/dev/null)
 { echo "$slout" | grep -q 'Opus X' \
-    && echo "$slout" | grep -q '5h 90% left' \
-    && echo "$slout" | grep -q 'resets in' \
-    && echo "$slout" | grep -q '7d 50% left'; } \
+    && echo "$slout" | grep -qE '5h, 90% left \(' \
+    && echo "$slout" | grep -q '7d, 50% left'; } \
   && ok "statusline.sh renders model + limits-left + reset" || bad "statusline.sh output wrong: [$slout]"
 
 echo "== non-destructive: keeps a folder's OWN CLAUDE.md / justfile / settings.json =="
