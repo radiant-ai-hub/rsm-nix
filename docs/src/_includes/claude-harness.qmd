@@ -2,46 +2,60 @@
 
 The flake deploys a course-agnostic Claude Code teaching harness that encourages
 good habits + critical thinking (verify AI output, tests-as-interface,
-git-as-safety-net). Source assets live in `claude/` and `skills/`. There are two
-deploy paths, on purpose:
+git-as-safety-net). Source assets live in `claude/` and `skills/`. There are three
+deploy scopes, on purpose:
 
-**1. Skills — user-level (`~/.claude/skills/`).** Installed by `rsm-setup` (§6b),
-which copies every `skills/<name>/` from the flake. Available in every folder,
-including personal work (they are guidance-only, so this is harmless):
+**1. User-level: skills + slash commands (`~/.claude/`).** Installed by `rsm-setup`
+(steps 6b and 6b2), which copies every `skills/<name>/` and every
+`claude/commands/*.md` from the flake into `~/.claude/skills/` and
+`~/.claude/commands/`. Being user-level, these are available in **every** folder and
+subfolder. That matters because project-scoped commands do not reach up from a
+subfolder to the workspace root, so otherwise each folder would need its own copy.
 
-- `rsm-project` — set up/manage project folders (direnv + uv + venv).
-- `git-workflow` — recover from push/pull/merge trouble from real repo state
+Skills (guidance-only, so harmless everywhere):
+
+- `rsm-project`: set up/manage project folders (direnv + uv + venv).
+- `git-workflow`: recover from push/pull/merge trouble from real repo state
   (runs a read-only `git_state.sh` first).
-- `verify-ai-code` — a structured read-and-verify pass on AI-written code (read
+- `verify-ai-code`: a structured read-and-verify pass on AI-written code (read
   the diff, explain it, run + manually exercise, check the agent's claims).
 
-Adding a skill is just a new `skills/<name>/SKILL.md` — no code change.
+Slash commands: `/review`, `/explain`, `/run-tests`, `/add-function`. Adding a
+skill or command is just a new file under `skills/` or `claude/commands/`, no code
+change.
 
-**2. Per-folder harness (`<dir>/.claude/` + `CLAUDE.md` + `justfile`).** Written by
+**2. One workspace `justfile` (`~/rsm-msba/justfile`).** Deployed by `rsm-setup`.
+`just` searches UP the directory tree, so this single file is found from any
+subfolder below (no per-folder copy), and every recipe runs in the folder you
+invoked `just` from (via `invocation_directory()`), so `just test` targets your
+current project. It is refreshed while it carries the `_rsmManaged` marker; delete
+the marker to keep your own edits. Recipes: `just test`, `just check`, `just
+review`, `just save "msg"`, `just verify`, plus the hook and status-line toggles
+below.
+
+**3. Per-folder harness (`<dir>/.claude/` + `CLAUDE.md`).** Written by
 `rsm-claude-settings <dir>`, which `rsm-setup` calls on the `~/rsm-msba` workspace
-root and `rsm-mkdir`/`rsm-clone` call on every folder — mirroring
-`rsm-vscode-settings`. Curated source is read from the **live** flake checkout
-(`$RSM_FLAKE/claude/`), so a `git pull` of the flake updates it — no rebuild. The
-harness is therefore active **only** in folders the environment set up; a student's
-personal projects elsewhere are untouched.
+root and `rsm-mkdir`/`rsm-clone` call on every folder, mirroring
+`rsm-vscode-settings`. Settings and hooks are **git-root-scoped** by Claude Code
+(they do not span repos), so they are deployed per repo/folder. Curated source is
+read from the **live** flake checkout (`$RSM_FLAKE/claude/`), so a `git pull` of the
+flake updates it, no rebuild.
 
-- `.claude/settings.json` — a **uv-only permission policy** (`deny` pip/`uv pip`;
+- `.claude/settings.json`: a **uv-only permission policy** (`deny` pip/`uv pip`;
   `ask` before `rm`/`ssh`/destructive git; safe reads + `uv`/`just`/git pre-allowed;
   `defaultMode: default` so students see each prompt) plus the hook wiring. Carries
   an `_rsmManaged` marker: a folder's own `settings.json` **without** that marker is
-  kept, never clobbered (same for a folder's own `CLAUDE.md`/`justfile`, which are
-  only created when absent).
-- `.claude/hooks/` — bash hooks:
+  kept, never clobbered (same for a folder's own `CLAUDE.md`, which is only created
+  when absent).
+- `.claude/hooks/`: bash hooks:
 
   | Hook | Event | What it does |
   | --- | --- | --- |
   | `secret-scan` | PreToolUse (git commit) | Flags API keys / `.env` files in staged content; forces an `ask`. |
-  | `usage-log` / `auto-stage-log` | UserPromptSubmit / PreToolUse | Instructor telemetry — **course-org repos only** (see below). |
+  | `usage-log` / `auto-stage-log` | UserPromptSubmit / PreToolUse | Instructor telemetry, **course-org repos only** (see below). |
   | `ruff-format` | PostToolUse (Write/Edit) | `ruff format` on any `.py` Claude writes. |
   | `check-stale-tests` / `ruff-check` | Stop | Non-blocking nudges to run pytest / fix lint. |
   | `save-test-time` | PostToolUse (pytest) | Records the last test run for the stale-test nudge. |
-
-- `.claude/commands/` — `/review`, `/explain`, `/run-tests`, `/add-function`.
 
 **Telemetry is scoped to the course org.** `usage-log.sh` + `auto-stage-log.sh`
 no-op unless the enclosing repo's `origin` matches `RSM_COURSE_ORG_PATTERN`
@@ -51,8 +65,8 @@ repo). Logs record prompts + tool-call summaries, never file contents or output;
 `.claude/usage-log/README.md` is the student-facing disclosure. Override the org
 pattern by exporting `RSM_COURSE_ORG_PATTERN` before launching Claude.
 
-**Toggling hooks / status line (teaching).** The justfile ships `just hooks-off`
-/ `just hooks-on` (flip the built-in `disableAllHooks` in
+**Toggling hooks / status line (teaching).** The workspace justfile ships `just
+hooks-off` / `just hooks-on` (flip the built-in `disableAllHooks` in
 `.claude/settings.local.json`, to demo what the hooks catch) and `just status-line`
 / `just status-line-off` (install `claude/statusline.sh` into
 `~/.claude/settings.json` — shows `host | folder (branch) | model | ctx N% left |
@@ -68,6 +82,8 @@ disable a single hook, remove its block from `settings.json`. Course-specific
 enforcement (deliverable CI, stack rules, always-on telemetry) belongs in the
 course repo's own `.claude/`, not the base environment.
 
-Verified by `tests/check-claude-harness.sh` (in `nix-ci.yml`): deploy, secret-scan,
-the telemetry scope guard (personal / no-origin repos are never logged),
-stale-tests, ruff-format, justfile recipes, and the keep-foreign guards.
+Verified by `tests/check-claude-harness.sh` (in `nix-ci.yml`): per-folder deploy
+(no per-folder commands/justfile), user-level commands, the workspace justfile
+(upward-search + `invocation_directory`), secret-scan, the telemetry scope guard
+(personal / no-origin repos are never logged), stale-tests, ruff-format, and the
+keep-foreign guards.

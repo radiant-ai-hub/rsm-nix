@@ -116,11 +116,26 @@ rsm-vscode-settings "$RSM_WORKSPACE" \
   --zdotdir "\${workspaceFolder}/.rsm-msba/zsh"
 echo "    vscode    : wrote $RSM_WORKSPACE/.vscode/{settings,extensions}.json"
 
-# 1b2. Workspace Claude Code "agentic engineering" harness (.claude/ + CLAUDE.md
-#      + justfile), via the shared generator that rsm-mkdir also uses for nested
-#      folders. Course-agnostic habits + gentle hooks; telemetry self-scopes to
-#      rsm-msba-* repos, so the workspace root (not a repo) is never logged.
+# 1b2. Workspace Claude Code "agentic engineering" harness (.claude/ + CLAUDE.md),
+#      via the shared generator that rsm-mkdir also uses for nested folders.
+#      Course-agnostic habits + gentle hooks; telemetry self-scopes to rsm-msba-*
+#      repos, so the workspace root (not a repo) is never logged.
 rsm-claude-settings "$RSM_WORKSPACE"
+
+# 1b3. A SINGLE justfile at the workspace root. `just` searches UP the directory
+#      tree, so this one file is found from every subfolder below (no per-folder
+#      copy needed), and its recipes run in the folder you invoke `just` from.
+#      Refresh the RSM-managed file (new marker or the old RSM signature), but keep
+#      a user's own edited justfile untouched.
+_rsm_jf="$RSM_WORKSPACE/justfile"
+if [ -e "$RSM_WORKSPACE/Justfile" ]; then
+  echo "    justfile  : kept your own $RSM_WORKSPACE/Justfile"
+elif [ ! -e "$_rsm_jf" ] || grep -qE '_rsmManaged|Provided by the RSM-MSBA environment' "$_rsm_jf" 2>/dev/null; then
+  cp -f "$RSM_FLAKE/claude/justfile" "$_rsm_jf"
+  echo "    justfile  : $_rsm_jf (RSM-managed; just finds it from any subfolder)"
+else
+  echo "    justfile  : kept your own $_rsm_jf (no _rsmManaged marker)"
+fi
 
 # 1c. Point VS Code's Remote-SSH machine settings at the nix-uv interpreter, so
 #     ANY folder opened on this server -- even a nested one with no .vscode/ of
@@ -429,6 +444,22 @@ if [ -n "${RSM_SKILLS_SRC:-}" ] && [ -d "$RSM_SKILLS_SRC" ]; then
     chmod -R u+w "$skills_dest/$_sname" 2>/dev/null || true
     echo "    skill     : $_sname -> $skills_dest/$_sname"
   done
+fi
+
+# 6b2. Install the RSM slash commands user-level (~/.claude/commands), so /review,
+#      /explain, /run-tests, /add-function work in EVERY folder and subfolder.
+#      Project-scoped commands do NOT reach up from a subfolder to the workspace,
+#      so user-level is the reliable place. Refreshed each run; a student's own
+#      differently-named commands are left untouched.
+_cmd_src="$RSM_FLAKE/claude/commands"
+if [ -d "$_cmd_src" ]; then
+  cmd_dest="$HOME/.claude/commands"
+  mkdir -p "$cmd_dest"
+  for _cmd in "$_cmd_src"/*.md; do
+    [ -e "$_cmd" ] || continue
+    cp -f "$_cmd" "$cmd_dest/"
+  done
+  echo "    commands  : /review /explain /run-tests /add-function -> $cmd_dest"
 fi
 
 # 6c. VS Code extensions into the connected/served remote. rsm-vscode-ext finds
