@@ -72,7 +72,8 @@ while [ -n "$_d" ] && [ "$_d" != "/" ]; do
 done
 
 # --- helpers ---------------------------------------------------------------
-_now=$(printf '%(%s)T' -1 2>/dev/null)          # current epoch, bash builtin
+_now=$(printf '%(%s)T' -1 2>/dev/null)          # current epoch (bash builtin, bash 4.2+)
+[ -z "$_now" ] && _now=$(date +%s 2>/dev/null)  # fallback for old bash (macOS /bin/bash 3.2)
 _int() { [ -n "$1" ] && printf '%.0f' "$1"; }   # round
 _left() { local u; u="$(_int "$1")"; [ -n "$u" ] && printf '%d' "$(( 100 - u ))"; }
 _reset() {                                       # epoch -> "2h13m" / "5d6h" / "45m"
