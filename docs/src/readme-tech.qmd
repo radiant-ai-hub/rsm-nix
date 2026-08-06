@@ -34,6 +34,8 @@ Per-platform guides:
 
 {{< include _includes/flake-interfaces.qmd >}}
 
+{{< include _includes/claude-harness.qmd >}}
+
 {{< include _includes/testing.qmd >}}
 
 {{< include _includes/server-tailscale.qmd >}}

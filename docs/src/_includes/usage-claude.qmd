@@ -1,0 +1,52 @@
+## Using Claude Code
+
+[Claude Code](https://www.claude.com/product/claude-code) is installed for you and
+runs in the RSM-MSBA environment. The goal is to help you **go faster *and*
+understand more** — use AI as a capable assistant while you stay the engineer who
+reviews, tests, and understands the result. Start it by typing `claude` in the
+VS Code integrated terminal of any course folder.
+
+**What's already set up in your course folders.** When the environment sets up a
+folder (`rsm-setup`, `rsm-mkdir`, or `rsm-clone`), it drops a small Claude Code
+"agentic engineering" harness into it so good habits are the default:
+
+- **Skills** — Claude automatically uses these when relevant. Ask for help with a
+  broken push/merge and the **git-workflow** skill walks you through it from your
+  real repo state; ask "is this right?" or "review this" and the
+  **verify-ai-code** skill runs a structured read-and-verify pass.
+- **Slash commands** — type these in Claude Code:
+
+  | Command | What it does |
+  | --- | --- |
+  | `/run-tests` | Run the test suite and report results. |
+  | `/review` | Review your current diff — flags bugs, missing tests, style. No edits. |
+  | `/add-function` | Add a new function **with** its tests, in one shot. |
+  | `/explain <thing>` | Beginner-friendly explanation of a file, function, or concept. |
+
+- **A `CLAUDE.md`** of house rules that Claude reads every session, and a
+  **`justfile`** of handy commands: `just test`, `just check` (tests + lint),
+  `just review` (show your diff), `just save "msg"` (checkpoint commit),
+  `just verify` (tests, then the diff to read).
+- **Gentle guardrails** — before every `git commit`, Claude scans staged files for
+  secrets (API keys, `.env` files) and pauses if it finds one; it uses `uv` for
+  packages (not `pip`); and it nudges you to run your tests when code has changed.
+
+**Suggestions — get the most out of it without switching your brain off:**
+
+1. **You own the review.** Read the diff (`git diff HEAD` or `/review`) before you
+   commit. If you can't explain a change in plain English, don't commit it — ask
+   `/explain` first.
+2. **Verify, don't assume.** Passing tests do not prove the code is right. Run the
+   thing on a real input and look at the output yourself.
+3. **Work in small steps.** Commit early and often, one idea at a time — git is
+   your safety net (`just save "msg"`).
+4. **Tests are how you tell Claude what "done" means.** Ask for the test first,
+   watch it fail, then make it pass.
+5. **Ask it to teach you.** `/explain` a function or concept you don't follow —
+   use AI to learn faster, not to skip the learning.
+
+> **Note on privacy.** In **course repositories** (the `rsm-msba-*` GitHub org),
+> Claude Code writes a short activity log (your prompts + a summary of each tool
+> call — never file contents or output) that is committed with your work for
+> instructor review. **Nothing is logged in your personal repositories.** See
+> `.claude/usage-log/README.md` in a course folder for details.
