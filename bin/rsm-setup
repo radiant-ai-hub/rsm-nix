@@ -116,6 +116,12 @@ rsm-vscode-settings "$RSM_WORKSPACE" \
   --zdotdir "\${workspaceFolder}/.rsm-msba/zsh"
 echo "    vscode    : wrote $RSM_WORKSPACE/.vscode/{settings,extensions}.json"
 
+# 1b2. Workspace Claude Code "agentic engineering" harness (.claude/ + CLAUDE.md
+#      + justfile), via the shared generator that rsm-mkdir also uses for nested
+#      folders. Course-agnostic habits + gentle hooks; telemetry self-scopes to
+#      rsm-msba-* repos, so the workspace root (not a repo) is never logged.
+rsm-claude-settings "$RSM_WORKSPACE"
+
 # 1c. Point VS Code's Remote-SSH machine settings at the nix-uv interpreter, so
 #     ANY folder opened on this server -- even a nested one with no .vscode/ of
 #     its own -- defaults to the RSM Python instead of a stray /usr/bin/python or

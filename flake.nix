@@ -192,7 +192,7 @@
           # the assembled zsh assets + the ZDOTDIR template it installs.
           rsm-setup = pkgs.writeShellApplication {
             name = "rsm-setup";
-            runtimeInputs = [ pythonSync pkgs.uv pkgs.python313 pkgs.coreutils pkgs.git pkgs.nodejs_22 rsm-version rsm-vscode-settings rsm-vscode-ext rsm-vscode-keybindings rsm-mkdir ];
+            runtimeInputs = [ pythonSync pkgs.uv pkgs.python313 pkgs.coreutils pkgs.git pkgs.nodejs_22 rsm-version rsm-vscode-settings rsm-vscode-ext rsm-vscode-keybindings rsm-claude-settings rsm-mkdir ];
             excludeShellChecks = [ "SC1090" "SC1091" "SC2164" ];
             text = rsmEnvHeader + "\n" + nativeEnvHook pkgs + ''
               export RSM_OMZ_SRC="${zshOmz}"
@@ -215,7 +215,7 @@
           # `use flake`; multi-path; --venv for an own reproducible venv). Does
           # the per-folder work directly (writes .envrc + .vscode + direnv allow);
           # rsm-clone and rsm-setup call it too.
-          rsm-mkdir = mk "rsm-mkdir" [ rsm-vscode-settings pkgs.uv pkgs.direnv pkgs.coreutils ];
+          rsm-mkdir = mk "rsm-mkdir" [ rsm-vscode-settings rsm-claude-settings pkgs.uv pkgs.direnv pkgs.coreutils ];
           # rsm-clone: git clone + make the clone direnv-ready (rsm-mkdir) in one step.
           rsm-clone = mk "rsm-clone" [ pkgs.git rsm-mkdir pkgs.coreutils ];
           # Prints the rsm-nix version (the flake's git commit) + platform/python,
@@ -245,6 +245,11 @@
           # (interpreter, RSM terminal shell, curated settings). Shared by
           # rsm-setup + rsm-mkdir.
           rsm-vscode-settings = mk "rsm-vscode-settings" [ pkgs.coreutils pkgs.gnused pkgs.gnugrep ];
+          # Writes the per-folder Claude Code "agentic engineering" harness
+          # (.claude/ {settings,hooks,commands,usage-log} + CLAUDE.md + justfile).
+          # Shared by rsm-setup (workspace root) + rsm-mkdir (nested folders);
+          # reads curated source from the live flake path $RSM_FLAKE/claude.
+          rsm-claude-settings = mk "rsm-claude-settings" [ pkgs.coreutils pkgs.gnused pkgs.gnugrep ];
           # Merges the curated VS Code keybindings (vscode/keybindings.json) into
           # the User keybindings.json. User-scoped (VS Code has no per-workspace
           # keybindings); called by rsm-setup on a laptop only.
@@ -299,6 +304,9 @@
             gnused
             gnugrep
             which
+            just # simple task runner for the per-folder justfile (test/check/review/save/verify)
+            jq # JSON processor used by the Claude Code hooks (secret-scan, usage-log)
+            ruff # Python linter/formatter used by the Claude Code hooks
           ] ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
             # C/Fortran toolchain for source-built wheels that ship no aarch64
             # wheel (scikit-misc). gfortran's wrapper provides cc/gcc/g++ too.

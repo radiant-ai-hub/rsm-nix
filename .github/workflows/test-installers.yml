@@ -145,6 +145,9 @@ jobs:
           bash -n tests/check-vscode-ext.sh
           bash -n tests/check-vscode-settings.sh
           bash -n tests/check-mkdir.sh
+          bash -n tests/check-claude-harness.sh
+          bash -n bin/rsm-claude-settings
+          for h in claude/hooks/*.sh skills/git-workflow/scripts/git_state.sh; do bash -n "$h"; done
 
       - name: Data-seed no-clobber test
         run: bash tests/check-data-seed.sh
