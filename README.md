@@ -161,8 +161,10 @@ are the default:
 - **See the guardrails for yourself** — `just hooks-off` /
   `just hooks-on` toggle the hooks for a folder (restart Claude Code to
   apply) so you can watch the difference, and `just status-line` adds a
-  status bar showing your model, context left, and (on Claude Pro/Max)
-  your 5-hour and 7-day usage.
+  status bar showing which computer and folder you’re in, your model,
+  and how much of your context and (on Claude Pro/Max) your 5-hour /
+  7-day limits you have **left** — with a countdown to when those limits
+  reset. (Restart Claude Code after turning it on.)
 
 - **Gentle guardrails** — before every `git commit`, Claude scans staged
   files for secrets (API keys, `.env` files) and pauses if it finds one;

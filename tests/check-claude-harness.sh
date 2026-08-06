@@ -114,12 +114,16 @@ grep -q '"disableAllHooks"[[:space:]]*:[[:space:]]*true' "$jf/.claude/settings.l
   && ok "just hooks-off sets disableAllHooks" || bad "hooks-off did not set disableAllHooks"
 ( cd "$jf" && just hooks-on >/dev/null 2>&1 )
 [ ! -f "$jf/.claude/settings.local.json" ] && ok "just hooks-on clears the override" || bad "hooks-on left settings.local.json behind"
-# statusline.sh renders model + context + (Pro/Max) rate limits
+# statusline.sh renders model + context/limits as REMAINING (left) + reset countdown
 sl="${RSM_FLAKE:-$HOME/rsm-nix}/claude/statusline.sh"
 [ -f "$sl" ] && ok "statusline.sh present" || bad "statusline.sh missing"
-slout=$(printf '%s' '{"model":{"display_name":"Opus X"},"context_window":{"used_percentage":40},"rate_limits":{"five_hour":{"used_percentage":10},"seven_day":{"used_percentage":50}}}' | bash "$sl" 2>/dev/null)
-{ echo "$slout" | grep -q 'Opus X' && echo "$slout" | grep -q '5h 10%' && echo "$slout" | grep -q '7d 50%'; } \
-  && ok "statusline.sh renders model + rate limits" || bad "statusline.sh output wrong: [$slout]"
+_r=$(( $(date +%s 2>/dev/null || printf '%(%s)T' -1) + 8000 ))
+slout=$(printf '%s' '{"model":{"display_name":"Opus X"},"workspace":{"current_dir":"'"$HOME"'/x"},"context_window":{"remaining_percentage":60},"rate_limits":{"five_hour":{"used_percentage":10,"resets_at":'"$_r"'},"seven_day":{"used_percentage":50}}}' | bash "$sl" 2>/dev/null)
+{ echo "$slout" | grep -q 'Opus X' \
+    && echo "$slout" | grep -q '5h 90% left' \
+    && echo "$slout" | grep -q 'resets in' \
+    && echo "$slout" | grep -q '7d 50% left'; } \
+  && ok "statusline.sh renders model + limits-left + reset" || bad "statusline.sh output wrong: [$slout]"
 
 echo "== non-destructive: keeps a folder's OWN CLAUDE.md / justfile / settings.json =="
 g="$tmp/guard"; mkdir -p "$g/.claude"
