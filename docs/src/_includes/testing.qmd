@@ -5,6 +5,8 @@ nix flake check
 nix develop -c bash tests/check-default.sh        # toolchain + 35 course-core imports
 nix develop -c bash tests/check-postgres.sh       # PostgreSQL lifecycle
 nix develop -c bash tests/check-folders.sh        # workspace layout
+nix develop -c bash tests/check-mkdir.sh          # rsm-mkdir folder setup
+nix develop -c bash tests/check-claude-harness.sh # Claude Code harness + telemetry scope
 nix develop -c bash tests/check-no-host-mutation.sh
 nix develop .#spark-hadoop -c bash tests/check-spark-hadoop.sh
 nix run .#check                                   # bundled smoke check

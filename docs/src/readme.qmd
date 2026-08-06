@@ -41,6 +41,8 @@ Full walkthrough covers Tailscale setup, and the campus VPN option:
 
 {{< include _includes/usage-vscode.qmd >}}
 
+{{< include _includes/usage-claude.qmd >}}
+
 {{< include _includes/usage-shell.qmd >}}
 
 {{< include _includes/usage-uv.qmd >}}
