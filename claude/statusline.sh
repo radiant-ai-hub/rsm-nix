@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # RSM-MSBA Claude Code status line:
 #
-#   host | ~/folder (branch) | Model | ctx NN% left | 5h NN% left, resets in Xh | 7d NN% left, resets in Xd
+#   host | ~/folder (branch) | Model | ctx NN% left | 5h, NN% left (Xh Ym) | 7d, NN% left (Xd Yh)
+#   (the value in parentheses is the time until that limit window resets)
 #
 # All percentages are REMAINING ("left"): context memory still free, and the
 # 5-hour / 7-day usage-limit headroom (5h/7d appear on Claude Pro/Max only, with
@@ -99,8 +100,8 @@ elif [ -n "$repo" ] && [ -n "$branch" ];     then parts+=("$repo ($branch)")
 fi
 [ -n "$model" ]    && parts+=("$model")
 [ -n "$ctx_left" ] && parts+=("ctx ${ctx_left}% left")
-[ -n "$f_left" ]   && parts+=("5h ${f_left}% left${f_in:+, resets in $f_in}")
-[ -n "$w_left" ]   && parts+=("7d ${w_left}% left${w_in:+, resets in $w_in}")
+[ -n "$f_left" ]   && parts+=("5h, ${f_left}% left${f_in:+ ($f_in)}")
+[ -n "$w_left" ]   && parts+=("7d, ${w_left}% left${w_in:+ ($w_in)}")
 
 out=""
 for p in "${parts[@]}"; do out="${out:+$out | }$p"; done
