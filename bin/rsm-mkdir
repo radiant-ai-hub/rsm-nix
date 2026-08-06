@@ -169,6 +169,11 @@ EOF2
       --zdotdir "$RSMBASE/zsh"
   fi
 
+  # Claude Code "agentic engineering" harness (.claude/ + CLAUDE.md + justfile),
+  # via the shared generator rsm-setup also uses. Its own keep-foreign guards
+  # protect a repo's own CLAUDE.md / justfile / settings.json.
+  rsm-claude-settings "$_here"
+
   if command -v direnv >/dev/null 2>&1; then
     direnv allow "$_here" || true
   fi
