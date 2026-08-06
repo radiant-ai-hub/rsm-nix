@@ -27,6 +27,10 @@ folder (`rsm-setup`, `rsm-mkdir`, or `rsm-clone`), it drops a small Claude Code
   **`justfile`** of handy commands: `just test`, `just check` (tests + lint),
   `just review` (show your diff), `just save "msg"` (checkpoint commit),
   `just verify` (tests, then the diff to read).
+- **See the guardrails for yourself** — `just hooks-off` / `just hooks-on` toggle
+  the hooks for a folder (restart Claude Code to apply) so you can watch the
+  difference, and `just status-line` adds a status bar showing your model, context
+  left, and (on Claude Pro/Max) your 5-hour and 7-day usage.
 - **Gentle guardrails** — before every `git commit`, Claude scans staged files for
   secrets (API keys, `.env` files) and pauses if it finds one; it uses `uv` for
   packages (not `pip`); and it nudges you to run your tests when code has changed.

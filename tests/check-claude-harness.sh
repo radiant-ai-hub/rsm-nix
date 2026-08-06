@@ -102,12 +102,24 @@ printf 'x=1\ny =2\n' > "$rf/bad.py"
 printf '{"tool_input":{"file_path":"%s"}}' "$rf/bad.py" | bash "$rf/.claude/hooks/ruff-format.sh"
 if grep -q 'x = 1' "$rf/bad.py"; then ok "ruff-format reformatted the file"; else bad "ruff-format did not format"; fi
 
-echo "== justfile: valid syntax + expected recipes =="
+echo "== justfile: recipes + hooks toggle + status line =="
 jf="$tmp/just"; mkdir -p "$jf"; rsm-claude-settings "$jf" >/dev/null 2>&1
 recipes=$( cd "$jf" && just --list 2>/dev/null )
-for r in test check review save verify; do
+for r in test check review save verify hooks-off hooks-on hooks-status status-line status-line-off; do
   echo "$recipes" | grep -qw "$r" && ok "justfile recipe: $r" || bad "justfile missing recipe: $r"
 done
+# hooks toggle flips the built-in disableAllHooks in settings.local.json
+( cd "$jf" && just hooks-off >/dev/null 2>&1 )
+grep -q '"disableAllHooks"[[:space:]]*:[[:space:]]*true' "$jf/.claude/settings.local.json" 2>/dev/null \
+  && ok "just hooks-off sets disableAllHooks" || bad "hooks-off did not set disableAllHooks"
+( cd "$jf" && just hooks-on >/dev/null 2>&1 )
+[ ! -f "$jf/.claude/settings.local.json" ] && ok "just hooks-on clears the override" || bad "hooks-on left settings.local.json behind"
+# statusline.sh renders model + context + (Pro/Max) rate limits
+sl="${RSM_FLAKE:-$HOME/rsm-nix}/claude/statusline.sh"
+[ -f "$sl" ] && ok "statusline.sh present" || bad "statusline.sh missing"
+slout=$(printf '%s' '{"model":{"display_name":"Opus X"},"context_window":{"used_percentage":40},"rate_limits":{"five_hour":{"used_percentage":10},"seven_day":{"used_percentage":50}}}' | bash "$sl" 2>/dev/null)
+{ echo "$slout" | grep -q 'Opus X' && echo "$slout" | grep -q '5h 10%' && echo "$slout" | grep -q '7d 50%'; } \
+  && ok "statusline.sh renders model + rate limits" || bad "statusline.sh output wrong: [$slout]"
 
 echo "== non-destructive: keeps a folder's OWN CLAUDE.md / justfile / settings.json =="
 g="$tmp/guard"; mkdir -p "$g/.claude"

@@ -5,6 +5,8 @@
 default:
     @just --list
 
+# --- everyday workflow ------------------------------------------------------
+
 # Run the test suite
 test:
     uv run pytest
@@ -28,3 +30,51 @@ verify:
     uv run pytest
     @echo "--- review the diff below yourself ---"
     git --no-pager diff HEAD
+
+# --- Claude Code: hooks on/off (to SEE what the hooks do) -------------------
+
+# Are the Claude Code hooks on or off in this folder?
+hooks-status:
+    #!/usr/bin/env bash
+    if [ -f .claude/settings.local.json ] && grep -q '"disableAllHooks"[[:space:]]*:[[:space:]]*true' .claude/settings.local.json; then
+      echo "hooks: OFF (this folder)"
+    else
+      echo "hooks: ON"
+    fi
+
+# Turn the hooks OFF here (demo: commit a secret with hooks off vs on to see the difference)
+hooks-off:
+    #!/usr/bin/env bash
+    mkdir -p .claude
+    f=.claude/settings.local.json
+    if [ -f "$f" ]; then jq '.disableAllHooks = true' "$f" > "$f.tmp" && mv "$f.tmp" "$f"; else echo '{ "disableAllHooks": true }' > "$f"; fi
+    echo "🚫 hooks OFF for this folder. Restart Claude Code (or run /hooks) to apply. Re-enable: just hooks-on"
+
+# Turn the hooks back ON here
+hooks-on:
+    #!/usr/bin/env bash
+    f=.claude/settings.local.json
+    if [ -f "$f" ]; then
+      jq 'del(.disableAllHooks)' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+      [ "$(jq -r 'keys | length' "$f")" = "0" ] && rm -f "$f"
+    fi
+    echo "✅ hooks ON. Restart Claude Code (or run /hooks) to apply."
+
+# --- Claude Code: status line (see model, context left, usage) -------------
+
+# Turn ON a status line: model | context left | (Pro/Max) 5h & 7d usage
+status-line:
+    #!/usr/bin/env bash
+    src="${RSM_FLAKE:-$HOME/rsm-nix}/claude/statusline.sh"
+    dest="$HOME/.claude"; mkdir -p "$dest"
+    cp -f "$src" "$dest/rsm-statusline.sh"; chmod +x "$dest/rsm-statusline.sh"
+    f="$dest/settings.json"; [ -f "$f" ] || echo '{}' > "$f"
+    jq --arg c "bash $dest/rsm-statusline.sh" '.statusLine = {type: "command", command: $c}' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+    echo "📊 status line ON — restart Claude Code. Shows model | context left | (Pro/Max) 5h & 7d usage. Off: just status-line-off"
+
+# Remove the status line
+status-line-off:
+    #!/usr/bin/env bash
+    f="$HOME/.claude/settings.json"
+    [ -f "$f" ] && jq 'del(.statusLine)' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+    echo "status line removed. Restart Claude Code."
