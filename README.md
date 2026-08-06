@@ -154,9 +154,11 @@ are the default:
   | `/explain <thing>` | Beginner-friendly explanation of a file, function, or concept.         |
 
 - **A `CLAUDE.md`** of house rules that Claude reads every session, and
-  a **`justfile`** of handy commands: `just test`, `just check` (tests +
-  lint), `just review` (show your diff), `just save "msg"` (checkpoint
-  commit), `just verify` (tests, then the diff to read).
+  a single **`justfile`** at your `~/rsm-msba` root that `just` finds
+  from any subfolder (running in the folder you are in): `just test`,
+  `just check` (tests + lint), `just review` (show your diff),
+  `just save "msg"` (checkpoint commit), `just verify` (tests, then the
+  diff to read).
 
 - **See the guardrails for yourself** — `just hooks-off` /
   `just hooks-on` toggle the hooks for a folder (restart Claude Code to

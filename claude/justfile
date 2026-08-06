@@ -1,5 +1,15 @@
-# Common commands for this project. Run `just` to list them.
-# (Provided by the RSM-MSBA environment as a simple, editable starting point.)
+# RSM-MSBA default commands. Run `just` to list them.   _rsmManaged
+#
+# This ONE justfile lives at ~/rsm-msba. `just` searches UP the directory tree,
+# so it is found automatically from any subfolder below (no need to copy it into
+# each folder). Every recipe runs in the folder you invoked `just` from (not this
+# file's folder), so `just test` targets your current project.
+#
+# Edit freely. To keep your own version and stop rsm-setup from refreshing it,
+# delete the "_rsmManaged" marker on the first line.
+
+# the directory you ran `just` from (found via just's upward search)
+_here := invocation_directory()
 
 # Show the available commands
 default:
@@ -7,35 +17,32 @@ default:
 
 # --- everyday workflow ------------------------------------------------------
 
-# Run the test suite
+# Run the test suite (in the folder you are in)
 test:
-    uv run pytest
+    cd "{{_here}}" && uv run pytest
 
 # Run tests + lint (the "is this good enough to commit?" check)
 check:
-    uv run pytest
-    uvx ruff check .
+    cd "{{_here}}" && uv run pytest && uvx ruff check .
 
-# Show what you've changed since the last commit (review before you commit)
+# Show what you have changed since the last commit (review before you commit)
 review:
-    git --no-pager diff HEAD
+    cd "{{_here}}" && git --no-pager diff HEAD
 
 # Checkpoint your work with a commit message, e.g. `just save "add clv function"`
 save msg:
-    git add -A
-    git commit -m "{{msg}}"
+    cd "{{_here}}" && git add -A && git commit -m "{{msg}}"
 
 # Verify AI-written work: run the tests, then show the diff for you to read
 verify:
-    uv run pytest
-    @echo "--- review the diff below yourself ---"
-    git --no-pager diff HEAD
+    cd "{{_here}}" && uv run pytest && echo "--- review the diff below yourself ---" && git --no-pager diff HEAD
 
 # --- Claude Code: hooks on/off (to SEE what the hooks do) -------------------
 
 # Are the Claude Code hooks on or off in this folder?
 hooks-status:
     #!/usr/bin/env bash
+    cd "{{_here}}"
     if [ -f .claude/settings.local.json ] && grep -q '"disableAllHooks"[[:space:]]*:[[:space:]]*true' .claude/settings.local.json; then
       echo "hooks: OFF (this folder)"
     else
@@ -45,20 +52,22 @@ hooks-status:
 # Turn the hooks OFF here (demo: commit a secret with hooks off vs on to see the difference)
 hooks-off:
     #!/usr/bin/env bash
+    cd "{{_here}}"
     mkdir -p .claude
     f=.claude/settings.local.json
     if [ -f "$f" ]; then jq '.disableAllHooks = true' "$f" > "$f.tmp" && mv "$f.tmp" "$f"; else echo '{ "disableAllHooks": true }' > "$f"; fi
-    echo "🚫 hooks OFF for this folder. Restart Claude Code (or run /hooks) to apply. Re-enable: just hooks-on"
+    echo "hooks OFF for this folder. Restart Claude Code (or run /hooks) to apply. Re-enable: just hooks-on"
 
 # Turn the hooks back ON here
 hooks-on:
     #!/usr/bin/env bash
+    cd "{{_here}}"
     f=.claude/settings.local.json
     if [ -f "$f" ]; then
       jq 'del(.disableAllHooks)' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
       [ "$(jq -r 'keys | length' "$f")" = "0" ] && rm -f "$f"
     fi
-    echo "✅ hooks ON. Restart Claude Code (or run /hooks) to apply."
+    echo "hooks ON. Restart Claude Code (or run /hooks) to apply."
 
 # --- Claude Code: status line (see model, context left, usage) -------------
 
@@ -70,7 +79,7 @@ status-line:
     cp -f "$src" "$dest/rsm-statusline.sh"; chmod +x "$dest/rsm-statusline.sh"
     f="$dest/settings.json"; [ -f "$f" ] || echo '{}' > "$f"
     jq --arg c "bash $dest/rsm-statusline.sh" '.statusLine = {type: "command", command: $c}' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
-    echo "📊 status line ON — restart Claude Code. Shows model | context left | (Pro/Max) 5h & 7d usage. Off: just status-line-off"
+    echo "status line ON -- restart Claude Code. Shows model | context left | (Pro/Max) 5h & 7d usage. Off: just status-line-off"
 
 # Remove the status line
 status-line-off:

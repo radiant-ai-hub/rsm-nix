@@ -1,9 +1,10 @@
 # rsm-claude-settings <dir>: write the RSM "agentic engineering" Claude Code
-# harness into <dir> -- the per-folder .claude/ (settings.json + hooks + commands
-# + usage-log disclosure), a CLAUDE.md of house habits, and an example justfile.
-# Shared by rsm-setup (the ~/rsm-msba workspace root) and rsm-mkdir (nested
-# folders), so the harness is generated in exactly ONE place, mirroring
-# rsm-vscode-settings.
+# harness into <dir> -- the per-folder .claude/ (settings.json + hooks +
+# usage-log disclosure) and a CLAUDE.md of house habits. Slash COMMANDS are
+# deployed user-level (~/.claude/commands) and the JUSTFILE is a single file at
+# the workspace root; both are handled by rsm-setup so they are available in every
+# subfolder without a per-folder copy. Shared by rsm-setup (the ~/rsm-msba
+# workspace root) and rsm-mkdir (nested folders), mirroring rsm-vscode-settings.
 #
 # Curated source comes from the LIVE flake checkout ($RSM_FLAKE/claude), so a
 # plain `git pull` of the flake updates the harness -- no rebuild needed.
@@ -22,7 +23,7 @@ if [ ! -d "$_src" ]; then
   exit 0
 fi
 
-mkdir -p "$_target/.claude/hooks" "$_target/.claude/commands" "$_target/.claude/usage-log"
+mkdir -p "$_target/.claude/hooks" "$_target/.claude/usage-log"
 
 # settings.json: refresh the RSM-managed file (it carries an "_rsmManaged"
 # marker), but KEEP a student's own foreign settings.json untouched. To take
@@ -34,47 +35,38 @@ else
   cp -f "$_src/settings.json" "$_target/.claude/settings.json"
 fi
 
-# Hooks + commands + usage-log disclosure: RSM-managed, refreshed every run so
-# fixes land. (Runtime output -- *.jsonl logs, caches -- is created by the hooks
-# and git-ignored below.)
+# Hooks + usage-log disclosure: RSM-managed, refreshed every run so fixes land.
+# (Runtime output -- *.jsonl logs, caches -- is created by the hooks and
+# git-ignored below.) Slash commands are user-level now; see rsm-setup.
 for _f in "$_src"/hooks/*.sh; do
   [ -e "$_f" ] || continue
   cp -f "$_f" "$_target/.claude/hooks/"
   chmod u+x "$_target/.claude/hooks/$(basename "$_f")" 2>/dev/null || true
 done
-for _f in "$_src"/commands/*.md; do
-  [ -e "$_f" ] || continue
-  cp -f "$_f" "$_target/.claude/commands/"
-done
 cp -f "$_src/usage-log/README.md" "$_target/.claude/usage-log/README.md"
 
-# CLAUDE.md + justfile: NON-destructive. A course repo may ship its own; never
-# clobber it. Only create when absent.
+# CLAUDE.md: NON-destructive. A course repo may ship its own; never clobber it.
+# Only create when absent. (The justfile is a single file at the workspace root,
+# deployed by rsm-setup; `just` finds it from any subfolder via its upward search,
+# so it does not need a per-folder copy here.)
 _kept_claudemd=""
 if [ -e "$_target/CLAUDE.md" ]; then
   _kept_claudemd=1
 else
   cp "$_src/CLAUDE.md" "$_target/CLAUDE.md"
 fi
-_kept_justfile=""
-if [ -e "$_target/justfile" ] || [ -e "$_target/Justfile" ]; then
-  _kept_justfile=1
-else
-  cp "$_src/justfile" "$_target/justfile"
-fi
 
 # Keep runtime/cache bits out of git; the tracked harness (settings.json, hooks,
-# commands, usage-log/*.jsonl, CLAUDE.md, justfile) is meant to be committed.
+# usage-log/*.jsonl, CLAUDE.md) is meant to be committed.
 touch "$_target/.gitignore"
 for _ig in '.claude/.last-test-time' '.claude/settings.local.json' '.claude/bin/' '.claude/usage-log/.github-user'; do
   grep -qxF "$_ig" "$_target/.gitignore" 2>/dev/null || printf '%s\n' "$_ig" >> "$_target/.gitignore"
 done
 
-echo "    claude    : harness -> $_target/.claude (+ CLAUDE.md, justfile)"
+echo "    claude    : harness -> $_target/.claude (+ CLAUDE.md)"
 # NB: use if-blocks (not `[ ... ] && echo`) so the script's final exit status is
 # 0 even when nothing was kept — a trailing `[ -n "" ] && echo` would exit 1 and,
 # under the caller's `set -e`, abort rsm-mkdir's multi-folder loop. (An if whose
 # condition is false returns 0, so no explicit `exit 0` is needed.)
 if [ -n "$_kept_settings" ]; then echo "                kept the folder's own .claude/settings.json (no _rsmManaged marker)"; fi
 if [ -n "$_kept_claudemd" ]; then echo "                kept the folder's own CLAUDE.md"; fi
-if [ -n "$_kept_justfile" ]; then echo "                kept the folder's own justfile"; fi

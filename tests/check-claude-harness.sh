@@ -23,15 +23,15 @@ tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 echo "== deploy: rsm-claude-settings writes the full harness =="
 proj="$tmp/proj"; mkdir -p "$proj"
 rsm-claude-settings "$proj" >/dev/null 2>&1
-for f in .claude/settings.json .claude/usage-log/README.md CLAUDE.md justfile .gitignore; do
+for f in .claude/settings.json .claude/usage-log/README.md CLAUDE.md .gitignore; do
   [ -f "$proj/$f" ] && ok "wrote $f" || bad "missing $f"
 done
 for h in _common secret-scan usage-log auto-stage-log save-test-time check-stale-tests ruff-check ruff-format; do
   [ -f "$proj/.claude/hooks/$h.sh" ] && ok "hook $h.sh" || bad "missing hook $h.sh"
 done
-for c in review explain run-tests add-function; do
-  [ -f "$proj/.claude/commands/$c.md" ] && ok "command /$c" || bad "missing command /$c"
-done
+# commands + justfile are NO LONGER per-folder (user-level commands + one workspace justfile)
+[ ! -e "$proj/.claude/commands" ] && ok "no per-folder .claude/commands (commands are user-level)" || bad "rsm-claude-settings still writes per-folder commands"
+[ ! -e "$proj/justfile" ] && ok "no per-folder justfile (single workspace justfile)" || bad "rsm-claude-settings still writes a per-folder justfile"
 [ -x "$proj/.claude/hooks/secret-scan.sh" ] && ok "hooks are executable" || bad "hooks not executable"
 grep -q '_rsmManaged' "$proj/.claude/settings.json" && ok "settings has _rsmManaged marker" || bad "settings missing marker"
 grep -q 'Bash(pip:\*)' "$proj/.claude/settings.json" && ok "settings deny pip (uv-only policy)" || bad "settings missing deny pip"
@@ -53,6 +53,15 @@ for s in git-workflow verify-ai-code rsm-project; do
   [ -f "$fakehome/$s/SKILL.md" ] && ok "skill $s deploys cleanly" || bad "skill $s did not deploy"
 done
 [ -f "$skills_src/git-workflow/scripts/git_state.sh" ] && ok "git-workflow ships git_state.sh" || bad "git-workflow missing git_state.sh"
+
+echo "== commands: user-level source present + deploys cleanly (mirrors rsm-setup 6b2) =="
+cmd_src="${RSM_FLAKE:-$HOME/rsm-nix}/claude/commands"
+fakecmd="$tmp/home/.claude/commands"; mkdir -p "$fakecmd"
+for _cf in "$cmd_src"/*.md; do [ -e "$_cf" ] && cp -f "$_cf" "$fakecmd/"; done
+for c in review explain run-tests add-function; do
+  [ -f "$cmd_src/$c.md" ] && ok "command source /$c present" || bad "command source /$c missing"
+  [ -f "$fakecmd/$c.md" ] && ok "command /$c deploys user-level" || bad "command /$c did not deploy user-level"
+done
 
 echo "== secret-scan: flags a key on git commit, silent when clean =="
 srepo="$tmp/secret"; mkdir -p "$srepo"; ( cd "$srepo" && git init -q )
@@ -102,18 +111,29 @@ printf 'x=1\ny =2\n' > "$rf/bad.py"
 printf '{"tool_input":{"file_path":"%s"}}' "$rf/bad.py" | bash "$rf/.claude/hooks/ruff-format.sh"
 if grep -q 'x = 1' "$rf/bad.py"; then ok "ruff-format reformatted the file"; else bad "ruff-format did not format"; fi
 
-echo "== justfile: recipes + hooks toggle + status line =="
-jf="$tmp/just"; mkdir -p "$jf"; rsm-claude-settings "$jf" >/dev/null 2>&1
-recipes=$( cd "$jf" && just --list 2>/dev/null )
+echo "== justfile: single workspace file, upward-search + invocation_directory =="
+jf_src="${RSM_FLAKE:-$HOME/rsm-nix}/claude/justfile"
+grep -q '_rsmManaged' "$jf_src" && ok "justfile has _rsmManaged marker" || bad "justfile missing _rsmManaged marker"
+grep -q 'invocation_directory()' "$jf_src" && ok "justfile uses invocation_directory" || bad "justfile missing invocation_directory"
+# deploy ONE justfile at a fake workspace root; run `just` from a DEEP subfolder
+ws="$tmp/ws"; mkdir -p "$ws/sub/deep"; cp "$jf_src" "$ws/justfile"
+recipes=$( cd "$ws/sub/deep" && just --list 2>/dev/null )   # found via just's upward search
 for r in test check review save verify hooks-off hooks-on hooks-status status-line status-line-off; do
   echo "$recipes" | grep -qw "$r" && ok "justfile recipe: $r" || bad "justfile missing recipe: $r"
 done
-# hooks toggle flips the built-in disableAllHooks in settings.local.json
-( cd "$jf" && just hooks-off >/dev/null 2>&1 )
-grep -q '"disableAllHooks"[[:space:]]*:[[:space:]]*true' "$jf/.claude/settings.local.json" 2>/dev/null \
-  && ok "just hooks-off sets disableAllHooks" || bad "hooks-off did not set disableAllHooks"
-( cd "$jf" && just hooks-on >/dev/null 2>&1 )
-[ ! -f "$jf/.claude/settings.local.json" ] && ok "just hooks-on clears the override" || bad "hooks-on left settings.local.json behind"
+here=$( cd "$ws/sub/deep" && just --evaluate _here 2>/dev/null )
+# compare canonical paths: on macOS just returns /private/tmp/... while $ws is the
+# /tmp symlink, so resolve both with `pwd -P` before comparing.
+want=$( cd "$ws/sub/deep" && pwd -P )
+here_c=$( cd "$here" 2>/dev/null && pwd -P || printf '%s' "$here" )
+[ "$here_c" = "$want" ] && ok "just from a subfolder targets the invocation dir" || bad "invocation_directory wrong: [$here_c] != [$want]"
+# hooks toggle must run in the INVOCATION dir (writes settings.local.json there, not at the justfile)
+( cd "$ws/sub/deep" && just hooks-off >/dev/null 2>&1 )
+grep -q '"disableAllHooks"[[:space:]]*:[[:space:]]*true' "$ws/sub/deep/.claude/settings.local.json" 2>/dev/null \
+  && ok "just hooks-off writes to the invocation dir" || bad "hooks-off did not target the invocation dir"
+[ ! -e "$ws/.claude/settings.local.json" ] && ok "hooks-off did NOT write to the justfile's own dir" || bad "hooks-off wrote to the justfile dir, not the invocation dir"
+( cd "$ws/sub/deep" && just hooks-on >/dev/null 2>&1 )
+[ ! -f "$ws/sub/deep/.claude/settings.local.json" ] && ok "just hooks-on clears the override" || bad "hooks-on left settings.local.json behind"
 # statusline.sh renders model + context/limits as REMAINING (left) + reset countdown
 sl="${RSM_FLAKE:-$HOME/rsm-nix}/claude/statusline.sh"
 [ -f "$sl" ] && ok "statusline.sh present" || bad "statusline.sh missing"
@@ -124,15 +144,31 @@ slout=$(printf '%s' '{"model":{"display_name":"Opus X"},"workspace":{"current_di
     && echo "$slout" | grep -q '7d, 50% left'; } \
   && ok "statusline.sh renders model + limits-left + reset" || bad "statusline.sh output wrong: [$slout]"
 
-echo "== non-destructive: keeps a folder's OWN CLAUDE.md / justfile / settings.json =="
+echo "== non-destructive: rsm-claude-settings keeps a folder's OWN CLAUDE.md / settings.json =="
 g="$tmp/guard"; mkdir -p "$g/.claude"
 printf '# my own rules\n' > "$g/CLAUDE.md"
-printf 'mine:\n\t@echo hi\n' > "$g/justfile"
 printf '{"permissions":{"allow":["Bash(ls:*)"]}}\n' > "$g/.claude/settings.json"
 rsm-claude-settings "$g" >/dev/null 2>&1
 grep -q 'my own rules' "$g/CLAUDE.md" && ok "kept foreign CLAUDE.md" || bad "clobbered foreign CLAUDE.md"
-grep -q '^mine:' "$g/justfile" && ok "kept foreign justfile" || bad "clobbered foreign justfile"
 { grep -q 'Bash(ls' "$g/.claude/settings.json" && ! grep -q '_rsmManaged' "$g/.claude/settings.json"; } \
   && ok "kept foreign .claude/settings.json" || bad "clobbered foreign settings.json"
+
+echo "== workspace justfile deploy: refresh RSM-managed, keep a user's own (mirrors rsm-setup 1b3) =="
+_deploy_wsjf() {  # mirrors the deploy decision in bin/rsm-setup step 1b3
+  _jf="$1/justfile"
+  if [ ! -e "$_jf" ] || grep -qE '_rsmManaged|Provided by the RSM-MSBA environment' "$_jf" 2>/dev/null; then
+    cp -f "$jf_src" "$_jf"
+  fi
+}
+d1="$tmp/wsjf-absent"; mkdir -p "$d1"; _deploy_wsjf "$d1"
+grep -q '_rsmManaged' "$d1/justfile" 2>/dev/null && ok "deploys the justfile when absent" || bad "did not deploy when absent"
+d2="$tmp/wsjf-old"; mkdir -p "$d2"
+printf '# Common commands.\n# (Provided by the RSM-MSBA environment as a simple, editable starting point.)\ntest:\n\tuv run pytest\n' > "$d2/justfile"
+_deploy_wsjf "$d2"
+grep -q 'invocation_directory()' "$d2/justfile" && ok "upgrades an old RSM justfile" || bad "did not upgrade an old RSM justfile"
+d3="$tmp/wsjf-foreign"; mkdir -p "$d3"; printf 'mine:\n\t@echo hi\n' > "$d3/justfile"
+_deploy_wsjf "$d3"
+{ grep -q '^mine:' "$d3/justfile" && ! grep -q '_rsmManaged' "$d3/justfile"; } \
+  && ok "keeps a user's own workspace justfile" || bad "clobbered a user's own workspace justfile"
 
 [ "$fail" -eq 0 ] && echo "claude-harness check passed." || { echo "claude-harness check FAILED." >&2; exit 1; }
