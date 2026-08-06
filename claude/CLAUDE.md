@@ -72,3 +72,7 @@ confirm there's no real secret — don't push through the warning blindly.
 If a `justfile` is present: `just test` (run tests), `just check` (tests + lint),
 `just review` (show your diff), `just save "msg"` (checkpoint commit),
 `just verify` (tests, then show the diff to review).
+
+To see what the hooks do, `just hooks-off` / `just hooks-on` toggle them for this
+folder (restart Claude Code to apply). `just status-line` turns on a status bar
+showing your model, context left, and (on Pro/Max) your 5-hour and 7-day usage.
