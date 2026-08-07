@@ -257,6 +257,9 @@
           # Verifies a project's env: imports each declared dependency and flags
           # anything that fails to load (missing package or missing system lib).
           rsm-project-check = mk "rsm-project-check" [ pkgs.coreutils ];
+          # rsm-threads: fzf menu of past Claude Code conversations across every
+          # folder (title + folder + date); Enter resumes the thread in its folder.
+          rsm-threads = mk "rsm-threads" [ pkgs.jq pkgs.fzf pkgs.coreutils pkgs.findutils pkgs.gnused ];
         };
     in
     {

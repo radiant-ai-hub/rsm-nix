@@ -9,9 +9,16 @@
 | `rsm-python-sync` | Refresh the base env from `uv.lock` |
 | `rsm-mkdir [--venv] PATH...` | Make folder(s) first-class RSM projects to open directly in VS Code — nested or standalone, sharing the one nix-uv env (CWD-relative like `mkdir`); `--venv` gives a folder its **own** reproducible env (the conda alternative) |
 | `rsm-clone URL [DIR]` | `git clone` a repo AND set it up (direnv + nix-uv) so it opens directly in VS Code |
+| `rsm-threads` | Browse past Claude Code conversations across every folder (fzf menu by title + folder + date); Enter resumes the chosen thread in its own folder |
 | `rsm-project-check` | In a `--venv` folder, import each declared package and flag anything that fails to load |
 | `rsm-vscode-ext` | Install the curated VS Code extensions into the connected (WSL/SSH) window |
 | `rsm-pg-init` / `-start` / `-stop` / `-status` | Workspace-local PostgreSQL lifecycle |
 | `rsm-pg-psql` | `psql` into the `rsm-msba` database |
 | `rsm-pgweb` | Browser-based database viewer (opens the exact per-user URL it prints) |
 | `rsm-github` (alias `github`) | One-time setup of your Git identity + a GitHub SSH key |
+
+`rsm-threads` is handy when you work across many folders (for example lots of student
+repos): it reads your local Claude history in `~/.claude/projects/` and, on Enter,
+`cd`s to the selected thread's folder and runs `claude --resume`, so you reconnect in
+the right place. The preview pane shows your prompts in that thread, and
+`rsm-threads --list` gives a plain, non-interactive listing.

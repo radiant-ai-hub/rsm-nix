@@ -1,0 +1,120 @@
+# rsm-threads: browse and resume past Claude Code conversations across every folder.
+#
+# Reads your local Claude history under ~/.claude/projects/*/*.jsonl and shows an
+# fzf menu of past threads by date + folder + AI-generated title, with a preview of
+# your prompts in that thread. Enter resumes the chosen thread IN ITS OWN FOLDER
+# (cd <folder> && claude --resume <id>), because Claude sessions are folder-scoped.
+#
+# Usage:
+#   rsm-threads               open the interactive menu (needs fzf)
+#   rsm-threads --list        print the thread list, no menu (for scripting)
+#   rsm-threads --preview ID  print the preview for one session id (used by the menu)
+#   rsm-threads --print ID    print the `cd <folder> && claude --resume ID` command
+
+_proj="${CLAUDE_PROJECTS_DIR:-$HOME/.claude/projects}"
+
+_title_for() {  # $1 = jsonl file -> a human-readable title (never empty)
+  local t p
+  t=$(jq -r 'select(.type=="ai-title" and .aiTitle!=null and .aiTitle!="null" and .aiTitle!="") | .aiTitle' "$1" 2>/dev/null | tail -1)
+  if [ -z "$t" ]; then
+    p=$(jq -r 'select(.type=="last-prompt" and .lastPrompt!=null) | .lastPrompt' "$1" 2>/dev/null | tail -1)
+    [ -z "$p" ] && p=$(jq -r 'select(.type=="user") | .message.content | if type=="string" then . else ([.[]?.text // empty] | join(" ")) end' "$1" 2>/dev/null | head -1)
+    t=$(printf '%s' "$p" | tr '\n\t' '  ' | cut -c1-70)
+  fi
+  [ -n "$t" ] && printf '%s' "$t" || printf '(untitled)'
+}
+
+_cwd_for() {  # $1 = jsonl file -> the folder the thread ran in (may be empty)
+  jq -r 'select(.cwd!=null and .cwd!="") | .cwd' "$1" 2>/dev/null | tail -1
+}
+
+_file_for() {  # $1 = session id -> its jsonl path (may be empty)
+  find "$_proj" -type f -name "$1.jsonl" 2>/dev/null | head -1
+}
+
+_emit_rows() {  # -> TSV lines: mtime \t sid \t cwd \t "DATE  FOLDER  TITLE"
+  local f sid cwd title mt d folder tilde
+  tilde='~'  # via a var so shellcheck does not flag a literal ~ in the display
+  for f in "$_proj"/*/*.jsonl; do
+    [ -e "$f" ] || continue
+    sid=$(basename "$f" .jsonl)
+    cwd=$(_cwd_for "$f")
+    title=$(_title_for "$f")
+    mt=$(stat -c %Y "$f" 2>/dev/null || stat -f %m "$f" 2>/dev/null || echo 0)
+    d=$(date -d "@$mt" '+%Y-%m-%d %H:%M' 2>/dev/null || date -r "$mt" '+%Y-%m-%d %H:%M' 2>/dev/null || echo "????-??-??")
+    case "$cwd" in
+      "$HOME") folder="$tilde" ;;
+      "$HOME"/*) folder="$tilde/${cwd#"$HOME"/}" ;;
+      "" | null) folder="?" ;;
+      *) folder="$cwd" ;;
+    esac
+    printf '%s\t%s\t%s\t%s  %-38.38s  %s\n' "$mt" "$sid" "$cwd" "$d" "$folder" "$title"
+  done
+}
+
+_resume_cmd() {  # $1 = session id -> "cd <folder> && claude --resume <id>"
+  local f cwd
+  f=$(_file_for "$1"); [ -n "$f" ] || { printf 'claude --resume %s' "$1"; return; }
+  cwd=$(_cwd_for "$f")
+  if [ -n "$cwd" ]; then printf 'cd %s && claude --resume %s' "$cwd" "$1"; else printf 'claude --resume %s' "$1"; fi
+}
+
+case "${1:-}" in
+  --preview)
+    sid="${2:-}"; [ -n "$sid" ] || exit 0
+    f=$(_file_for "$sid"); [ -n "$f" ] || { echo "session not found"; exit 0; }
+    printf 'Title : %s\nFolder: %s\nId    : %s\n\n--- your prompts in this thread ---\n' \
+      "$(_title_for "$f")" "$(_cwd_for "$f")" "$sid"
+    jq -r 'select(.type=="user") | .message.content | if type=="string" then . else ([.[]?.text // empty] | join(" ")) end | select(. != null and . != "")' "$f" 2>/dev/null \
+      | sed 's/^/> /' | cut -c1-200 | head -40
+    exit 0
+    ;;
+  --list)
+    _emit_rows | sort -rn | cut -f4-
+    exit 0
+    ;;
+  --print)
+    sid="${2:-}"; [ -n "$sid" ] || { echo "usage: rsm-threads --print <session-id>" >&2; exit 2; }
+    _resume_cmd "$sid"; echo
+    exit 0
+    ;;
+  -h | --help)
+    cat <<'EOF'
+rsm-threads: browse and resume past Claude Code conversations across every folder.
+
+  rsm-threads               open the interactive menu (needs fzf)
+  rsm-threads --list        print the thread list, no menu
+  rsm-threads --preview ID  print the preview for one session id
+  rsm-threads --print ID    print the "cd <folder> && claude --resume ID" command
+
+Enter in the menu resumes the chosen thread in its own folder.
+EOF
+    exit 0
+    ;;
+esac
+
+command -v fzf >/dev/null 2>&1 || { echo "fzf is required for the menu; try 'rsm-threads --list'." >&2; exit 1; }
+rows=$(_emit_rows | sort -rn)
+[ -n "$rows" ] || { echo "No past Claude conversations found under $_proj." >&2; exit 0; }
+
+sel=$(printf '%s\n' "$rows" \
+  | fzf --delimiter='\t' --with-nth='4..' \
+        --prompt='claude threads> ' \
+        --height='90%' --layout=reverse --border --no-hscroll \
+        --preview 'rsm-threads --preview {2}' \
+        --preview-window='right,55%,wrap') || exit 0
+
+[ -n "$sel" ] || exit 0
+sid=$(printf '%s' "$sel" | cut -f2)
+cwd=$(printf '%s' "$sel" | cut -f3)
+[ -n "$sid" ] || exit 0
+
+if [ -n "$cwd" ] && [ -d "$cwd" ]; then
+  echo "==> resuming in $cwd"
+  cd "$cwd" || exit 1
+  exec claude --resume "$sid"
+else
+  echo "The folder for this thread is gone ($cwd). Resume it from anywhere with:" >&2
+  echo "  claude --resume $sid" >&2
+  exit 0
+fi
