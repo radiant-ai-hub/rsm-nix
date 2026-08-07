@@ -58,6 +58,9 @@ jobs:
       - name: Claude Code agentic-engineering harness (deploy + hooks + telemetry scoped to course repos)
         run: nix develop -c bash tests/check-claude-harness.sh
 
+      - name: rsm-threads (past-conversation browser)
+        run: nix develop -c bash tests/check-rsm-threads.sh
+
       - name: Check xgboost/libomp in a terminal — shared env + isolated venv (macOS SIP)
         run: nix develop -c bash tests/check-macos-omp.sh
 
