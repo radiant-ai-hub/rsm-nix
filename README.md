@@ -173,6 +173,41 @@ are the default:
   it uses `uv` for packages (not `pip`); and it nudges you to run your
   tests when code has changed.
 
+**Run Claude in the right folder, and point it at files.** Claude can
+only see files under the folder where you started it (its working
+directory), and that same folder decides which `CLAUDE.md` and settings
+apply and which past conversations you can resume. A few things worth
+knowing:
+
+- **Start in the intended folder.** In VS Code, open the project folder
+  you want to work in (File \> Open Folder, or the Remote-SSH folder
+  picker) so the integrated terminal opens there, then run `claude`. If
+  you started in the wrong place, quit Claude and restart it from the
+  right folder. The status line (`just status-line`) shows which folder
+  you are in.
+- **Resume a past conversation** instead of starting over.
+  `claude --continue` (or `claude -c`) jumps straight back into your
+  most recent conversation; `claude --resume` (or `claude -r`) opens a
+  list to pick from; and `/resume` does the same from inside a session.
+  These lists are **per folder**, so start Claude in the same folder you
+  used before or that conversation will not show up (inside the picker,
+  `Ctrl-A` widens the list to every project).
+- **Let Claude look in another folder.** To give Claude access to files
+  outside its working directory (a shared data folder, a sibling
+  project), add the folder with `/add-dir /absolute/path/to/folder` (add
+  several if you like, or start Claude with
+  `claude --add-dir /path/a /path/b`). Your `CLAUDE.md`, settings, and
+  hooks still come only from the folder you launched in, not from added
+  folders.
+- **Hand Claude a specific file** in your prompt, three easy ways:
+  - Type `@` and start typing the name; Claude autocompletes paths
+    relative to your folder, e.g. `explain @rfm.qmd` or
+    `what is in @data/bbb.parquet?`.
+  - Drag the file from the VS Code Explorer (or Finder) into the
+    terminal; the shell pastes its full path into your prompt.
+  - Right-click the file in the VS Code Explorer, choose **Copy Relative
+    Path** (or Copy Path), and paste it into your prompt.
+
 **Suggestions — get the most out of it without switching your brain
 off:**
 
