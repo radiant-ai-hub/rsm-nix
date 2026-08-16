@@ -6,16 +6,46 @@
 echo "Let's set up your Git configuration and GitHub SSH access."
 echo
 
-read -r -p "Enter your @ucsd.edu email address for Git commits: " git_email
-git config --global user.email "$git_email"
-git config --global user.name "rsm-${git_email%@ucsd.edu}"
-git config --global pull.rebase false
-git config --global init.defaultBranch main
+# True if $1 exists and is read-only or a nix-store symlink (managed declaratively
+# by NixOS / home-manager, so we must not try to write it).
+_managed_ro() {
+  [ -e "$1" ] || return 1
+  [ -w "$1" ] || return 0
+  case "$(readlink -f "$1" 2>/dev/null || true)" in /nix/store/*) return 0 ;; esac
+  return 1
+}
 
-echo
-echo "Git configuration set:"
-echo "  Name : $(git config --global user.name)"
-echo "  Email: $(git config --global user.email)"
+# Which file `git config --global` would write (mirrors git's own resolution).
+_xdg="${XDG_CONFIG_HOME:-$HOME/.config}"
+if [ -n "${GIT_CONFIG_GLOBAL:-}" ]; then git_cfg="$GIT_CONFIG_GLOBAL"
+elif [ -f "$HOME/.gitconfig" ]; then git_cfg="$HOME/.gitconfig"
+elif [ -f "$_xdg/git/config" ]; then git_cfg="$_xdg/git/config"
+else git_cfg="$HOME/.gitconfig"; fi
+
+if _managed_ro "$git_cfg"; then
+  # NixOS / home-manager owns the global Git config; it is read-only. The identity
+  # is set declaratively, so read it instead of writing (which would error).
+  echo "Your global Git config is managed by NixOS / home-manager (read-only):"
+  echo "    $git_cfg"
+  echo "Skipping Git identity setup; it is configured declaratively. Current identity:"
+  echo "  Name : $(git config --global user.name 2>/dev/null || echo '<unset>')"
+  echo "  Email: $(git config --global user.email 2>/dev/null || echo '<unset>')"
+  git_email="$(git config --global user.email 2>/dev/null || true)"
+  if [ -z "$git_email" ]; then
+    read -r -p "Enter your @ucsd.edu email to derive your GitHub username (not saved): " git_email
+  fi
+else
+  read -r -p "Enter your @ucsd.edu email address for Git commits: " git_email
+  git config --global user.email "$git_email"
+  git config --global user.name "rsm-${git_email%@ucsd.edu}"
+  git config --global pull.rebase false
+  git config --global init.defaultBranch main
+
+  echo
+  echo "Git configuration set:"
+  echo "  Name : $(git config --global user.name)"
+  echo "  Email: $(git config --global user.email)"
+fi
 
 # --- GitHub username -------------------------------------------------------
 # Coursework expects your GitHub account to be named after your UCSD username:

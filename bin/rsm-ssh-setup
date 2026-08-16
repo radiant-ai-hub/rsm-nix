@@ -17,6 +17,15 @@ SC2_HOST="${RSM_SC2_HOST:-sc2-ubuntu.tail37260b.ts.net}"
 BEGIN="# >>> rsm-msba (managed) >>>"
 END="# <<< rsm-msba (managed) <<<"
 
+# True if $1 exists and is read-only or a nix-store symlink (managed declaratively
+# by NixOS / home-manager, so we must not try to write it).
+_managed_ro() {
+  [ -e "$1" ] || return 1
+  [ -w "$1" ] || return 0
+  case "$(readlink -f "$1" 2>/dev/null || true)" in /nix/store/*) return 0 ;; esac
+  return 1
+}
+
 mkdir -p "$SSH_DIR"
 chmod 700 "$SSH_DIR" 2>/dev/null || true
 
@@ -40,8 +49,17 @@ if [ -z "$user" ]; then
 fi
 
 # 3) ~/.ssh/config — write a managed 'Host sc2' block (only once we know the
-#    username). The marked block is replaced in place on every run.
-if [ -n "$user" ]; then
+#    username). The marked block is replaced in place on every run. Skip entirely
+#    if the config is read-only (managed by NixOS / home-manager); there the host
+#    belongs in your Nix config instead.
+if _managed_ro "$CFG"; then
+  echo "    ssh       : $CFG is managed by NixOS / home-manager (read-only); not modifying it."
+  if grep -q '^[[:space:]]*Host[[:space:]].*\bsc2\b' "$CFG" 2>/dev/null; then
+    echo "                ('Host sc2' is already present.)"
+  else
+    echo "                Add the RSM server to your Nix ssh config: Host sc2 -> HostName $SC2_HOST${user:+, User $user}."
+  fi
+elif [ -n "$user" ]; then
   touch "$CFG"
   chmod 600 "$CFG" 2>/dev/null || true
   tmp="$(mktemp)"
