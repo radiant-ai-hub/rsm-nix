@@ -380,6 +380,73 @@ nix develop .#spark-hadoop
 rsm-spark-hadoop-proof             # Hadoop + Spark + a local PySpark session
 ```
 
+## Optional: GPUs (deep learning)
+
+The Rady servers have NVIDIA GPUs; laptops generally do not. The same
+commands work in both places — they detect what the machine actually
+has, so you do not need a different notebook for the server.
+
+### Check what you have
+
+```bash
+cd ~/rsm-msba
+nix run .#check-gpu
+```
+
+On a GPU server this lists the GPUs and confirms CUDA is reachable. On a
+laptop it says there is no NVIDIA driver and that PyTorch will run on
+CPU — that is a normal answer, not an error.
+
+### Make a course folder with PyTorch
+
+```bash
+rsm-gpu-init deep-learning        # picks the right PyTorch for this machine
+```
+
+This creates a normal RSM project folder with its own `.venv`, then
+installs the PyTorch build that matches the machine: the CUDA build
+where there is a GPU, the CPU build where there is not. Open the folder
+in VS Code and pick the `.venv` interpreter, as with any other project.
+
+The GPU download is large (several GB) because the CUDA libraries ship
+inside the PyTorch wheel. On a laptop you can force the much smaller CPU
+build:
+
+```bash
+rsm-gpu-init --cpu experiment
+```
+
+### Confirm your code can see the GPU
+
+```python
+import torch
+torch.cuda.is_available()      # True on the server
+torch.cuda.device_count()      # how many GPUs you can use
+torch.cuda.get_device_name(0)
+```
+
+If `is_available()` is `False` **on the server**, the usual cause is
+that you started Python outside the RSM environment. The environment is
+what points PyTorch at the system GPU driver; a bare `python` from a
+plain terminal will not find it. Open the folder in VS Code (which loads
+the environment through direnv), or run `cd ~/rsm-msba && nix develop`
+first, and try again.
+
+### Sharing the servers
+
+The GPUs and the memory are shared with everyone else on the machine. A
+few things follow from that:
+
+- **Memory is capped per user.** If you exceed the cap your job is
+  stopped rather than the whole machine going down. If work dies
+  unexpectedly and you were loading a very large dataset, this is the
+  likely cause — load it in chunks, or ask about the current limit.
+- **Free the GPU when you are done.** Shut down notebook kernels you are
+  not using; an idle kernel keeps holding GPU memory and blocks other
+  people. `nvidia-smi` shows what is currently running.
+- **Ask before taking every GPU.** `torch.cuda.device_count()` may
+  report several, but using all of them means nobody else can work.
+
 ## Updating the environment
 
 Everything (Python packages, tools, examples, the shell) is defined in

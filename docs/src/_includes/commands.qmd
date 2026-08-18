@@ -9,6 +9,8 @@
 | `rsm-python-sync` | Refresh the base env from `uv.lock` |
 | `rsm-mkdir [--venv] PATH...` | Make folder(s) first-class RSM projects to open directly in VS Code — nested or standalone, sharing the one nix-uv env (CWD-relative like `mkdir`); `--venv` gives a folder its **own** reproducible env (the conda alternative) |
 | `rsm-clone URL [DIR]` | `git clone` a repo AND set it up (direnv + nix-uv) so it opens directly in VS Code |
+| `rsm-gpu-init [--cpu] PATH` | `rsm-mkdir --venv` plus PyTorch matched to this machine — CUDA build where a driver is present, CPU build otherwise (`--cpu` forces the smaller CPU build) |
+| `rsm-gpu-proof` | Report the NVIDIA driver, CUDA reachability, and (if installed) what PyTorch actually sees. Also `nix run .#check-gpu` |
 | `rsm-threads` | Browse past Claude Code conversations across every folder (fzf menu by title + folder + date); Enter resumes the chosen thread in its own folder |
 | `rsm-project-check` | In a `--venv` folder, import each declared package and flag anything that fails to load |
 | `rsm-vscode-ext` | Install the curated VS Code extensions into the connected (WSL/SSH) window |
