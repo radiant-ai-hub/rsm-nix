@@ -1,0 +1,91 @@
+# rsm-gpu-init [--cpu] PATH : make PATH an RSM project folder with its OWN venv
+# and a PyTorch build matched to THIS machine's GPU.
+#
+#   rsm-gpu-init deep-learning     a course folder with GPU PyTorch
+#   rsm-gpu-init --cpu experiment  force the CPU build (smaller; laptop-friendly)
+#
+# This is rsm-mkdir --venv plus one decision: WHICH torch wheel. That decision
+# is the whole reason this command exists, because getting it wrong is quiet
+# rather than loud -- a CPU wheel on a GPU box does not error, it just reports
+# torch.cuda.is_available() == False and trains ~50x slower while the student
+# assumes the GPU is broken.
+#
+# The wheel is chosen from the DRIVER, not from the machine's name or OS:
+#
+#   libcuda.so.1 present  -> CUDA build  (uv --torch-backend=auto picks the
+#                            wheel matching the installed driver version)
+#   absent                -> CPU build   (explicit CPU index; much smaller
+#                            download, and no CUDA payload to drag around)
+#
+# The GPU wheels are large (multiple GB). That is inherent -- they bundle the
+# CUDA runtime, cuBLAS and cuDNN -- and is exactly why the CPU build is the
+# right default on a laptop.
+
+_force_cpu=0
+_path=""
+for _arg in "$@"; do
+  case "$_arg" in
+    --cpu) _force_cpu=1 ;;
+    -h|--help)
+      echo "usage: rsm-gpu-init [--cpu] PATH"
+      echo "  PATH   folder to set up as a GPU-ready RSM project"
+      echo "  --cpu  force the CPU torch build even on a GPU machine"
+      exit 0 ;;
+    -*) echo "rsm-gpu-init: unknown argument: $_arg" >&2; exit 2 ;;
+    *)
+      if [ -n "$_path" ]; then
+        echo "rsm-gpu-init: only one PATH is supported" >&2; exit 2
+      fi
+      _path="$_arg" ;;
+  esac
+done
+
+if [ -z "$_path" ]; then
+  echo "usage: rsm-gpu-init [--cpu] PATH" >&2
+  exit 2
+fi
+
+# Same detection the devShell hook and the proof use.
+if [ -e /run/opengl-driver/lib/libcuda.so.1 ] && [ "$_force_cpu" -eq 0 ]; then
+  _mode="cuda"
+else
+  _mode="cpu"
+fi
+
+echo "rsm-gpu-init: setting up '$_path' with the $_mode PyTorch build"
+
+# Reuse rsm-mkdir rather than reimplementing .envrc/.vscode/direnv handling --
+# a GPU project should be identical to every other RSM project except for the
+# torch wheel.
+rsm-mkdir --venv "$_path"
+
+cd "$_path"
+
+if [ "$_mode" = "cuda" ]; then
+  # --torch-backend=auto inspects the installed driver and resolves the wheel
+  # that matches it, so this does not hard-code a CUDA version that will rot
+  # the next time the servers are upgraded.
+  uv add torch torchvision --torch-backend=auto
+else
+  uv add torch torchvision --torch-backend=cpu
+fi
+
+echo
+echo "rsm-gpu-init: verifying"
+# Run the proof INSIDE the new venv so it reports on the environment the
+# student will actually use, not the outer nix shell.
+if [ -x .venv/bin/python ]; then
+  LD_LIBRARY_PATH="/run/opengl-driver/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+    .venv/bin/python - <<'PY'
+import torch
+print(f"  torch {torch.__version__}")
+print(f"  cuda available : {torch.cuda.is_available()}")
+print(f"  device count   : {torch.cuda.device_count()}")
+for i in range(torch.cuda.device_count()):
+    print(f"    cuda:{i} {torch.cuda.get_device_name(i)}")
+PY
+fi
+
+echo
+echo "Open '$_path' in VS Code and pick the .venv interpreter."
+echo "Re-check the GPU at any time with: rsm-gpu-proof"
