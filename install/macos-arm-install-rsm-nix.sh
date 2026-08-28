@@ -594,6 +594,15 @@ configure_direnv() {
     nix profile "$nix_add" nixpkgs#nix-direnv
   fi
 
+  # macOS ships bash 3.2, but nix-direnv's `use flake` needs bash >= 4.4. direnv
+  # normally uses its own baked (nix) bash, but if that store path is ever garbage-
+  # collected it silently falls back to /bin/bash 3.2 and warns on every `cd`. A
+  # profile-rooted nix bash is GC-safe; the managed .zshrc block below points
+  # DIRENV_BASH at it so `use flake` always gets a modern bash.
+  if [ ! -x "$HOME/.nix-profile/bin/bash" ]; then
+    nix profile "$nix_add" nixpkgs#bash
+  fi
+
   mkdir -p "$HOME/.config/direnv"
   touch "$HOME/.config/direnv/direnvrc"
   if ! grep -Fqx 'source ~/.nix-profile/share/nix-direnv/direnvrc' "$HOME/.config/direnv/direnvrc"; then
@@ -614,6 +623,10 @@ configure_direnv() {
 # Nix on PATH (safety net; harmless if the system zsh config already does this).
 [ -e /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ] && \
   . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+# macOS ships bash 3.2, but nix-direnv needs bash >= 4.4. Point direnv at the nix
+# bash (a GC-safe profile root) so `use flake` works even if direnv's baked bash
+# was garbage-collected.
+[ -x "$HOME/.nix-profile/bin/bash" ] && export DIRENV_BASH="$HOME/.nix-profile/bin/bash"
 # direnv: load the per-folder rsm-msba Python environment automatically.
 command -v direnv >/dev/null 2>&1 && eval "$(direnv hook zsh)"
 # Load the full oh-my-zsh + powerlevel10k shell when you enter ~/rsm-msba.
@@ -630,6 +643,16 @@ add-zsh-hook chpwd _rsm_zsh_load
 _rsm_zsh_load
 # <<< rsm-msba (managed) <<<
 ZRC
+  fi
+
+  # Existing installs whose managed block predates DIRENV_BASH: append it once so a
+  # re-run of the installer fixes the macOS bash-3.2 nix-direnv warning. (New
+  # installs already have it inside the block above, so this is skipped.)
+  if ! grep -Fq 'DIRENV_BASH' "$HOME/.zshrc" 2>/dev/null; then
+    {
+      printf '\n# rsm-msba: macOS nix-direnv needs bash >= 4.4; point direnv at the nix bash.\n'
+      printf '[ -x "$HOME/.nix-profile/bin/bash" ] && export DIRENV_BASH="$HOME/.nix-profile/bin/bash"\n'
+    } >>"$HOME/.zshrc"
   fi
 }
 
