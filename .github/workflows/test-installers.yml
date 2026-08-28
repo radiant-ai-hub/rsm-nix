@@ -148,6 +148,7 @@ jobs:
           bash -n tests/check-claude-harness.sh
           bash -n tests/check-rsm-threads.sh
           bash -n tests/check-rsm-ssh-readonly.sh
+          bash -n tests/check-direnv-bash.sh
           bash -n bin/rsm-claude-settings
           bash -n bin/rsm-threads
           for h in claude/hooks/*.sh claude/statusline.sh skills/git-workflow/scripts/git_state.sh; do bash -n "$h"; done

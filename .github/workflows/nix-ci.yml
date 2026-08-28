@@ -84,3 +84,9 @@ jobs:
 
       - name: Run Spark/Hadoop checks
         run: nix develop .#spark-hadoop -c bash tests/check-spark-hadoop.sh
+
+      # Last: installs direnv/bash into the profile, so it runs after the
+      # host-mutation comparison above. Static checks on all OSes; the direnv +
+      # DIRENV_BASH integration only on macOS.
+      - name: direnv bash on macOS (nix-direnv >= 4.4 fix)
+        run: nix develop -c bash tests/check-direnv-bash.sh
