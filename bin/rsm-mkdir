@@ -105,7 +105,25 @@ export UV_PROJECT_ENVIRONMENT="$PWD/.venv"
 watch_file .venv/bin/activate
 if [ -f "$PWD/.venv/bin/activate" ]; then
   export VIRTUAL_ENV="$PWD/.venv"
-  export VIRTUAL_ENV_PROMPT="($(basename "$PWD")) "
+  # Prompt label. powerlevel10k shows VIRTUAL_ENV_PROMPT verbatim when it differs
+  # from the venv's own directory name, so this string IS what appears in the
+  # prompt. It lives in the RIGHT prompt, which p10k drops WHOLESALE when the
+  # line does not fit -- so an over-long label does not wrap or truncate, it
+  # makes the venv indicator vanish entirely and the shell look unconfigured.
+  # Course repos are named rsm-<course>-<topic>-rsm-<studentid>, most of which is
+  # boilerplate, so drop the leading "rsm-" and the trailing "-rsm-<id>" (only
+  # when the name actually started with "rsm-", so a personal repo like
+  # "my-rsm-tools" is left alone), then hard-cap what is left.
+  _rsm_label="${PWD##*/}"
+  _rsm_short="${_rsm_label#rsm-}"
+  if [ "$_rsm_short" != "$_rsm_label" ]; then
+    _rsm_short="${_rsm_short%-rsm-*}"
+  fi
+  if [ "${#_rsm_short}" -gt 20 ]; then
+    _rsm_short="${_rsm_short:0:19}…"
+  fi
+  export VIRTUAL_ENV_PROMPT="($_rsm_short) "
+  unset _rsm_label _rsm_short
   export QUARTO_PYTHON="$PWD/.venv/bin/python"
   PATH_add "$PWD/.venv/bin"
   watch_file pyproject.toml uv.lock

@@ -177,6 +177,44 @@ else
   bad "could not find rsm-shell-hook.sh to test"
 fi
 
+echo "== a project .venv still WINS over the shared env (ordering invariant) =="
+# The hook now MOVES nix-uv/bin to the front of PATH. A project's .venv/bin is
+# added by the folder's OWN .envrc via PATH_add, so the project venv wins only
+# because that file runs AFTER the workspace one: source_up is the first thing
+# it does, and PATH_add comes later. Invert that order and you would silently
+# get the SHARED env's python inside a project folder -- no error, just the
+# wrong packages, while VIRTUAL_ENV (set on its own line) still makes the prompt
+# show the project's name. That is why this ordering is asserted, not assumed.
+rsm-mkdir --venv ordertest >/dev/null 2>&1
+if awk '/^source_up|^use flake/{if(!load)load=NR}
+        /PATH_add/{if(!padd)padd=NR}
+        END{exit !(load>0 && padd>0 && load<padd)}' ordertest/.envrc; then
+  ok "the folder's .envrc loads the workspace BEFORE adding ./.venv to PATH"
+else
+  bad "PATH_add runs before source_up -- a project .venv would lose to nix-uv"
+fi
+
+echo "== the venv prompt label is shortened (it lives in p10k's RIGHT prompt) =="
+# p10k drops the right prompt WHOLESALE when the line does not fit, so an
+# over-long label does not truncate -- the venv indicator just disappears.
+mkdir -p rsm-mgta464-snowflake-rsm-k1xiang
+rsm-mkdir --venv rsm-mgta464-snowflake-rsm-k1xiang >/dev/null 2>&1
+_label="$(bash -c 'cd rsm-mgta464-snowflake-rsm-k1xiang
+  _rsm_label="${PWD##*/}"; _rsm_short="${_rsm_label#rsm-}"
+  if [ "$_rsm_short" != "$_rsm_label" ]; then _rsm_short="${_rsm_short%-rsm-*}"; fi
+  if [ "${#_rsm_short}" -gt 20 ]; then _rsm_short="${_rsm_short:0:19}…"; fi
+  printf "%s" "$_rsm_short"')"
+if [ "$_label" = "mgta464-snowflake" ]; then
+  ok "course-repo label shortened to '$_label'"
+else
+  bad "unexpected label: '$_label'"
+fi
+if grep -q '_rsm_short' rsm-mgta464-snowflake-rsm-k1xiang/.envrc; then
+  ok ".envrc uses the shortening rule (not the raw folder name)"
+else
+  bad ".envrc still uses the raw folder name"
+fi
+
 echo "== the escape hatch still works (rsm-python-sync's route) =="
 if env RSM_ALLOW_SHARED_SYNC=1 UV_PROJECT_ENVIRONMENT="$RSM_UV_ENV" uv sync >/dev/null 2>&1; then
   ok "RSM_ALLOW_SHARED_SYNC=1 permits a deliberate shared-env sync"
