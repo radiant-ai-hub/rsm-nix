@@ -75,6 +75,8 @@ bash examples/run-examples.sh
 
 {{< include _includes/usage-spark.qmd >}}
 
+{{< include _includes/usage-gpu.qmd >}}
+
 {{< include _includes/maintenance.qmd >}}
 
 {{< include _includes/troubleshooting.qmd >}}

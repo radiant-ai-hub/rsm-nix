@@ -218,6 +218,11 @@
           rsm-mkdir = mk "rsm-mkdir" [ rsm-vscode-settings rsm-claude-settings pkgs.uv pkgs.direnv pkgs.coreutils ];
           # rsm-clone: git clone + make the clone direnv-ready (rsm-mkdir) in one step.
           rsm-clone = mk "rsm-clone" [ pkgs.git rsm-mkdir pkgs.coreutils ];
+          # rsm-gpu-init: rsm-mkdir --venv, plus the one decision that folder
+          # cannot make for itself -- whether to install the CUDA or the CPU
+          # torch wheel. Chosen from the driver, because a CPU wheel on a GPU box
+          # fails silently (no error, just is_available() False and ~50x slower).
+          rsm-gpu-init = mk "rsm-gpu-init" [ rsm-mkdir pkgs.uv pkgs.coreutils ];
           # Prints the rsm-nix version (the flake's git commit) + platform/python,
           # so it is easy to confirm everyone is on the same environment.
           rsm-version = mk "rsm-version" [ pkgs.git pkgs.coreutils pkgs.gawk ];
@@ -330,11 +335,32 @@
             # PySpark should drive the uv base env when it exists.
             python = pkgs.python313;
           };
+
+          gpu = import ./gpu {
+            inherit pkgs;
+            python = pkgs.python313;
+          };
         in
         {
           default = pkgs.mkShell {
             packages = corePackages;
-            shellHook = baseHook;
+            # The GPU hook is in the DEFAULT shell on purpose. It is a no-op
+            # without a driver (it only sets RSM_GPU=0), and putting it here
+            # means a student on a GPU server gets a working torch.cuda without
+            # having to know that a separate shell exists. The gpu devShell
+            # below only adds the proof tool.
+            shellHook = baseHook + gpu.envHook;
+          };
+
+          gpu = pkgs.mkShell {
+            packages = corePackages ++ [ gpu.proof ];
+            shellHook = baseHook + gpu.envHook + ''
+              if [ "$RSM_GPU" = "1" ]; then
+                echo "[gpu] driver found; torch will see the GPU. Verify: rsm-gpu-proof"
+              else
+                echo "[gpu] no NVIDIA driver on this machine -- torch will run on CPU."
+              fi
+            '';
           };
 
           spark-hadoop = pkgs.mkShell {
@@ -362,6 +388,10 @@
           system = pkgs.stdenv.hostPlatform.system;
           rsmScripts = mkRsmScripts pkgs;
           sparkHadoop = import ./spark-hadoop {
+            inherit pkgs;
+            python = pkgs.python313;
+          };
+          gpu = import ./gpu {
             inherit pkgs;
             python = pkgs.python313;
           };
@@ -394,6 +424,11 @@
             type = "app";
             program = "${sparkHadoop.proof}/bin/rsm-spark-hadoop-proof";
             meta.description = "Run the RSM-MSBA Spark/Hadoop PySpark proof";
+          };
+          check-gpu = {
+            type = "app";
+            program = "${gpu.proof}/bin/rsm-gpu-proof";
+            meta.description = "Check NVIDIA driver + CUDA reachability (and torch, if installed)";
           };
           rsm-setup = {
             type = "app";

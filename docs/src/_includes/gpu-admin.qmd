@@ -1,0 +1,137 @@
+## GPUs: how it works, and limiting server resources
+
+### Why there is no Docker here
+
+A CUDA workload needs exactly **one** thing from the host: `libcuda.so.1`, the
+userspace half of the kernel driver. It must match the running kernel module and
+cannot be pip-installed. Everything above it — the CUDA runtime, cuBLAS, cuDNN —
+ships *inside* the PyTorch wheel.
+
+On a normal distro `libcuda.so.1` sits in `/usr/lib` and the loader finds it. On
+NixOS it lives in `/run/opengl-driver/lib`, which is deliberately **not** on the
+default loader path — `ldconfig -p | grep libcuda` returns nothing on a perfectly
+working GPU machine. That single omission is the whole problem. Measured on
+`rsm-compute-01`:
+
+| environment | `torch.cuda.is_available()` | devices |
+|---|---|---|
+| plain `uv` venv | `False` | 0 |
+| `+ LD_LIBRARY_PATH=/run/opengl-driver/lib` | `True` | 4 |
+
+`nvidia-container-toolkit` solves this by bind-mounting the host driver into a
+container. Running natively there is no container to inject into, so pointing the
+loader at the driver is sufficient — and simpler.
+
+`gpu/default.nix` does that, guarded on the library **existing** rather than on
+the OS, so the same commit works on a Mac laptop, a CPU-only Linux box, and the
+GPU servers. The hook lives in the **default** devShell (it is a no-op without a
+driver, setting only `RSM_GPU=0`), which is why a student on the server gets a
+working `torch.cuda` without knowing a special shell exists.
+
+```bash
+nix run .#check-gpu     # driver -> ctypes cuInit -> torch, reported separately
+rsm-gpu-init FOLDER     # project folder + the matching torch wheel
+```
+
+`rsm-gpu-init` picks the wheel from the driver, not the hostname. That is the
+reason it exists: a CPU wheel on a GPU box does **not** error. It reports
+`is_available() False` and trains roughly 50× slower while the student concludes
+the GPU is broken.
+
+### Limiting memory
+
+Per-user caps are set in the server config (`limits.nix`) via the systemd user
+slice. **Two keys are required, and this is the part that catches people:**
+
+```nix
+systemd.slices."user-".sliceConfig = {
+  MemoryAccounting = true;
+  MemoryHigh    = "48G";   # soft: reclaim pressure, user slows down
+  MemoryMax     = "64G";   # hard ceiling
+  MemorySwapMax = "16G";   # WITHOUT THIS the two above are advisory
+};
+```
+
+`MemoryMax` alone is not a cap. Measured: a process under a 512 M `MemoryMax` was
+held at exactly 512 MiB RSS (`memory.peak` confirmed it, and the cgroup hit its
+limit 8 979 times) and **still ran to completion**, `oom_kill 0`, because the
+overflow went to swap. Add `MemorySwapMax` and the identical test dies by
+SIGKILL (scope exit `137`) with the OOM events in `dmesg`.
+
+This matters more than it sounds on `rsm-compute-01`, whose swap is **188 GiB of
+zram** — swap that lives in RAM. Spilling a runaway job into zram does not
+protect the machine's memory; it stores the same pages compressed, still in RAM.
+
+Two operational notes:
+
+- Values are **policy**, not physics. They are sized per host (sc0: 125 GiB RAM →
+  32 G per user; sc1: 376 GiB → 64 G), aiming to leave room for several
+  concurrent users plus system services.
+- Changing the config does **not** retroactively change a logged-in user's slice.
+  New logins pick it up; to apply immediately use
+  `systemctl set-property user-<uid>.slice MemoryMax=…`.
+
+Verify enforcement on any host:
+
+```bash
+sudo systemd-run --scope -p MemoryMax=512M -p MemorySwapMax=0 -p MemoryAccounting=yes \
+  python3 -c 'b=[]
+for i in range(16):
+    x=bytearray(128*1024**2); x[::4096]=b"x"*(len(x)//4096); b.append(x)'
+# expect: exit 137
+```
+
+Note the loop **touches** every page. A plain `bytearray(n)` is served by
+`mmap`, glibc skips the memset, the pages are never faulted in, and no physical
+memory is used — a test written that way appears to prove the limit is broken
+when it is fine.
+
+### Limiting GPUs
+
+| mechanism | actually enforces? | notes |
+|---|---|---|
+| `CUDA_VISIBLE_DEVICES` | **no** | advisory; the user can `unset` it |
+| cgroup `DeviceAllow` (root) | **yes** | kernel-level; survives `unset` |
+| `systemd-run --user` + `DeviceAllow` | **no** | *silently ignored*, exits 0 |
+| compute mode `EXCLUSIVE_PROCESS` | yes | root-only to set; 1 process per GPU |
+| MIG partitioning | n/a | A2 and RTX 2080 do not support it |
+
+Measured on `rsm-compute-01` (4 GPUs), with the student running
+`unset CUDA_VISIBLE_DEVICES` in every case:
+
+```
+no restriction                          4 devices
+CUDA_VISIBLE_DEVICES=0, then unset      4 devices   <- escaped
+root scope + DeviceAllow /dev/nvidia0   1 device    <- enforced
+user scope + DeviceAllow /dev/nvidia0   4 devices   <- SILENTLY ignored
+```
+
+Two conclusions worth acting on:
+
+1. **`CUDA_VISIBLE_DEVICES` is a convention, not a control.** Use it to steer
+   cooperative users; never rely on it to enforce a share.
+2. **GPU limits must be imposed by the admin.** The user-scope form accepts
+   `DeviceAllow`, exits 0, prints no warning, and does nothing — so it is
+   entirely possible to believe a restriction is in place when it is not. Always
+   verify by counting devices, not by checking that the command succeeded.
+
+To pin a user to specific GPUs, add a drop-in on their slice:
+
+```nix
+systemd.slices."user-1234".sliceConfig = {
+  DevicePolicy = "closed";
+  DeviceAllow = [ "/dev/nvidiactl rw" "/dev/nvidia-uvm rw" "/dev/nvidia0 rw" ];
+};
+```
+
+Static per-user assignment does not scale to a whole class against 4 GPUs. For a
+class the more practical lever is compute mode:
+
+```bash
+sudo nvidia-smi -c EXCLUSIVE_PROCESS     # one CUDA process per GPU
+```
+
+which caps concurrency at the number of GPUs and gives a clear
+`CUDA_ERROR_DEVICE_UNAVAILABLE` to the next person instead of silent thrashing.
+It requires root to change, so students cannot undo it — verified: a non-root
+`nvidia-smi -c` fails with `Insufficient Permissions`.
