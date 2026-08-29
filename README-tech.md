@@ -135,7 +135,7 @@ all of this for you.
 | `rsm-version`                                  | Print the environment version (the flake’s git commit) + platform                                                                                                                                                                |
 | `rsm-python-sync`                              | Refresh the base env from `uv.lock`                                                                                                                                                                                              |
 | `rsm-mkdir [--venv] PATH...`                   | Make folder(s) first-class RSM projects to open directly in VS Code — nested or standalone, sharing the one nix-uv env (CWD-relative like `mkdir`); `--venv` gives a folder its **own** reproducible env (the conda alternative) |
-| `rsm-clone URL [DIR]`                          | `git clone` a repo AND set it up (direnv + nix-uv) so it opens directly in VS Code                                                                                                                                               |
+| `rsm-clone [--venv\|--no-venv] URL [DIR]`       | `git clone` a repo AND set it up (direnv + VS Code) so it opens directly. A repo that ships its own `pyproject.toml` gets its **own** `.venv`; otherwise the shared nix-uv env. The flags force either way                        |
 | `rsm-gpu-init [--cpu] PATH`                    | `rsm-mkdir --venv` plus PyTorch matched to this machine — CUDA build where a driver is present, CPU build otherwise (`--cpu` forces the smaller CPU build)                                                                       |
 | `rsm-gpu-proof`                                | Report the NVIDIA driver, CUDA reachability, and (if installed) what PyTorch actually sees. Also `nix run .#check-gpu`                                                                                                           |
 | `rsm-threads`                                  | Browse past Claude Code conversations across every folder (fzf menu by title + folder + date); Enter resumes the chosen thread in its own folder                                                                                 |
@@ -417,6 +417,7 @@ nix develop -c bash tests/check-default.sh        # toolchain + 35 course-core i
 nix develop -c bash tests/check-postgres.sh       # PostgreSQL lifecycle
 nix develop -c bash tests/check-folders.sh        # workspace layout
 nix develop -c bash tests/check-mkdir.sh          # rsm-mkdir folder setup
+nix develop -c bash tests/check-clone.sh          # rsm-clone venv decision
 nix develop -c bash tests/check-claude-harness.sh # Claude Code harness + telemetry scope
 nix develop -c bash tests/check-no-host-mutation.sh
 nix develop .#spark-hadoop -c bash tests/check-spark-hadoop.sh
