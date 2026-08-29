@@ -102,6 +102,67 @@ _rsm_zoxide_init || add-zsh-hook precmd _rsm_zoxide_init
 # Powerlevel10k prompt configuration.
 [[ ! -f "${ZDOTDIR}/.p10k.zsh" ]] || source "${ZDOTDIR}/.p10k.zsh"
 
+# --- adaptive venv label + right-prompt fitting ----------------------------
+# The virtualenv indicator lives in p10k's RIGHT prompt, and zsh hides the WHOLE
+# right prompt when the left and right halves do not fit -- it never truncates a
+# segment. So on a narrow terminal (a VS Code panel) the indicator did not get
+# shorter, it vanished, and the shell looked like no environment was active.
+#
+# Both adjustments run in precmd, where $COLUMNS is still the real terminal
+# width. They cannot be done from a prompt expansion: p10k sets COLUMNS=1024
+# while EXPANDING the prompt and keeps the real width in an internal variable.
+#
+#   1. Shrink the venv label to what the line can afford, so more of the name
+#      appears as the terminal gets wider (or the font smaller).
+#   2. Hide context/time/nix_shell when the line is tight, so the venv label is
+#      what survives. Nothing is lost by this: at those widths the ENTIRE right
+#      prompt was hidden before, so none of those segments were visible anyway.
+#
+# RSM_VENV_LABEL (exported by a managed .envrc) is the full label; without it we
+# fall back to the venv's own directory name, so foreign venvs still work.
+_rsm_venv_label() {
+  [[ -n ${RSM_VENV_LABEL:-} ]] && { print -r -- "$RSM_VENV_LABEL"; return 0 }
+  [[ -n ${VIRTUAL_ENV:-} ]] || return 1
+  [[ $VIRTUAL_ENV == ${RSM_UV_ENV:-/nonexistent} ]] && { print -r -- nix-uv; return 0 }
+  local base=${VIRTUAL_ENV:t}
+  [[ $base == (venv|.venv|env|virtualenv) ]] && base=${VIRTUAL_ENV:h:t}
+  print -r -- "$base"
+}
+
+_rsm_prompt_fit() {
+  (( $+functions[p10k] )) || return 0
+  local full; full="$(_rsm_venv_label)" || full=""
+
+  # What the rest of the line costs. The directory segment dominates and varies
+  # with depth, so derive it from %~ rather than hardcoding a constant. p10k
+  # truncates the path on narrow terminals, so %~ OVER-estimates there -- which
+  # errs toward a shorter label. That is the safe direction: over-estimating the
+  # available width makes the right prompt overflow and disappear entirely,
+  # which is exactly the failure this hook exists to prevent.
+  local cost=${RSM_PROMPT_COST:-$(( 24 + ${#${(%):-%~}} ))}
+
+  # context + time + nix_shell cost roughly 45 columns between them; show them
+  # only when they fit alongside the whole label.
+  local mode=narrow
+  (( COLUMNS >= cost + ${#full} + 45 )) && mode=wide
+  if [[ $mode != ${_rsm_prompt_mode:-} ]]; then
+    typeset -g _rsm_prompt_mode=$mode
+    if [[ $mode == narrow ]]; then
+      p10k display '*/context'=hide '*/time'=hide '*/nix_shell'=hide 2>/dev/null
+    else
+      p10k display '*/context'=show '*/time'=show '*/nix_shell'=show 2>/dev/null
+    fi
+  fi
+
+  [[ -n $full ]] || return 0
+  local budget=$(( COLUMNS - cost ))
+  (( budget < 3 )) && budget=3
+  local label=$full
+  (( ${#full} > budget )) && label="${full[1,budget-1]}…"
+  [[ ${VIRTUAL_ENV_PROMPT:-} == "($label) " ]] || export VIRTUAL_ENV_PROMPT="($label) "
+}
+add-zsh-hook precmd _rsm_prompt_fit
+
 # --- personal, opt-in overrides -------------------------------------------
 # Sourced last so it can override anything above (e.g. `bindkey -v` for vi mode,
 # or `set -o vi`). Lives in $HOME so it survives a workspace reset; students

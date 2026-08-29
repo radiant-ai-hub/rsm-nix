@@ -453,6 +453,7 @@ nix develop -c bash tests/check-mkdir.sh          # rsm-mkdir folder setup
 nix develop -c bash tests/check-clone.sh          # rsm-clone venv decision
 nix develop -c bash tests/check-shared-env.sh     # shared nix-uv env cannot be clobbered
 nix develop -c bash tests/check-refresh.sh        # existing folders get template fixes
+nix develop -c bash tests/check-prompt.sh         # adaptive venv label in the prompt
 nix develop -c bash tests/check-claude-harness.sh # Claude Code harness + telemetry scope
 nix develop -c bash tests/check-no-host-mutation.sh
 nix develop .#spark-hadoop -c bash tests/check-spark-hadoop.sh

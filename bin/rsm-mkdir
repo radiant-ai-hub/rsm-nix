@@ -122,7 +122,12 @@ if [ -f "$PWD/.venv/bin/activate" ]; then
   if [ "${#_rsm_short}" -gt 20 ]; then
     _rsm_short="${_rsm_short:0:19}…"
   fi
+  # VIRTUAL_ENV_PROMPT is the static label (bash, non-p10k shells). RSM_VENV_LABEL
+  # is the same string kept intact for the zsh prompt hook, which truncates it to
+  # the terminal width per prompt -- it must read the FULL label, never the
+  # already-truncated one, or it would shrink a little more on every redraw.
   export VIRTUAL_ENV_PROMPT="($_rsm_short) "
+  export RSM_VENV_LABEL="$_rsm_short"
   unset _rsm_label _rsm_short
   export QUARTO_PYTHON="$PWD/.venv/bin/python"
   PATH_add "$PWD/.venv/bin"
