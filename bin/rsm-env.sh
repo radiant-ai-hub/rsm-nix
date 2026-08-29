@@ -22,7 +22,22 @@ RSM_UV_ENV="${RSM_UV_ENV:-$RSMBASE/envs/nix-uv}"
 export RSM_FLAKE RSM_WORKSPACE RSMBASE RSM_UV_ENV
 export UV_CACHE_DIR="${UV_CACHE_DIR:-$RSMBASE/uv-cache}"
 export UV_LINK_MODE="${UV_LINK_MODE:-copy}"
-export UV_PROJECT_ENVIRONMENT="${UV_PROJECT_ENVIRONMENT:-$RSM_UV_ENV}"
+# UV_PROJECT_ENVIRONMENT is deliberately NOT defaulted to $RSM_UV_ENV.
+#
+# `uv sync` does not "install into the active env" -- it makes its TARGET match
+# the project's pyproject.toml + uv.lock exactly, which means REMOVING every
+# package the project does not list. Pointing that target at the shared nix-uv
+# env meant a `uv sync` in any course folder silently rewrote the one Python
+# environment every other folder shares, pruning it down to that project's deps.
+#
+# Unset, uv falls back to ./.venv -- per project, and nobody else's problem. The
+# shared env stays the DEFAULT INTERPRETER (rsm-shell-hook.sh exports VIRTUAL_ENV
+# + PATH for that, which `uv sync` does NOT follow), so a folder without a .venv
+# still gets the full course-core Python. The two roles are separate variables;
+# only this one is destructive.
+#
+# The shared env is rebuilt deliberately, by rsm-python-sync, which sets both
+# UV_PROJECT_ENVIRONMENT and RSM_ALLOW_SHARED_SYNC on its own uv invocation.
 export UV_PYTHON_PREFERENCE="${UV_PYTHON_PREFERENCE:-only-system}"
 export JUPYTER_PATH="${JUPYTER_PATH:-$RSMBASE/jupyter}"
 export JUPYTER_DATA_DIR="${JUPYTER_DATA_DIR:-$RSMBASE/jupyter}"

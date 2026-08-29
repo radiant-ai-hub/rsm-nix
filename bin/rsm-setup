@@ -358,6 +358,15 @@ if [ -f "$courses_file" ]; then
   done < "$courses_file"
 fi
 
+# 3b. Repair folders that ALREADY exist. rsm-mkdir writes a folder's .envrc once;
+#     when that template is fixed (as it was, to stop `uv sync` rewriting the
+#     shared nix-uv env), nothing would ever regenerate it for folders created
+#     earlier. This is what makes an update actually fix them. Only folders whose
+#     .envrc carries the managed marker are touched.
+if command -v rsm-refresh-folders >/dev/null 2>&1; then
+  rsm-refresh-folders "$RSM_WORKSPACE" 2>/dev/null | sed 's/^/    folders   : /' || true
+fi
+
 # 4. Refresh the examples in the workspace. We COPY (not symlink) so the folder
 #    lives under the workspace's own .envrc — a symlink into $RSM_FLAKE would make
 #    `cd examples` resolve into the flake repo and trip its (unallowed) .envrc.

@@ -47,10 +47,17 @@ fi
 
 if [ ! -x "$RSM_UV_ENV/bin/python" ]; then
   echo "Creating the nix-uv environment at $RSM_UV_ENV"
-  uv venv --prompt nix-uv --python "$py" "$RSM_UV_ENV"
+  RSM_ALLOW_SHARED_SYNC=1 uv venv --prompt nix-uv --python "$py" "$RSM_UV_ENV"
 fi
 
 echo "Syncing nix-uv from uv.lock (this can take a few minutes the first time)..."
-( cd "$RSM_FLAKE" && UV_PROJECT_ENVIRONMENT="$RSM_UV_ENV" uv sync --frozen --python "$RSM_UV_ENV/bin/python" )
+# RSM_ALLOW_SHARED_SYNC opts out of the `uv` guard (bin/uv), which otherwise
+# refuses any command that would rewrite the shared environment. THIS is the one
+# place that rewrite is intended: the target is the flake's own pyproject.toml +
+# uv.lock, so the env is being restored to the course-core set, not pruned to
+# some project's.
+( cd "$RSM_FLAKE" \
+  && RSM_ALLOW_SHARED_SYNC=1 UV_PROJECT_ENVIRONMENT="$RSM_UV_ENV" \
+     uv sync --frozen --python "$RSM_UV_ENV/bin/python" )
 
 echo "rsm-python-sync: nix-uv environment ready at $RSM_UV_ENV"

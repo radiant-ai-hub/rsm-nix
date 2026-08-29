@@ -16,6 +16,24 @@ mkdir -p \
   "$RSMBASE/zsh" \
   "$RSMBASE/logs" 2>/dev/null || true
 
+# Repair a POISONED UV_PROJECT_ENVIRONMENT inherited from the parent shell.
+#
+# It used to be defaulted to the shared nix-uv env (bin/rsm-env.sh), which is
+# what let a `uv sync` in a course folder rewrite the environment every folder
+# shares. That default is gone -- but removing it does not help a shell (or a
+# VS Code window) that was ALREADY RUNNING when the fix landed: the old value
+# lives in that process's environment and is inherited by everything it starts,
+# including new integrated terminals. Clear it here, so entering the RSM
+# environment repairs the shell instead of carrying the hazard forward.
+#
+# Deliberately NOT in bin/rsm-env.sh: that header is also prepended to the `uv`
+# guard, where unsetting the variable would silently redirect an explicit
+# `UV_PROJECT_ENVIRONMENT=$RSM_UV_ENV uv sync` to ./.venv instead of refusing it
+# with an explanation. Only shells get repaired; uv still reports the refusal.
+if [ "${UV_PROJECT_ENVIRONMENT:-}" = "$RSM_UV_ENV" ]; then
+  unset UV_PROJECT_ENVIRONMENT
+fi
+
 # Neutralize any foreign, pre-activated Python virtualenv inherited from the
 # parent (login) shell. `nix develop` is IMPURE by default (it inherits the
 # calling shell's environment), and nix-direnv does not support pure mode, so a

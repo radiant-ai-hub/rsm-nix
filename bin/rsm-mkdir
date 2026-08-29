@@ -91,9 +91,19 @@ EOF
     # needed. watch_file so creating or removing it reloads direnv.
     cat >> "$_here/.envrc" <<'EOF'
 
+# Where `uv sync`/`uv add` may write. Set UNCONDITIONALLY -- and deliberately so.
+# It must be pinned here even when no .venv exists yet, because that is exactly
+# the moment the old setup was dangerous: with nothing pinned, uv fell back to
+# the SHARED nix-uv env and a first `uv sync` pruned it to this project's deps,
+# breaking Python for every other folder. Pinned, the first `uv sync` CREATES
+# ./.venv instead. This does not activate anything on its own.
+export UV_PROJECT_ENVIRONMENT="$PWD/.venv"
+
+# Activation is separate, and stays conditional: until ./.venv exists the shared
+# nix-uv env (from the workspace .envrc) remains the active interpreter, so the
+# full course-core Python still works in a folder that has no venv of its own.
 watch_file .venv/bin/activate
 if [ -f "$PWD/.venv/bin/activate" ]; then
-  export UV_PROJECT_ENVIRONMENT="$PWD/.venv"
   export VIRTUAL_ENV="$PWD/.venv"
   export VIRTUAL_ENV_PROMPT="($(basename "$PWD")) "
   export QUARTO_PYTHON="$PWD/.venv/bin/python"

@@ -1,0 +1,64 @@
+# uv, wrapped so that nothing can rewrite the SHARED nix-uv environment by
+# accident. Installed as `uv` on the dev-shell PATH, ahead of the real binary.
+#
+# WHY THIS EXISTS
+# `uv sync` does not "install into" its target -- it makes the target MATCH the
+# project's pyproject.toml + uv.lock, which means removing every package the
+# project does not list. When the target was the shared nix-uv env, one `uv sync`
+# in one course folder pruned the Python environment every other folder shares.
+# bin/rsm-env.sh no longer points uv there, and the managed .envrc pins
+# ./.venv, so this can no longer happen by default. This wrapper closes the last
+# door: an explicit `export UV_PROJECT_ENVIRONMENT=$RSM_UV_ENV`, a stray script,
+# or a copied-in shell snippet.
+#
+# FAIL OPEN
+# This sits in front of a tool students run constantly, so it refuses ONLY when
+# it can positively identify BOTH halves of the dangerous combination:
+#   1. the resolved target IS the shared nix-uv env, and
+#   2. the command mutates that target.
+# Anything it cannot classify is handed straight to the real uv, unchanged.
+#
+# The legitimate way to rebuild the shared env is rsm-python-sync, which sets
+# RSM_ALLOW_SHARED_SYNC=1 to opt out of the guard.
+
+if [ -n "${RSM_UV_ENV:-}" ] && [ -z "${RSM_ALLOW_SHARED_SYNC:-}" ]; then
+  # Which environment would THIS invocation write to? `uv pip ...` targets
+  # VIRTUAL_ENV; every other (project) command targets UV_PROJECT_ENVIRONMENT.
+  # Empty means "uv will pick ./.venv itself", which is never the shared env.
+  case " $* " in
+    *" pip "*) _rsm_target="${VIRTUAL_ENV:-}" ;;
+    *) _rsm_target="${UV_PROJECT_ENVIRONMENT:-}" ;;
+  esac
+
+  if [ -n "$_rsm_target" ]; then
+    # Compare resolved paths so a symlink or a trailing slash cannot slip past.
+    # If either path cannot be resolved, fall back to the literal strings.
+    _rsm_a="$(realpath -m "$_rsm_target" 2>/dev/null || printf '%s' "$_rsm_target")"
+    _rsm_b="$(realpath -m "$RSM_UV_ENV" 2>/dev/null || printf '%s' "$RSM_UV_ENV")"
+
+    if [ "$_rsm_a" = "$_rsm_b" ]; then
+      # Does this command write to that target? Deliberately blunt: we are
+      # already inside "the target is the shared env", where refusing something
+      # harmless costs a re-run and allowing something harmful costs everyone's
+      # Python. A false positive here is the cheap mistake.
+      case " $* " in
+        *" sync "* | *" add "* | *" remove "* | *" run "* | *" install "* | *" uninstall "*)
+          echo "uv: refusing to run this against the SHARED nix-uv environment." >&2
+          echo "" >&2
+          echo "  target : $_rsm_target" >&2
+          echo "  reason : every RSM folder shares this environment. 'uv sync' would" >&2
+          echo "           make it match THIS project's pyproject.toml + uv.lock and" >&2
+          echo "           remove every package that project does not list." >&2
+          echo "" >&2
+          echo "  If you want a per-project environment (the usual case):" >&2
+          echo "      rsm-mkdir --venv .    # create ./.venv here, then re-run uv" >&2
+          echo "" >&2
+          echo "  If you really meant to rebuild the shared environment:" >&2
+          echo "      rsm-python-sync       # rebuilds nix-uv from the flake's uv.lock" >&2
+          exit 3 ;;
+      esac
+    fi
+  fi
+fi
+
+exec "$RSM_REAL_UV" "$@"
