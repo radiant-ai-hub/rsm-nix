@@ -16,6 +16,24 @@ mkdir -p \
   "$RSMBASE/zsh" \
   "$RSMBASE/logs" 2>/dev/null || true
 
+# Repair a POISONED UV_PROJECT_ENVIRONMENT inherited from the parent shell.
+#
+# It used to be defaulted to the shared nix-uv env (bin/rsm-env.sh), which is
+# what let a `uv sync` in a course folder rewrite the environment every folder
+# shares. That default is gone -- but removing it does not help a shell (or a
+# VS Code window) that was ALREADY RUNNING when the fix landed: the old value
+# lives in that process's environment and is inherited by everything it starts,
+# including new integrated terminals. Clear it here, so entering the RSM
+# environment repairs the shell instead of carrying the hazard forward.
+#
+# Deliberately NOT in bin/rsm-env.sh: that header is also prepended to the `uv`
+# guard, where unsetting the variable would silently redirect an explicit
+# `UV_PROJECT_ENVIRONMENT=$RSM_UV_ENV uv sync` to ./.venv instead of refusing it
+# with an explanation. Only shells get repaired; uv still reports the refusal.
+if [ "${UV_PROJECT_ENVIRONMENT:-}" = "$RSM_UV_ENV" ]; then
+  unset UV_PROJECT_ENVIRONMENT
+fi
+
 # Neutralize any foreign, pre-activated Python virtualenv inherited from the
 # parent (login) shell. `nix develop` is IMPURE by default (it inherits the
 # calling shell's environment), and nix-direnv does not support pure mode, so a
@@ -37,18 +55,39 @@ fi
 
 # Activate the nix-uv environment the way a normal venv would: put it first on
 # PATH and mark it active via VIRTUAL_ENV. Setting VIRTUAL_ENV (not just PATH) is
-# what makes the environment visibly "on" — `which python` points at it, uv
+# what makes the environment visibly "on" — `which python` points at it, `uv pip`
 # targets it, and prompt frameworks (powerlevel10k's virtualenv segment) show
 # `(nix-uv)`. direnv snapshots the environment, so leaving the workspace cleanly
 # reverts all of this — exactly like sourcing/deactivating a venv.
+#
+# NOTE: `uv sync` does NOT follow VIRTUAL_ENV. It targets UV_PROJECT_ENVIRONMENT,
+# which is deliberately never pointed at the shared env (see bin/rsm-env.sh).
+# Being "active" and being uv's write target are different things, and conflating
+# them is what let one `uv sync` prune this environment for every folder.
+#
+# MOVE $RSM_UV_ENV/bin to the front rather than only adding it when absent.
+# `nix develop` is impure: entering a dev shell from a shell that already has the
+# workspace loaded leaves $RSM_UV_ENV/bin in PATH but pushes it BEHIND the Nix
+# python313 that nix prepends along with the other dev-shell packages. A
+# presence-only check then declines to fix the order, and `python` silently
+# resolves to the bare store interpreter — same version, none of the course
+# packages. Idempotency here has to be about POSITION, not membership.
+#
+# A project-local .venv still wins: the folder's .envrc runs PATH_add AFTER
+# source_up has run this hook, so ./.venv/bin lands ahead of nix-uv/bin.
 if [ -d "$RSM_UV_ENV/bin" ]; then
-  case ":$PATH:" in
-    *":$RSM_UV_ENV/bin:"*) ;;
-    *) PATH="$RSM_UV_ENV/bin:$PATH" ;;
-  esac
+  _rsm_newpath=""
+  _rsm_ifs="$IFS"; IFS=":"
+  for _rsm_p in $PATH; do
+    [ "$_rsm_p" = "$RSM_UV_ENV/bin" ] && continue
+    _rsm_newpath="${_rsm_newpath:+$_rsm_newpath:}$_rsm_p"
+  done
+  IFS="$_rsm_ifs"
+  PATH="$RSM_UV_ENV/bin${_rsm_newpath:+:$_rsm_newpath}"
   export PATH
   export VIRTUAL_ENV="$RSM_UV_ENV"
   export VIRTUAL_ENV_PROMPT="(nix-uv) "
+  unset _rsm_newpath _rsm_p _rsm_ifs
 fi
 
 # Quarto must render with the course-core interpreter. FORCE it (not a ":-"

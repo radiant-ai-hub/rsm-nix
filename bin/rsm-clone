@@ -1,5 +1,5 @@
-# rsm-clone URL [DIR]: git clone URL, then make the cloned repo direnv-ready
-# (rsm-mkdir) so VS Code and the terminal use the shared nix-uv Python.
+# rsm-clone [--venv|--no-venv] URL [DIR]: git clone URL, then make the cloned
+# repo direnv-ready (rsm-mkdir) so VS Code and the terminal use the right Python.
 #
 # Like `git clone`, DIR defaults to the repo name and is relative to the CURRENT
 # directory -- run it inside ~/rsm-msba (the usual case) to nest it there:
@@ -8,15 +8,51 @@
 #
 # A folder inside ~/rsm-msba loads the workspace env via `source_up`; a clone
 # made elsewhere loads the flake directly with `use flake`.
+#
+# WHICH Python the clone gets is decided from the repo's OWN contents, because a
+# repo that commits a pyproject.toml is declaring that it wants its own pinned
+# environment -- usually with a uv.lock beside it:
+#
+#   pyproject.toml in the clone  -> a project-local ./.venv  (rsm-mkdir --venv)
+#   no pyproject.toml            -> the shared nix-uv environment
+#
+# That default is not a convenience; getting it wrong is quiet and destructive.
+# Until a local .venv exists, UV_PROJECT_ENVIRONMENT still points at the SHARED
+# nix-uv env, so the student's obvious next step -- `uv sync` -- resolves the
+# repo's lockfile INTO the shared env and prunes every package the repo does not
+# list, breaking Python for every other course folder. Detecting the pyproject
+# closes that trap without the student having to know a flag exists.
+#
+#   --venv     force a project-local ./.venv even if the repo ships no pyproject
+#   --no-venv  force the shared nix-uv env even if the repo ships a pyproject
 
-if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
-  echo "usage: rsm-clone URL [DIR]" >&2
+_venv_mode="auto"
+_args=()
+for _arg in "$@"; do
+  case "$_arg" in
+    --venv) _venv_mode="on" ;;
+    --no-venv) _venv_mode="off" ;;
+    -h|--help)
+      echo "usage: rsm-clone [--venv|--no-venv] URL [DIR]"
+      echo "  URL        repository to clone"
+      echo "  DIR        target folder (default: the repo name)"
+      echo "  --venv     give the clone its OWN ./.venv (pyproject + uv)"
+      echo "  --no-venv  use the shared nix-uv environment"
+      echo "  (default: --venv if the cloned repo has a pyproject.toml)"
+      exit 0 ;;
+    -*) echo "rsm-clone: unknown argument: $_arg" >&2; exit 2 ;;
+    *) _args+=("$_arg") ;;
+  esac
+done
+
+if [ "${#_args[@]}" -lt 1 ] || [ "${#_args[@]}" -gt 2 ]; then
+  echo "usage: rsm-clone [--venv|--no-venv] URL [DIR]" >&2
   echo "  e.g. cd ~/rsm-msba && rsm-clone https://github.com/you/my-repo" >&2
   exit 1
 fi
 
-url="$1"
-dir="${2:-}"
+url="${_args[0]}"
+dir="${_args[1]:-}"
 if [ -z "$dir" ]; then
   dir="$(basename "$url")"
   dir="${dir%.git}"
@@ -29,5 +65,21 @@ if [ -e "$dir" ]; then
 fi
 
 git clone "$url" "$dir" || exit 1
+
+# Decide AFTER the clone -- the repo's contents are the signal.
+if [ "$_venv_mode" = "auto" ]; then
+  if [ -f "$dir/pyproject.toml" ]; then
+    _venv_mode="on"
+    echo "rsm-clone: '$dir' ships a pyproject.toml -- giving it its own ./.venv."
+    echo "  (use --no-venv to put it on the shared nix-uv environment instead)"
+  else
+    _venv_mode="off"
+  fi
+fi
+
 # Set up .envrc + .vscode + `direnv allow` on the freshly cloned folder.
-rsm-mkdir "$dir"
+if [ "$_venv_mode" = "on" ]; then
+  rsm-mkdir --venv "$dir"
+else
+  rsm-mkdir "$dir"
+fi

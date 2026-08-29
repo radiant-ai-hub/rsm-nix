@@ -151,6 +151,19 @@
               ++ pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.gfortran pkgs.pkg-config ]);
           pgInit = mk "rsm-pg-init" [ pkgs.postgresql_16 pkgs.coreutils ];
 
+          # `uv`, wrapped in a guard that refuses to let a project command
+          # rewrite the SHARED nix-uv environment. Shadows pkgs.uv on the
+          # dev-shell PATH; RSM_REAL_UV points at the unwrapped binary, so the
+          # wrapper can never recurse into itself. See bin/uv for the reasoning.
+          uvGuarded = pkgs.writeShellApplication {
+            name = "uv";
+            runtimeInputs = [ pkgs.coreutils ];
+            excludeShellChecks = [ "SC1090" "SC1091" "SC2164" ];
+            text = rsmEnvHeader + "\n" + nativeEnvHook pkgs
+              + "RSM_REAL_UV=\"${pkgs.uv}/bin/uv\"\n"
+              + builtins.readFile ./bin/uv;
+          };
+
           # Assembled oh-my-zsh + powerlevel10k + plugins for the rsm-msba ZDOTDIR
           # (installed into the workspace by rsm-setup). Built from nixpkgs, so
           # there is no per-user cloning from GitHub.
@@ -188,11 +201,15 @@
         rec {
           rsm-python-sync = pythonSync;
           rsm-pg-init = pgInit;
+          # Named `uv` on purpose: it REPLACES pkgs.uv on the dev-shell PATH.
+          # pkgs.uv is deliberately absent from corePackages below so this one
+          # cannot be shadowed by the unwrapped binary.
+          uv = uvGuarded;
           # rsm-setup is built directly (not via mk) so it can carry the paths to
           # the assembled zsh assets + the ZDOTDIR template it installs.
           rsm-setup = pkgs.writeShellApplication {
             name = "rsm-setup";
-            runtimeInputs = [ pythonSync pkgs.uv pkgs.python313 pkgs.coreutils pkgs.git pkgs.nodejs_22 rsm-version rsm-vscode-settings rsm-vscode-ext rsm-vscode-keybindings rsm-claude-settings rsm-mkdir ];
+            runtimeInputs = [ pythonSync pkgs.uv pkgs.python313 pkgs.coreutils pkgs.git pkgs.nodejs_22 rsm-version rsm-vscode-settings rsm-vscode-ext rsm-vscode-keybindings rsm-claude-settings rsm-mkdir rsm-refresh-folders ];
             excludeShellChecks = [ "SC1090" "SC1091" "SC2164" ];
             text = rsmEnvHeader + "\n" + nativeEnvHook pkgs + ''
               export RSM_OMZ_SRC="${zshOmz}"
@@ -216,6 +233,10 @@
           # the per-folder work directly (writes .envrc + .vscode + direnv allow);
           # rsm-clone and rsm-setup call it too.
           rsm-mkdir = mk "rsm-mkdir" [ rsm-vscode-settings rsm-claude-settings pkgs.uv pkgs.direnv pkgs.coreutils ];
+          # rsm-refresh-folders: re-apply the managed setup to folders that already
+          # exist, so a fix to rsm-mkdir's .envrc template reaches them. rsm-setup
+          # calls it; see bin/rsm-refresh-folders.
+          rsm-refresh-folders = mk "rsm-refresh-folders" [ rsm-mkdir pkgs.findutils pkgs.gnugrep pkgs.coreutils ];
           # rsm-clone: git clone + make the clone direnv-ready (rsm-mkdir) in one step.
           rsm-clone = mk "rsm-clone" [ pkgs.git rsm-mkdir pkgs.coreutils ];
           # rsm-gpu-init: rsm-mkdir --venv, plus the one decision that folder
@@ -293,7 +314,10 @@
 
           corePackages = with pkgs; [
             python313
-            uv
+            # NOTE: `uv` is intentionally NOT here. The dev shell gets the
+            # guarded wrapper (rsmScripts.uv, appended via rsmScriptList below),
+            # which refuses to let a project command rewrite the shared nix-uv
+            # env. Adding pkgs.uv back would shadow it and reopen that hole.
             quarto
             postgresql_16
             pgweb

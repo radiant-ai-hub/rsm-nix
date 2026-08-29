@@ -1,0 +1,67 @@
+# rsm-refresh-folders [ROOT]: re-apply the managed folder setup (.envrc, .vscode,
+# Claude harness) to every rsm-managed folder under ROOT (default: the workspace).
+#
+#   rsm-refresh-folders            every managed folder under ~/rsm-msba
+#   rsm-refresh-folders ~/projects somewhere else
+#
+# WHY THIS EXISTS
+# rsm-mkdir generates a folder's .envrc once. When that TEMPLATE is fixed, every
+# folder created before the fix keeps the old file forever -- nothing would
+# regenerate it. That is not cosmetic: the current template pins
+# UV_PROJECT_ENVIRONMENT to ./.venv unconditionally, which is what stops a
+# `uv sync` in a course folder from rewriting the SHARED nix-uv environment.
+# A folder still carrying the old .envrc keeps that hole open.
+#
+# rsm-setup/rsm-update call this, so an update repairs existing folders.
+#
+# SAFE BY CONSTRUCTION: only folders whose .envrc carries the "rsm-msba (managed)"
+# marker are touched, and rsm-mkdir's own keep-foreign guards mean a student's
+# own .envrc / .vscode / CLAUDE.md is never overwritten even then.
+
+_root="${1:-$RSM_WORKSPACE}"
+if [ ! -d "$_root" ]; then
+  echo "rsm-refresh-folders: not a directory: $_root" >&2
+  exit 1
+fi
+
+_refreshed=0
+_skipped=0
+
+# Prune the directories that can hold thousands of files and never contain a
+# managed folder. .git is pruned too: a repo's internals are not project folders.
+_envrcs="$(find "$_root" \
+    -name .rsm-msba -prune -o \
+    -name .direnv -prune -o \
+    -name .venv -prune -o \
+    -name .git -prune -o \
+    -name node_modules -prune -o \
+    -name .envrc -print 2>/dev/null || true)"
+
+while IFS= read -r _envrc; do
+  [ -n "$_envrc" ] || continue
+  _dir="$(dirname "$_envrc")"
+
+  # The workspace root is rsm-setup's own job, not rsm-mkdir's.
+  [ "$_dir" = "${RSM_WORKSPACE:-}" ] && continue
+
+  if ! grep -q "rsm-msba (managed)" "$_envrc" 2>/dev/null; then
+    _skipped=$((_skipped + 1))
+    continue
+  fi
+
+  # A folder that already owns a venv (or ships a pyproject.toml) must be
+  # refreshed WITH --venv, or rsm-mkdir would point its VS Code interpreter back
+  # at the shared nix-uv env and undo the thing that makes it a --venv project.
+  if [ -d "$_dir/.venv" ] || [ -f "$_dir/pyproject.toml" ]; then
+    if rsm-mkdir --venv "$_dir" >/dev/null 2>&1; then _refreshed=$((_refreshed + 1)); fi
+  else
+    if rsm-mkdir "$_dir" >/dev/null 2>&1; then _refreshed=$((_refreshed + 1)); fi
+  fi
+done <<EOF
+$_envrcs
+EOF
+
+echo "rsm-refresh-folders: refreshed $_refreshed managed folder(s) under $_root"
+if [ "$_skipped" -gt 0 ]; then
+  echo "  kept $_skipped folder(s) with their own .envrc (not rsm-generated)"
+fi

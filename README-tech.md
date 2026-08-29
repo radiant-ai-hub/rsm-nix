@@ -133,9 +133,10 @@ all of this for you.
 | `rsm-update`                                   | Same as `rsm-setup` + bump Claude Code to latest (the “update” name)                                                                                                                                                             |
 | `rsm-msba`                                     | Bootstrap/reset: clone the flake if missing, then `rsm-setup`                                                                                                                                                                    |
 | `rsm-version`                                  | Print the environment version (the flake’s git commit) + platform                                                                                                                                                                |
-| `rsm-python-sync`                              | Refresh the base env from `uv.lock`                                                                                                                                                                                              |
+| `rsm-python-sync`                              | Refresh the shared `nix-uv` env from `uv.lock`. The **only** supported way to write to it (sets `RSM_ALLOW_SHARED_SYNC=1` to pass the `uv` guard)                                                                                 |
+| `rsm-refresh-folders [ROOT]`                   | Re-apply the managed setup (`.envrc`, `.vscode`) to folders that already exist, so template fixes reach them. Called by `rsm-setup`/`rsm-update`; skips folders with their own `.envrc`                                          |
 | `rsm-mkdir [--venv] PATH...`                   | Make folder(s) first-class RSM projects to open directly in VS Code — nested or standalone, sharing the one nix-uv env (CWD-relative like `mkdir`); `--venv` gives a folder its **own** reproducible env (the conda alternative) |
-| `rsm-clone URL [DIR]`                          | `git clone` a repo AND set it up (direnv + nix-uv) so it opens directly in VS Code                                                                                                                                               |
+| `rsm-clone [--venv\|--no-venv] URL [DIR]`       | `git clone` a repo AND set it up (direnv + VS Code) so it opens directly. A repo that ships its own `pyproject.toml` gets its **own** `.venv`; otherwise the shared nix-uv env. The flags force either way                        |
 | `rsm-gpu-init [--cpu] PATH`                    | `rsm-mkdir --venv` plus PyTorch matched to this machine — CUDA build where a driver is present, CPU build otherwise (`--cpu` forces the smaller CPU build)                                                                       |
 | `rsm-gpu-proof`                                | Report the NVIDIA driver, CUDA reachability, and (if installed) what PyTorch actually sees. Also `nix run .#check-gpu`                                                                                                           |
 | `rsm-threads`                                  | Browse past Claude Code conversations across every folder (fzf menu by title + folder + date); Enter resumes the chosen thread in its own folder                                                                                 |
@@ -409,6 +410,38 @@ commands, the workspace justfile (upward-search +
 (personal / no-origin repos are never logged), stale-tests, ruff-format,
 and the keep-foreign guards.
 
+## The shared `nix-uv` environment is write-protected
+
+Every RSM folder shares one Python environment (`~/rsm-msba/.rsm-msba/envs/nix-uv`).
+`uv sync` does not "install into" its target -- it makes the target **match**
+`pyproject.toml` + `uv.lock`, removing everything the project does not list. So a
+`uv sync` in one course folder, aimed at the shared env, prunes it to that
+project's dependencies and breaks Python for every other folder.
+
+Two different variables were doing two different jobs, and only one is dangerous:
+
+| variable | drives `uv sync`'s target | makes Python "active" |
+| --- | --- | --- |
+| `UV_PROJECT_ENVIRONMENT` | **yes** | no |
+| `VIRTUAL_ENV` + `PATH` | no | **yes** |
+
+So the shared env can stay the *default interpreter* in a folder with no `.venv`
+while being impossible to *write to*. Three independent layers:
+
+1. **`bin/rsm-env.sh`** no longer defaults `UV_PROJECT_ENVIRONMENT` to the shared
+   env. Unset, uv falls back to `./.venv`.
+2. **The managed `.envrc`** (from `rsm-mkdir`) pins `UV_PROJECT_ENVIRONMENT` to
+   `$PWD/.venv` *unconditionally* -- including when no `.venv` exists yet, which
+   is exactly when the old setup was dangerous. Activation stays conditional, so
+   a folder without a venv still runs on `nix-uv`.
+3. **`bin/uv`** wraps uv and refuses a mutating command whose resolved target is
+   the shared env. It fails **open**: it refuses only when it can identify both
+   the target and a mutating verb, and hands everything else straight through.
+
+`rsm-python-sync` sets `RSM_ALLOW_SHARED_SYNC=1` to opt out -- it is the one place
+the rewrite is intended. `tests/check-shared-env.sh` tests each layer separately,
+so a regression in any one is visible even though the other two still hold.
+
 ## Testing
 
 ```bash
@@ -417,6 +450,10 @@ nix develop -c bash tests/check-default.sh        # toolchain + 35 course-core i
 nix develop -c bash tests/check-postgres.sh       # PostgreSQL lifecycle
 nix develop -c bash tests/check-folders.sh        # workspace layout
 nix develop -c bash tests/check-mkdir.sh          # rsm-mkdir folder setup
+nix develop -c bash tests/check-clone.sh          # rsm-clone venv decision
+nix develop -c bash tests/check-shared-env.sh     # shared nix-uv env cannot be clobbered
+nix develop -c bash tests/check-refresh.sh        # existing folders get template fixes
+nix develop -c bash tests/check-prompt.sh         # adaptive venv label in the prompt
 nix develop -c bash tests/check-claude-harness.sh # Claude Code harness + telemetry scope
 nix develop -c bash tests/check-no-host-mutation.sh
 nix develop .#spark-hadoop -c bash tests/check-spark-hadoop.sh
