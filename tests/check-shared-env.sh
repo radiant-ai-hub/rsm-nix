@@ -144,6 +144,39 @@ else
   bad "could not find rsm-shell-hook.sh to test"
 fi
 
+echo "== python always resolves under ~/rsm-msba (PATH POSITION, not membership) =="
+# The hostile PATH: $RSM_UV_ENV/bin IS already present, but sits BEHIND another
+# directory that also provides `python`. That is exactly what `nix develop`
+# produces when entered from a shell that already has the workspace loaded -- it
+# prepends the dev-shell packages (including a bare python313) in front of the
+# nix-uv entry. A presence-only check leaves the order alone and `python` then
+# silently resolves to an interpreter with none of the course packages.
+if [ -f "$_hook" ]; then
+  _decoy="$tmp/decoy/bin"
+  mkdir -p "$_decoy"; : > "$_decoy/python"; chmod +x "$_decoy/python"
+  # Keep the real PATH after the probe entries so the hook still finds mkdir etc.
+  # The decoy sits FIRST and $RSM_UV_ENV/bin behind it -- that is the hazard.
+  _probe="$(env PATH="$_decoy:$RSM_UV_ENV/bin:$PATH" \
+      RSMBASE="$RSMBASE" RSM_UV_ENV="$RSM_UV_ENV" \
+      bash -c ". '$_hook' >/dev/null 2>&1
+               command -v python
+               printf '%s' \"\$PATH\" | tr ':' '\n' | grep -c \"^$RSM_UV_ENV/bin\$\"" 2>/dev/null)"
+  _which="$(printf '%s\n' "$_probe" | sed -n 1p)"
+  _count="$(printf '%s\n' "$_probe" | sed -n 2p)"
+  if [ "$_which" = "$RSM_UV_ENV/bin/python" ]; then
+    ok "nix-uv/bin is moved AHEAD of a python already on PATH"
+  else
+    bad "python resolved outside the workspace env: $_which"
+  fi
+  if [ "$_count" = "1" ]; then
+    ok "no duplicate PATH entry (idempotent by position)"
+  else
+    bad "nix-uv/bin appears $_count times in PATH"
+  fi
+else
+  bad "could not find rsm-shell-hook.sh to test"
+fi
+
 echo "== the escape hatch still works (rsm-python-sync's route) =="
 if env RSM_ALLOW_SHARED_SYNC=1 UV_PROJECT_ENVIRONMENT="$RSM_UV_ENV" uv sync >/dev/null 2>&1; then
   ok "RSM_ALLOW_SHARED_SYNC=1 permits a deliberate shared-env sync"

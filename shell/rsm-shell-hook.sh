@@ -55,18 +55,39 @@ fi
 
 # Activate the nix-uv environment the way a normal venv would: put it first on
 # PATH and mark it active via VIRTUAL_ENV. Setting VIRTUAL_ENV (not just PATH) is
-# what makes the environment visibly "on" — `which python` points at it, uv
+# what makes the environment visibly "on" — `which python` points at it, `uv pip`
 # targets it, and prompt frameworks (powerlevel10k's virtualenv segment) show
 # `(nix-uv)`. direnv snapshots the environment, so leaving the workspace cleanly
 # reverts all of this — exactly like sourcing/deactivating a venv.
+#
+# NOTE: `uv sync` does NOT follow VIRTUAL_ENV. It targets UV_PROJECT_ENVIRONMENT,
+# which is deliberately never pointed at the shared env (see bin/rsm-env.sh).
+# Being "active" and being uv's write target are different things, and conflating
+# them is what let one `uv sync` prune this environment for every folder.
+#
+# MOVE $RSM_UV_ENV/bin to the front rather than only adding it when absent.
+# `nix develop` is impure: entering a dev shell from a shell that already has the
+# workspace loaded leaves $RSM_UV_ENV/bin in PATH but pushes it BEHIND the Nix
+# python313 that nix prepends along with the other dev-shell packages. A
+# presence-only check then declines to fix the order, and `python` silently
+# resolves to the bare store interpreter — same version, none of the course
+# packages. Idempotency here has to be about POSITION, not membership.
+#
+# A project-local .venv still wins: the folder's .envrc runs PATH_add AFTER
+# source_up has run this hook, so ./.venv/bin lands ahead of nix-uv/bin.
 if [ -d "$RSM_UV_ENV/bin" ]; then
-  case ":$PATH:" in
-    *":$RSM_UV_ENV/bin:"*) ;;
-    *) PATH="$RSM_UV_ENV/bin:$PATH" ;;
-  esac
+  _rsm_newpath=""
+  _rsm_ifs="$IFS"; IFS=":"
+  for _rsm_p in $PATH; do
+    [ "$_rsm_p" = "$RSM_UV_ENV/bin" ] && continue
+    _rsm_newpath="${_rsm_newpath:+$_rsm_newpath:}$_rsm_p"
+  done
+  IFS="$_rsm_ifs"
+  PATH="$RSM_UV_ENV/bin${_rsm_newpath:+:$_rsm_newpath}"
   export PATH
   export VIRTUAL_ENV="$RSM_UV_ENV"
   export VIRTUAL_ENV_PROMPT="(nix-uv) "
+  unset _rsm_newpath _rsm_p _rsm_ifs
 fi
 
 # Quarto must render with the course-core interpreter. FORCE it (not a ":-"
