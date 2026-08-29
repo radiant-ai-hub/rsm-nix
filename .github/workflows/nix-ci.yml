@@ -76,6 +76,18 @@ jobs:
       - name: Run folder layout checks
         run: nix develop -c bash tests/check-folders.sh
 
+      - name: rsm-clone picks the right Python for a cloned repo
+        run: nix develop -c bash tests/check-clone.sh
+
+      - name: The shared nix-uv env cannot be clobbered from a project folder
+        run: nix develop -c bash tests/check-shared-env.sh
+
+      - name: Existing managed folders pick up .envrc template fixes
+        run: nix develop -c bash tests/check-refresh.sh
+
+      - name: Adaptive venv label survives a narrow prompt
+        run: nix develop -c bash tests/check-prompt.sh
+
       - name: Compare host-mutation baseline
         run: nix develop -c bash tests/check-no-host-mutation.sh
 
