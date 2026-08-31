@@ -147,6 +147,7 @@
           runtimeInputs = with pkgs; [
             bubblewrap
             coreutils
+            getent
             glibc.bin
             gnugrep
             gnused
