@@ -75,7 +75,7 @@ hooks-on:
 status-line:
     #!/usr/bin/env bash
     src="${RSM_FLAKE:-$HOME/rsm-nix}/claude/statusline.sh"
-    dest="$HOME/.claude"; mkdir -p "$dest"
+    dest="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"; mkdir -p "$dest"
     cp -f "$src" "$dest/rsm-statusline.sh"; chmod +x "$dest/rsm-statusline.sh"
     f="$dest/settings.json"; [ -f "$f" ] || echo '{}' > "$f"
     jq --arg c "bash $dest/rsm-statusline.sh" '.statusLine = {type: "command", command: $c}' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
@@ -84,6 +84,6 @@ status-line:
 # Remove the status line
 status-line-off:
     #!/usr/bin/env bash
-    f="$HOME/.claude/settings.json"
+    f="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"
     [ -f "$f" ] && jq 'del(.statusLine)' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
     echo "status line removed. Restart Claude Code."

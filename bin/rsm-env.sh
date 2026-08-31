@@ -14,7 +14,11 @@
 # The generated ~/rsm-msba/.envrc sets RSM_WORKSPACE explicitly; these defaults
 # cover bootstrap (rsm-setup) and standalone use.
 
-RSM_FLAKE="${RSM_FLAKE:-$HOME/rsm-nix}"
+if [ -n "${RSM_SERVER_MANAGED_CLAUDE:-}" ] && [ -e /opt/rsm-nix/flake.nix ]; then
+  RSM_FLAKE="${RSM_FLAKE:-/opt/rsm-nix}"
+else
+  RSM_FLAKE="${RSM_FLAKE:-$HOME/rsm-nix}"
+fi
 RSM_WORKSPACE="${RSM_WORKSPACE:-$HOME/rsm-msba}"
 RSMBASE="${RSMBASE:-$RSM_WORKSPACE/.rsm-msba}"
 RSM_UV_ENV="${RSM_UV_ENV:-$RSMBASE/envs/nix-uv}"
@@ -64,10 +68,17 @@ export NPM_CONFIG_PREFIX="${NPM_CONFIG_PREFIX:-$RSMBASE/npm}"
 # Keep the npm cache/logs workspace-local too, so npm never writes to ~/.npm
 # (preserves the "no host mutation" guarantee and stays per-user on the server).
 export NPM_CONFIG_CACHE="${NPM_CONFIG_CACHE:-$RSMBASE/npm-cache}"
-case ":$PATH:" in
-  *":$NPM_CONFIG_PREFIX/bin:"*) ;;
-  *) PATH="$NPM_CONFIG_PREFIX/bin:$PATH"; export PATH ;;
-esac
+if [ -z "${RSM_SERVER_MANAGED_CLAUDE:-}" ]; then
+  case ":$PATH:" in
+    *":$NPM_CONFIG_PREFIX/bin:"*) ;;
+    *) PATH="$NPM_CONFIG_PREFIX/bin:$PATH"; export PATH ;;
+  esac
+fi
+
+if [ -n "${RSM_SERVER_MANAGED_CLAUDE:-}" ]; then
+  export CLAUDE_CONFIG_DIR="${CLAUDE_CONFIG_DIR:-$RSMBASE/claude}"
+  export CLAUDE_PROJECTS_DIR="${CLAUDE_PROJECTS_DIR:-$CLAUDE_CONFIG_DIR/projects}"
+fi
 
 # Make the RSM sitecustomize (native-library preload) importable at EVERY Python
 # startup. PYTHONPATH is not a DYLD_* var, so macOS SIP keeps it across the

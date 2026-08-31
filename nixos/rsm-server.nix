@@ -10,6 +10,51 @@ let
   rsmMkdir = rsm-nix.packages.${system}.rsm-mkdir;
   rsmClone = rsm-nix.packages.${system}.rsm-clone;
   rsmProjectCheck = rsm-nix.packages.${system}.rsm-project-check;
+  rsmClaude = rsm-nix.packages.${system}.rsm-claude;
+  rsmClaudeBoundaryCheck = rsm-nix.packages.${system}.rsm-claude-boundary-check;
+  rsmFlakePath = "/opt/rsm-nix";
+  managedClaudeSettings = {
+    allowManagedPermissionRulesOnly = true;
+    permissions = {
+      disableAutoMode = "disable";
+      disableBypassPermissionsMode = "disable";
+      deny = [
+        "Read(//home/**)"
+        "Read(//root/**)"
+        "Read(//srv/**)"
+        "Read(//mnt/**)"
+        "Read(//etc/nixos/**)"
+      ];
+    };
+    sandbox = {
+      enabled = true;
+      failIfUnavailable = true;
+      allowUnsandboxedCommands = false;
+      bwrapPath = "${pkgs.bubblewrap}/bin/bwrap";
+      socatPath = "${pkgs.socat}/bin/socat";
+      filesystem = {
+        denyRead = [
+          "~/"
+          "/home"
+          "/root"
+          "/srv"
+          "/mnt"
+          "/etc/nixos"
+        ];
+        allowRead = [ "~/rsm-msba" ];
+        allowManagedReadPathsOnly = true;
+        denyWrite = [
+          "~/"
+          "/home"
+          "/root"
+          "/srv"
+          "/mnt"
+          "/etc"
+        ];
+        allowWrite = [ "~/rsm-msba" ];
+      };
+    };
+  };
 in
 {
   # --- VS Code Remote-SSH fix (the important one) ----------------------------
@@ -30,19 +75,19 @@ in
 
   # --- SSH access (key-only) -------------------------------------------------
   services.openssh = {
-    enable = true;
+    enable = lib.mkDefault true;
     settings = {
-      PasswordAuthentication = false;
-      KbdInteractiveAuthentication = false;
-      AllowTcpForwarding = true; # forward pgweb / Postgres back to the laptop
-      X11Forwarding = false;
+      PasswordAuthentication = lib.mkDefault false;
+      KbdInteractiveAuthentication = lib.mkDefault false;
+      AllowTcpForwarding = lib.mkDefault true; # forward pgweb / Postgres back to the laptop
+      X11Forwarding = lib.mkDefault false;
     };
   };
 
   # Only SSH is exposed. Per-student Postgres/pgweb are reached through SSH
   # port-forwarding, never published on the network.
-  networking.firewall.enable = true;
-  networking.firewall.allowedTCPPorts = [ 22 ];
+  networking.firewall.enable = lib.mkDefault true;
+  networking.firewall.allowedTCPPorts = lib.mkDefault [ 22 ];
 
   # zsh is the environment's native shell. Enabling it here lets students.nix set
   # it as the login shell. The interactiveShellInit hook loads the full rsm shell
@@ -76,10 +121,6 @@ in
   # group-writable regardless of each user's umask.
   users.groups.rsm = { };
 
-  systemd.tmpfiles.rules = [
-    "d /srv/uv-cache 2775 root rsm - -"
-    "a+ /srv/uv-cache - - - - d:g:rsm:rwx,g:rsm:rwx"
-  ];
   # Use the shared cache only when this user can actually write it (i.e. is in
   # the `rsm` group); otherwise a per-user cache, so `uv` never errors out for a
   # user who isn't in the group. Set via shell init (not sessionVariables) so the
@@ -90,7 +131,16 @@ in
     else
       export UV_CACHE_DIR="$HOME/.cache/uv"
     fi
+    if id -nG 2>/dev/null | tr ' ' '\n' | grep -qx rsm; then
+      export RSM_SERVER_MANAGED_CLAUDE=1
+      export RSM_FLAKE=${rsmFlakePath}
+    fi
   '';
+
+  environment.etc."claude-code/managed-settings.json" = {
+    text = builtins.toJSON managedClaudeSettings;
+    mode = "0444";
+  };
 
   # --- Per-user Postgres port ------------------------------------------------
   # Handled in the env header (rsm-nix/bin/rsm-env.sh): PGPORT defaults to
@@ -118,22 +168,29 @@ in
     rsmMkdir # `rsm-mkdir` — set up a folder (nested or standalone) as a project
     rsmClone # `rsm-clone` — git clone + set the clone up as a project
     rsmProjectCheck # `rsm-project-check` — verify a project's imports
+    rsmClaude # managed `claude` wrapper for shared servers
+    rsmClaudeBoundaryCheck # smoke-test the outer filesystem boundary
+    bubblewrap
+    socat
   ];
 
-  # --- Seed each student's flake checkout ------------------------------------
-  # Clone rsm-nix to ~/rsm-nix for every member of the `rsm` group that does not
-  # have it yet, then let them run `rsm-setup` once to build their personal
-  # nix-uv env. The real flake is the single source of truth — no toy template.
+  # --- Root-owned flake checkout ---------------------------------------------
+  # Shared servers use one immutable, root-owned flake source. Students can read
+  # it, but they cannot change the environment definition or shadow it with a
+  # writable per-user checkout.
+  systemd.tmpfiles.rules = [
+    "d /srv/uv-cache 2775 root rsm - -"
+    "a+ /srv/uv-cache - - - - d:g:rsm:rwx,g:rsm:rwx"
+    "L+ ${rsmFlakePath} - - - - ${rsm-nix}"
+  ];
+
   systemd.services.rsm-seed-workspaces = {
-    description = "Clone rsm-nix into each rsm-group home (if missing)";
+    description = "Prepare RSM-MSBA workspace directories for rsm-group users";
     wantedBy = [ "multi-user.target" ];
-    after = [ "network-online.target" ];
-    wants = [ "network-online.target" ];
-    path = [ pkgs.git pkgs.coreutils pkgs.getent ];
+    path = [ pkgs.coreutils pkgs.glibc.bin ];
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
-      Environment = "GIT_SSL_CAINFO=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
     };
     script = ''
       set -u
@@ -141,10 +198,7 @@ in
       for u in $members; do
         home="$(getent passwd "$u" | cut -d: -f6)"
         [ -n "$home" ] || continue
-        if [ ! -e "$home/rsm-nix/flake.nix" ]; then
-          git clone https://github.com/radiant-ai-hub/rsm-nix.git "$home/rsm-nix" || true
-          chown -R "$u":rsm "$home/rsm-nix" || true
-        fi
+        install -d -m 0700 -o "$u" -g "$u" "$home" "$home/rsm-msba" "$home/rsm-msba/.rsm-msba"
       done
     '';
   };
