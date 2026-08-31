@@ -11,9 +11,9 @@
 # ```
 #
 # The connection uses the `PG*` environment variables the dev shell exports
-# (`PGUSER`, `PGPORT`, `PGDATABASE`, `PGHOST`) — local socket, trust auth, no
-# password. On a shared server `PGPORT` is **per-user**, so don't hard-code it;
-# read it from the environment as below.
+# (`PGUSER`, `PGPORT`, `PGDATABASE`, `PGHOST`) — a private Unix socket with peer
+# auth, no password and no TCP. On a shared server `PGPORT` is **per-user**, so
+# don't hard-code it; read everything from the environment as below.
 
 # %%
 import getpass
@@ -23,11 +23,13 @@ from sqlalchemy import create_engine, text
 import polars as pl
 
 user = os.environ.get("PGUSER", getpass.getuser())
-port = os.environ.get("PGPORT")  # set per-user by the dev shell; do not hard-code
+port = os.environ.get("PGPORT")  # names the socket file; set per-user, don't hard-code
 db = os.environ.get("PGDATABASE", "rsm-msba")
+host = os.environ.get("PGHOST")  # the private socket directory (peer auth, no TCP)
 
-# TCP loopback (works with the workspace-local server started by rsm-pg-start).
-url = f"postgresql+psycopg2://{user}@127.0.0.1:{port}/{db}"
+# Connect over the Unix socket (host is a directory path). This is the only
+# transport on a shared server — there is no TCP listener to reach.
+url = f"postgresql+psycopg2://{user}@/{db}?host={host}&port={port}"
 print("connecting to:", url)
 engine = create_engine(url)
 

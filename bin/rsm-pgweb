@@ -1,12 +1,16 @@
 # rsm-pgweb: launch pgweb against the workspace-local PostgreSQL instance.
-# Web UI on http://127.0.0.1:$PGWEB_PORT (per-user, so students on a shared
-# server don't collide on one port). Bound to loopback only; VS Code Remote-SSH
-# auto-forwards the port to your laptop (open the URL in the Ports panel).
-# Extra args pass through to pgweb.
+# It connects over the PRIVATE Unix socket (peer auth). Its own web UI listens on
+# loopback, which is SHARED on a multi-user server, so it is protected with a
+# per-session random password: another user who reaches the port gets a 401. The
+# URL printed below embeds the credentials, so when VS Code Remote-SSH forwards the
+# port you open it with no extra typing. Extra args pass through to pgweb.
 
-echo "pgweb: http://localhost:$PGWEB_PORT  (VS Code forwards this port to your laptop)"
+_pass="$(head -c 32 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | cut -c1-24)"
+echo "pgweb: http://$PGUSER:$_pass@localhost:$PGWEB_PORT  (VS Code forwards this port to your laptop)"
 exec pgweb \
   --bind=127.0.0.1 \
   --listen="$PGWEB_PORT" \
-  --url "postgresql://$PGUSER@127.0.0.1:$PGPORT/$PGDATABASE?sslmode=disable" \
+  --auth-user="$PGUSER" \
+  --auth-pass="$_pass" \
+  --url "postgresql://$PGUSER@/$PGDATABASE?host=$PGHOST&port=$PGPORT&sslmode=disable" \
   "$@"
