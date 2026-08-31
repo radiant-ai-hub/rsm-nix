@@ -53,6 +53,27 @@ if [ -n "${VIRTUAL_ENV:-}" ] && [ "${VIRTUAL_ENV:-}" != "$RSM_UV_ENV" ]; then
   unset VIRTUAL_ENV VIRTUAL_ENV_PROMPT _rsm_stale_bin _rsm_newpath _rsm_p _rsm_ifs
 fi
 
+# Shared managed servers expose Claude through the root-owned wrapper only. Nix
+# develop is intentionally impure for direnv, so scrub inherited user-local nvm,
+# npm, npx, node, nix, and codex paths from the managed shell.
+if [ -n "${RSM_SERVER_MANAGED_CLAUDE:-}" ]; then
+  _rsm_newpath=""
+  _rsm_ifs="$IFS"; IFS=":"
+  for _rsm_p in $PATH; do
+    [ -n "$_rsm_p" ] || continue
+    case "$_rsm_p" in
+      "$NPM_CONFIG_PREFIX/bin"|*nodejs*|*/node_modules/*|/run/current-system/sw/bin) continue ;;
+    esac
+    if [ -x "$_rsm_p/codex" ] || [ -x "$_rsm_p/npm" ] || [ -x "$_rsm_p/npx" ] || [ -x "$_rsm_p/node" ] || [ -x "$_rsm_p/nix" ]; then
+      continue
+    fi
+    _rsm_newpath="${_rsm_newpath:+$_rsm_newpath:}$_rsm_p"
+  done
+  IFS="$_rsm_ifs"
+  PATH="$_rsm_newpath"; export PATH
+  unset _rsm_newpath _rsm_p _rsm_ifs
+fi
+
 # Activate the nix-uv environment the way a normal venv would: put it first on
 # PATH and mark it active via VIRTUAL_ENV. Setting VIRTUAL_ENV (not just PATH) is
 # what makes the environment visibly "on" — `which python` points at it, `uv pip`

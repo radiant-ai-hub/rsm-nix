@@ -240,13 +240,31 @@
               args+=(--ro-bind "$rsm_flake_src" "$sandbox_flake")
             fi
 
+            safe_path=""
+            old_ifs="$IFS"
+            IFS=:
+            for path_entry in ''${PATH:-}; do
+              [ -n "$path_entry" ] || continue
+              case "$path_entry" in
+                "$workspace/.rsm-msba/npm/bin"|*nodejs*|*/node_modules/*|/run/current-system/sw/bin) continue ;;
+              esac
+              if [ -x "$path_entry/codex" ] || [ -x "$path_entry/npm" ] || [ -x "$path_entry/npx" ] || [ -x "$path_entry/node" ] || [ -x "$path_entry/nix" ]; then
+                continue
+              fi
+              safe_path="''${safe_path:+$safe_path:}$path_entry"
+            done
+            IFS="$old_ifs"
+            if [ -z "$safe_path" ]; then
+              safe_path="${pkgs.coreutils}/bin:${pkgs.gnugrep}/bin:${pkgs.gnused}/bin:${pkgs.bash}/bin"
+            fi
+
             common_env=(
               --chdir "$cwd"
               --setenv HOME "$home"
               --setenv USER "$user"
               --setenv LOGNAME "$user"
               --setenv SHELL "${pkgs.bash}/bin/bash"
-              --setenv PATH "''${PATH:-${pkgs.coreutils}/bin}"
+              --setenv PATH "$safe_path"
               --setenv RSM_SERVER_MANAGED_CLAUDE "1"
               --setenv RSM_FLAKE "$sandbox_flake"
               --setenv RSM_WORKSPACE "$workspace"
@@ -271,6 +289,12 @@
                 test ! -e /srv
                 test ! -e /mnt
                 test ! -e /etc/nixos
+                for tool in codex npm npx node nix; do
+                  if command -v "$tool" >/dev/null 2>&1; then
+                    echo "$tool is visible inside managed Claude sandbox" >&2
+                    exit 1
+                  fi
+                done
                 touch "$TMPDIR/rsm-claude-boundary-write"
                 if touch "$HOME/rsm-claude-outside-workspace" 2>/dev/null; then
                   echo "home outside workspace is writable" >&2
@@ -515,7 +539,7 @@
           quarto = mkQuarto pkgs;
           rsmScriptList = builtins.attrValues rsmScripts;
 
-          corePackages = with pkgs; [
+          basePackages = with pkgs; [
             python313
             # NOTE: `uv` is intentionally NOT here. The dev shell gets the
             # guarded wrapper (rsmScripts.uv, appended via rsmScriptList below),
@@ -528,7 +552,6 @@
             git
             git-lfs
             gh
-            nodejs_22 # Node runtime for Claude Code (installed per-user via npm)
             prettier # markdown/JS/JSON formatter (also normalizes rendered docs)
             graphviz
             zsh
@@ -548,6 +571,15 @@
             pkgs.gfortran
             pkgs.pkg-config
           ] ++ rsmScriptList;
+
+          corePackages = basePackages ++ [
+            pkgs.nodejs_22 # Node/npm for laptop installs of Claude Code.
+          ];
+
+          serverPackages = basePackages ++ [
+            (mkRsmClaude pkgs)
+            (mkRsmClaudeBoundaryCheck pkgs)
+          ];
 
           baseHook = ''
             ${rsmEnvHeader}
@@ -576,6 +608,11 @@
             # means a student on a GPU server gets a working torch.cuda without
             # having to know that a separate shell exists. The gpu devShell
             # below only adds the proof tool.
+            shellHook = baseHook + gpu.envHook;
+          };
+
+          server = pkgs.mkShell {
+            packages = serverPackages;
             shellHook = baseHook + gpu.envHook;
           };
 

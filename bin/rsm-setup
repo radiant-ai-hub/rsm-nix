@@ -91,7 +91,7 @@ export RSM_FLAKE RSM_WORKSPACE
 # A change to any watched file makes direnv reload (rebuild the dev shell) on the
 # next cd, so an admin update to the flake propagates without a manual rebuild.
 watch_file "\$RSM_FLAKE/flake.nix" "\$RSM_FLAKE/flake.lock" "\$RSM_FLAKE/pyproject.toml" "\$RSM_FLAKE/uv.lock" "\$RSM_FLAKE/shell/rsm-shell-hook.sh" "\$RSM_FLAKE/bin/rsm-env.sh" "\$RSM_FLAKE/bin/rsm-setup"
-use flake "\$RSM_FLAKE#default"
+use flake "\$RSM_FLAKE#server"
 EOF
 else
   cat > "$RSM_WORKSPACE/.envrc" <<EOF
