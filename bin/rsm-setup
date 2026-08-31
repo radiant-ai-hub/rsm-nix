@@ -393,8 +393,10 @@ fi
 #    these are reference/test files, not coursework (which lives in course
 #    folders), so replacing them is safe.
 if [ -d "$RSM_FLAKE/examples" ]; then
+  chmod -R u+w "${RSM_WORKSPACE:?}/examples" 2>/dev/null || true
   rm -rf "${RSM_WORKSPACE:?}/examples"
   cp -R "$RSM_FLAKE/examples" "$RSM_WORKSPACE/examples"
+  chmod -R u+w "$RSM_WORKSPACE/examples" 2>/dev/null || true
   echo "    examples  : refreshed $RSM_WORKSPACE/examples"
 fi
 
