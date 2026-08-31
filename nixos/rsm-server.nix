@@ -350,6 +350,7 @@ in
     bubblewrap
     socat
   ];
+  environment.pathsToLink = [ "/share/rsm-msba" ];
 
   # --- Root-owned flake checkout ---------------------------------------------
   # Shared servers use one immutable, root-owned flake source. Students can read
