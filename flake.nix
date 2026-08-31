@@ -260,7 +260,7 @@
             fi
 
             for blocked_store in /nix/store/*-nodejs-* /nix/store/*-nix-* /nix/store/*-codex-* /nix/store/*-npm-* /nix/store/*-npx-*; do
-              [ -e "$blocked_store" ] || continue
+              [ -d "$blocked_store" ] || continue
               args+=(--tmpfs "$blocked_store")
             done
 
