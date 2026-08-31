@@ -256,7 +256,7 @@ pg                                 # overview: status + all the commands below
 rsm-pg-start                       # start (initializes on first run)
 rsm-pg-psql                        # open psql on the rsm-msba database
 rsm-pg-psql -c "SELECT version();" # run one statement
-rsm-pgweb                          # browse at http://127.0.0.1:8282
+rsm-pgweb                          # browse (prints a password-protected URL)
 rsm-pg-status                      # is it running?
 rsm-pg-stop                        # stop it
 ```
@@ -264,11 +264,15 @@ rsm-pg-stop                        # stop it
 Run **`pg`** any time for a quick status (running? which port?) plus a
 reminder of these commands.
 
-Connection details: host = socket under `.rsm-msba/postgres/socket` (or
-`127.0.0.1`), port = **`$PGPORT`** (run `echo $PGPORT`), databases =
-`rsm-msba` and your username. On your own machine the port is stable; on
-a shared server it is derived per-user (so students don’t collide on one
-port) — always read it from `$PGPORT` rather than hard-coding `8765`.
+Connection details: host = the private Unix socket under
+`.rsm-msba/postgres/socket` (the `$PGHOST` variable), port =
+**`$PGPORT`** (run `echo $PGPORT`), databases = `rsm-msba` and your
+username. There is **no TCP** and no password: the server listens only
+on that socket, protected by peer authentication — on a shared server
+this is what keeps one student out of another student’s database. From
+Python, connect over the socket (`host=$PGHOST`), not `127.0.0.1` (see
+`examples/postgres_python.py`). The port is derived per-user on a shared
+server, so always read it from `$PGPORT` rather than hard-coding `8765`.
 
 ## Quarto
 
