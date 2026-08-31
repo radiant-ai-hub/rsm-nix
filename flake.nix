@@ -632,6 +632,7 @@
 
           spark-hadoop = pkgs.mkShell {
             packages = corePackages ++ [
+              pkgs.procps
               sparkHadoop.java
               sparkHadoop.sparkHadoopEnv
               sparkHadoop.proof

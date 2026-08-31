@@ -89,6 +89,7 @@ let
       pkgs.coreutils
       pkgs.findutils
       pkgs.gnugrep
+      pkgs.procps
       hadoop
       java
       python
