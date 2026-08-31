@@ -528,6 +528,7 @@
           };
           rsmScriptList = builtins.attrValues rsmScripts;
           basePackages = with pkgs; [
+            bashInteractive
             python313
             quarto
             postgresql_16
