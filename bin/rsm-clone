@@ -64,6 +64,25 @@ if [ -e "$dir" ]; then
   exit 1
 fi
 
+if [ -n "${RSM_SERVER_MANAGED_CLAUDE:-}" ]; then
+  case "$dir" in
+    /*) _dest="$dir" ;;
+    *)  _dest="$PWD/$dir" ;;
+  esac
+  _parent="$(dirname "$_dest")"
+  _base="$(basename "$_dest")"
+  if [ -d "$_parent" ]; then
+    _dest="$(cd "$_parent" && pwd)/$_base"
+  fi
+  case "$_dest/" in
+    "$RSM_WORKSPACE"/*) ;;
+    *)
+      echo "rsm-clone: managed server accounts can clone RSM projects only under $RSM_WORKSPACE" >&2
+      exit 1
+      ;;
+  esac
+fi
+
 git clone "$url" "$dir" || exit 1
 
 # Decide AFTER the clone -- the repo's contents are the signal.

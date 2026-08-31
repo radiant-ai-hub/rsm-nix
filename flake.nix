@@ -434,7 +434,7 @@
           # the assembled zsh assets + the ZDOTDIR template it installs.
           rsm-setup = pkgs.writeShellApplication {
             name = "rsm-setup";
-            runtimeInputs = [ pythonSync pkgs.uv pkgs.python313 pkgs.coreutils pkgs.git pkgs.nodejs_22 rsm-version rsm-vscode-settings rsm-vscode-ext rsm-vscode-keybindings rsm-claude-settings rsm-mkdir rsm-refresh-folders ];
+            runtimeInputs = [ pythonSync pkgs.uv pkgs.python313 pkgs.coreutils pkgs.git rsm-version rsm-vscode-settings rsm-vscode-ext rsm-vscode-keybindings rsm-claude-settings rsm-mkdir rsm-refresh-folders ];
             excludeShellChecks = [ "SC1090" "SC1091" "SC2164" ];
             text = rsmEnvHeader + "\n" + nativeEnvHook pkgs + ''
               export RSM_OMZ_SRC="${zshOmz}"
@@ -512,6 +512,75 @@
           # folder (title + folder + date); Enter resumes the thread in its folder.
           rsm-threads = mk "rsm-threads" [ pkgs.jq pkgs.fzf pkgs.coreutils pkgs.findutils pkgs.gnused ];
         };
+
+      mkRsmServerEnv = pkgs:
+        let
+          system = pkgs.stdenv.hostPlatform.system;
+          rsmScripts = mkRsmScripts pkgs;
+          quarto = mkQuarto pkgs;
+          sparkHadoop = import ./spark-hadoop {
+            inherit pkgs;
+            python = pkgs.python313;
+          };
+          gpu = import ./gpu {
+            inherit pkgs;
+            python = pkgs.python313;
+          };
+          rsmScriptList = builtins.attrValues rsmScripts;
+          basePackages = with pkgs; [
+            python313
+            quarto
+            postgresql_16
+            pgweb
+            duckdb
+            git
+            git-lfs
+            gh
+            prettier
+            graphviz
+            zsh
+            eza
+            zoxide
+            cacert
+            coreutils
+            gnused
+            gnugrep
+            which
+            just
+            jq
+            ruff
+            sparkHadoop.runner
+          ] ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
+            pkgs.gfortran
+            pkgs.pkg-config
+          ] ++ rsmScriptList;
+          packages = basePackages ++ pkgs.lib.optionals (system == "x86_64-linux") [
+            (mkRsmClaude pkgs)
+            (mkRsmClaudeBoundaryCheck pkgs)
+          ];
+          env = pkgs.buildEnv {
+            name = "rsm-server-env";
+            paths = packages;
+            ignoreCollisions = true;
+            pathsToLink = [ "/bin" "/lib" "/share" ];
+          };
+          hook = pkgs.writeTextFile {
+            name = "rsm-server-env-hook";
+            destination = "/share/rsm-msba/server-env-hook.sh";
+            text = ''
+              ${rsmEnvHeader}
+              export SSL_CERT_FILE="''${SSL_CERT_FILE:-${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt}"
+              export NIX_SSL_CERT_FILE="''${NIX_SSL_CERT_FILE:-$SSL_CERT_FILE}"
+            '' + nativeEnvHook pkgs + ''
+              export PATH="${env}/bin''${PATH:+:$PATH}"
+              ${builtins.readFile ./shell/rsm-shell-hook.sh}
+              ${gpu.envHook}
+            '';
+          };
+        in
+        {
+          inherit env hook packages;
+        };
     in
     {
       packages = forAllSystems (pkgs:
@@ -523,6 +592,7 @@
             inherit pkgs;
             python = pkgs.python313;
           };
+          rsmServerEnv = mkRsmServerEnv pkgs;
           serverPackages = pkgs.lib.optionalAttrs (system == "x86_64-linux") {
             claude-code-native = mkClaudeCodeNative pkgs;
             rsm-claude = mkRsmClaude pkgs;
@@ -533,6 +603,9 @@
           quarto-bin = quarto;
           spark-hadoop-env = sparkHadoop.sparkHadoopEnv;
           spark-hadoop-proof = sparkHadoop.proof;
+          rsm-spark-hadoop = sparkHadoop.runner;
+          rsm-server-env = rsmServerEnv.env;
+          rsm-server-env-hook = rsmServerEnv.hook;
           default = rsmScripts.rsm-setup;
         });
 

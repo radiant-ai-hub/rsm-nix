@@ -87,11 +87,17 @@ if [ -n "${RSM_SERVER_MANAGED_CLAUDE:-}" ]; then
 # here (mgta403, ...) can be its own git repo without nesting conflicts.
 : \${RSM_FLAKE:=$RSM_FLAKE}
 : \${RSM_WORKSPACE:=$RSM_WORKSPACE}
-export RSM_FLAKE RSM_WORKSPACE
-# A change to any watched file makes direnv reload (rebuild the dev shell) on the
-# next cd, so an admin update to the flake propagates without a manual rebuild.
+export RSM_FLAKE RSM_WORKSPACE RSM_SERVER_MANAGED_CLAUDE=1
+# A change to any watched file makes direnv reload on the next cd, so an admin
+# update to the system-managed environment propagates without per-user Nix.
 watch_file "\$RSM_FLAKE/flake.nix" "\$RSM_FLAKE/flake.lock" "\$RSM_FLAKE/pyproject.toml" "\$RSM_FLAKE/uv.lock" "\$RSM_FLAKE/shell/rsm-shell-hook.sh" "\$RSM_FLAKE/bin/rsm-env.sh" "\$RSM_FLAKE/bin/rsm-setup"
-use flake "\$RSM_FLAKE#server"
+: \${RSM_SERVER_ENV_HOOK:=/run/current-system/sw/share/rsm-msba/server-env-hook.sh}
+watch_file "\$RSM_SERVER_ENV_HOOK"
+if [ ! -r "\$RSM_SERVER_ENV_HOOK" ]; then
+  echo "rsm-msba: missing managed server hook: \$RSM_SERVER_ENV_HOOK" >&2
+  exit 1
+fi
+source "\$RSM_SERVER_ENV_HOOK"
 EOF
 else
   cat > "$RSM_WORKSPACE/.envrc" <<EOF

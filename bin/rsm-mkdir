@@ -43,11 +43,32 @@ fi
 _rsm_setup_folder() {
   local _target="$1"
   local _here _inside _interp _name _ig _kept_envrc="" _kept_vscode=""
+  local _abs _parent _base
 
   # Resolve the target folder. Expand a leading ~ even if quoted.
   if [ "${_target#\~}" != "$_target" ]; then
     _target="$HOME${_target#\~}"
   fi
+
+  case "$_target" in
+    /*) _abs="$_target" ;;
+    *)  _abs="$PWD/$_target" ;;
+  esac
+  _parent="$(dirname "$_abs")"
+  _base="$(basename "$_abs")"
+  if [ -d "$_parent" ]; then
+    _abs="$(cd "$_parent" && pwd)/$_base"
+  fi
+  if [ -n "${RSM_SERVER_MANAGED_CLAUDE:-}" ]; then
+    case "$_abs/" in
+      "$RSM_WORKSPACE"/*) ;;
+      *)
+        echo "rsm-mkdir: managed server accounts can create RSM folders only under $RSM_WORKSPACE" >&2
+        return 1
+        ;;
+    esac
+  fi
+
   mkdir -p "$_target"
   _here="$(cd "$_target" && pwd)"
 
