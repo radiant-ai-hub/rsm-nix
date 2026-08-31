@@ -227,11 +227,11 @@
               --ro-bind-try /etc/protocols /etc/protocols
               --ro-bind-try /etc/claude-code /etc/claude-code
               --dir /run
-              --ro-bind-try /run/current-system /run/current-system
               --ro-bind-try /run/opengl-driver /run/opengl-driver
               --dir /var
               --tmpfs /var/tmp
-              --ro-bind /nix /nix
+              --dir /nix
+              --ro-bind /nix/store /nix/store
               --dir /home
               --ro-bind ${emptyHome} "$home"
               --bind "$workspace_real" "$workspace"
@@ -258,6 +258,11 @@
             if [ -z "$safe_path" ]; then
               safe_path="${pkgs.coreutils}/bin:${pkgs.gnugrep}/bin:${pkgs.gnused}/bin:${pkgs.bash}/bin"
             fi
+
+            for blocked_store in /nix/store/*-nodejs-* /nix/store/*-nix-* /nix/store/*-codex-* /nix/store/*-npm-* /nix/store/*-npx-*; do
+              [ -e "$blocked_store" ] || continue
+              args+=(--tmpfs "$blocked_store")
+            done
 
             common_env=(
               --chdir "$cwd"
@@ -290,9 +295,17 @@
                 test ! -e /srv
                 test ! -e /mnt
                 test ! -e /etc/nixos
+                test ! -e /run/current-system
+                test ! -e /nix/var
                 for tool in codex npm npx node nix; do
                   if command -v "$tool" >/dev/null 2>&1; then
                     echo "$tool is visible inside managed Claude sandbox" >&2
+                    exit 1
+                  fi
+                done
+                for pattern in "/nix/store/*-nodejs-*/bin/npm" "/nix/store/*-nix-*/bin/nix" "/nix/store/*-codex-*/bin/codex"; do
+                  if compgen -G "$pattern" >/dev/null 2>&1; then
+                    echo "$pattern is visible inside managed Claude sandbox" >&2
                     exit 1
                   fi
                 done
