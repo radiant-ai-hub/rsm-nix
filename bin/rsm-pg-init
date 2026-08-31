@@ -2,6 +2,9 @@
 # Data lives under $PGDATA; no system service, launchd, or systemd involved.
 
 mkdir -p "$RSMBASE/postgres" "$PGHOST"
+# Private socket directory: on a shared server this is what stops another user
+# from opening (and connecting through) your socket.
+chmod 700 "$PGHOST"
 
 if [ -s "$PGDATA/PG_VERSION" ]; then
   echo "PostgreSQL cluster already initialized at $PGDATA"
@@ -11,12 +14,18 @@ fi
 mkdir -p "$PGDATA"
 chmod 700 "$PGDATA"
 
-# Local socket/loopback only, trust auth for the single workspace user.
+# Local Unix-domain socket + PEER auth only -- no TCP, no trust. On a SHARED
+# server (e.g. sc2) loopback is shared by every user, so TCP + trust let any
+# student reach another student's database by guessing the per-uid port. A
+# private (0700) socket dir plus peer auth is filesystem-isolated: only the
+# owning OS user can open the socket, and peer re-checks that the OS user matches
+# the DB role. (rsm-pg-start also rewrites pg_hba.conf to peer-only on every start,
+# so clusters initialized before this change are remediated too.)
 initdb \
   --pgdata="$PGDATA" \
   --username="$PGUSER" \
-  --auth-local=trust \
-  --auth-host=trust \
+  --auth-local=peer \
+  --auth-host=reject \
   --encoding=UTF8 \
   --locale=C >/dev/null
 

@@ -7,13 +7,35 @@ if [ ! -s "$PGDATA/PG_VERSION" ]; then
 fi
 
 mkdir -p "$PGHOST"
+chmod 700 "$PGHOST"
 log_file="$RSMBASE/postgres/postgres.log"
 
+# Enforce socket + peer auth on EVERY start, so clusters created before this
+# change (initialized with trust) are remediated in place, not just new ones.
+cat > "$PGDATA/pg_hba.conf" <<'HBA'
+# Managed by rsm-pg-start (RSM-MSBA). Local Unix-domain socket + peer auth ONLY.
+# No TCP and no trust: on a shared server this is what stops one student from
+# reaching another student's database. Do NOT add `host ... trust` lines here.
+local   all   all   peer
+HBA
+
+# Start options: private socket dir, per-user socket name (port), and NO TCP
+# listener (empty listen_addresses). Loopback is shared on a multi-user host, so
+# the only safe transport there is the private socket.
+_pg_opts="-k $PGHOST -p $PGPORT -c listen_addresses="
+
 if pg_ctl status -D "$PGDATA" >/dev/null 2>&1; then
-  echo "PostgreSQL already running (PGDATA=$PGDATA, port=$PGPORT)"
+  # Already running: reload the peer-only pg_hba. If it is still listening on TCP
+  # (an old, insecure start), restart to drop the TCP listener.
+  pg_ctl reload -D "$PGDATA" >/dev/null 2>&1 || true
+  if pg_isready -h 127.0.0.1 -p "$PGPORT" >/dev/null 2>&1; then
+    echo "Restarting PostgreSQL to drop its TCP listener (127.0.0.1:$PGPORT)"
+    pg_ctl restart -D "$PGDATA" -w -l "$log_file" -o "$_pg_opts"
+  else
+    echo "PostgreSQL already running, socket-only (PGDATA=$PGDATA)"
+  fi
 else
-  pg_ctl start -D "$PGDATA" -w -l "$log_file" \
-    -o "-k $PGHOST -p $PGPORT -c listen_addresses=127.0.0.1"
+  pg_ctl start -D "$PGDATA" -w -l "$log_file" -o "$_pg_opts"
   echo "Started PostgreSQL (socket: $PGHOST, port: $PGPORT, log: $log_file)"
 fi
 

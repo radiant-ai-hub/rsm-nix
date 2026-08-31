@@ -137,6 +137,9 @@ jobs:
           bash -n tests/check-folders.sh
           bash -n tests/check-no-host-mutation.sh
           bash -n tests/check-postgres.sh
+          bash -n bin/rsm-pg-init
+          bash -n bin/rsm-pg-start
+          bash -n bin/rsm-pgweb
           bash -n tests/check-spark-hadoop.sh
           bash -n tests/check-data-seed.sh
           bash -n tests/check-reexec.sh

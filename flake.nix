@@ -251,7 +251,7 @@
           rsm-pg-stop = mk "rsm-pg-stop" [ pkgs.postgresql_16 pkgs.coreutils ];
           rsm-pg-status = mk "rsm-pg-status" [ pkgs.postgresql_16 pkgs.coreutils ];
           rsm-pg-psql = mk "rsm-pg-psql" [ pkgs.postgresql_16 ];
-          rsm-pgweb = mk "rsm-pgweb" [ pkgs.pgweb ];
+          rsm-pgweb = mk "rsm-pgweb" [ pkgs.pgweb pkgs.coreutils ];
           pg = mk "pg" [ rsm-pg-start rsm-pg-stop rsm-pg-status rsm-pg-psql rsm-pgweb rsm-pg-init pkgs.postgresql_16 pkgs.coreutils ];
           # Ensures ~/.ssh/id_ed25519 exists and adds the RSM server to
           # ~/.ssh/config (idempotent). Run by the installers (key) and by

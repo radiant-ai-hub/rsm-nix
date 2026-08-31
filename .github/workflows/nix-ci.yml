@@ -102,3 +102,6 @@ jobs:
       # DIRENV_BASH integration only on macOS.
       - name: direnv bash on macOS (nix-direnv >= 4.4 fix)
         run: nix develop -c bash tests/check-direnv-bash.sh
+
+      - name: PostgreSQL lifecycle + multi-tenant isolation (socket-only, peer auth)
+        run: nix develop -c bash tests/check-postgres.sh
