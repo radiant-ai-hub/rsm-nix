@@ -187,7 +187,7 @@ in
   systemd.services.rsm-seed-workspaces = {
     description = "Prepare RSM-MSBA workspace directories for rsm-group users";
     wantedBy = [ "multi-user.target" ];
-    path = [ pkgs.coreutils pkgs.glibc.bin ];
+    path = [ pkgs.coreutils pkgs.getent ];
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
