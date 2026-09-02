@@ -388,12 +388,12 @@ ships `just hooks-off` / `just hooks-on` (flip the built-in
 `disableAllHooks` in `.claude/settings.local.json`, to demo what the
 hooks catch) and `just status-line` / `just status-line-off` (install
 `claude/statusline.sh` into `~/.claude/settings.json` — shows
-`host | folder (branch) | model | ctx N% left | 5h/7d N% left + reset countdown`;
+`host | folder (branch*) | direnv | model | ctx N% left | 5h/7d N% left + reset countdown`;
 the rate-limit fields are Claude Pro/Max only). The script resolves `jq`
 by absolute path and derives host/folder/branch/time with bash builtins,
 because Claude Code runs status-line/hook commands with a **minimal
 PATH** — on NixOS `jq` (and everything) lives only in the Nix profile,
-never `/usr/bin`.
+never `/usr/bin`. A `*` after the branch means uncommitted changes; `direnv!` rather than `direnv` means an `.envrc` governs the folder but has not been allowed, so none of it is in effect — run `direnv allow`.
 
 **Customizing / opting out.** To take ownership of a folder’s managed
 `settings.json` (and stop it being refreshed), delete the `_rsmManaged`
