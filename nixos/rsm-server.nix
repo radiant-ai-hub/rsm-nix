@@ -203,6 +203,43 @@ let
     [sandbox_workspace_write]
     network_access = false
   '';
+  rsmCodex = pkgs.writeShellApplication {
+    name = "codex";
+    runtimeInputs = with pkgs; [
+      bubblewrap
+      coreutils
+      gnugrep
+    ];
+    text = ''
+      set -euo pipefail
+
+      fail() {
+        printf 'codex: %s\n' "$*" >&2
+        exit 126
+      }
+
+      user="$(id -un)"
+      uid="$(id -u)"
+      [ "$uid" != "0" ] || fail "use a non-root administrator account"
+
+      if id -nG "$user" 2>/dev/null | tr ' ' '\n' | grep -qx rds_managed; then
+        exec bwrap \
+          --dev-bind / / \
+          --tmpfs /etc/codex \
+          --tmpfs /etc/claude-code \
+          --unsetenv RSM_SERVER_MANAGED_CLAUDE \
+          --unsetenv RSM_FLAKE \
+          --unsetenv RSM_WORKSPACE \
+          --unsetenv RSMBASE \
+          --unsetenv RSM_UV_ENV \
+          --unsetenv NPM_CONFIG_PREFIX \
+          --unsetenv NPM_CONFIG_CACHE \
+          ${pkgs.codex}/bin/codex "$@"
+      fi
+
+      fail "Codex is available only to rds_managed administrators on this shared server"
+    '';
+  };
 in
 {
   # --- VS Code Remote-SSH fix (the important one) ----------------------------
@@ -344,6 +381,7 @@ in
     rsmClone # `rsm-clone` — git clone + set the clone up as a project
     rsmProjectCheck # `rsm-project-check` — verify a project's imports
     rsmClaude # managed `claude` wrapper for shared servers
+    rsmCodex # admin-only `codex` wrapper for shared servers
     rsmClaudeBoundaryCheck # smoke-test the outer filesystem boundary
     rsmServerEnv # root-built server shell closure for no-Nix student direnv
     rsmServerEnvHook # /run/current-system/sw/share/rsm-msba/server-env-hook.sh

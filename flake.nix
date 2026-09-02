@@ -174,6 +174,23 @@
               *) fail "managed RSM Claude expects a /home/<user> home; got $home" ;;
             esac
 
+            if id -nG "$user" 2>/dev/null | tr ' ' '\n' | grep -qx rds_managed; then
+              exec bwrap \
+                --dev-bind / / \
+                --tmpfs /etc/claude-code \
+                --tmpfs /etc/codex \
+                --unsetenv RSM_SERVER_MANAGED_CLAUDE \
+                --unsetenv RSM_FLAKE \
+                --unsetenv RSM_WORKSPACE \
+                --unsetenv RSMBASE \
+                --unsetenv RSM_UV_ENV \
+                --unsetenv NPM_CONFIG_PREFIX \
+                --unsetenv NPM_CONFIG_CACHE \
+                --unsetenv CLAUDE_CONFIG_DIR \
+                --unsetenv CLAUDE_PROJECTS_DIR \
+                ${claudeCode}/bin/claude-code-real "$@"
+            fi
+
             workspace="$home/rsm-msba"
             [ -d "$workspace" ] || fail "create the workspace first: run rsm-msba from $home on sc1"
 
@@ -308,6 +325,45 @@
             fi
 
             exec bwrap "''${args[@]}" "''${common_env[@]}" ${claudeCode}/bin/claude-code-real "$@"
+          '';
+        };
+
+      mkRsmCodex = pkgs:
+        pkgs.writeShellApplication {
+          name = "codex";
+          runtimeInputs = with pkgs; [
+            bubblewrap
+            coreutils
+            gnugrep
+          ];
+          text = ''
+            set -euo pipefail
+
+            fail() {
+              printf 'codex: %s\n' "$*" >&2
+              exit 126
+            }
+
+            user="$(id -un)"
+            uid="$(id -u)"
+            [ "$uid" != "0" ] || fail "use a non-root administrator account"
+
+            if id -nG "$user" 2>/dev/null | tr ' ' '\n' | grep -qx rds_managed; then
+              exec bwrap \
+                --dev-bind / / \
+                --tmpfs /etc/codex \
+                --tmpfs /etc/claude-code \
+                --unsetenv RSM_SERVER_MANAGED_CLAUDE \
+                --unsetenv RSM_FLAKE \
+                --unsetenv RSM_WORKSPACE \
+                --unsetenv RSMBASE \
+                --unsetenv RSM_UV_ENV \
+                --unsetenv NPM_CONFIG_PREFIX \
+                --unsetenv NPM_CONFIG_CACHE \
+                ${pkgs.codex}/bin/codex "$@"
+            fi
+
+            fail "Codex is available only to rds_managed administrators on this shared server"
           '';
         };
 
@@ -597,6 +653,7 @@
           serverPackages = pkgs.lib.optionalAttrs (system == "x86_64-linux") {
             claude-code-native = mkClaudeCodeNative pkgs;
             rsm-claude = mkRsmClaude pkgs;
+            rsm-codex = mkRsmCodex pkgs;
             rsm-claude-boundary-check = mkRsmClaudeBoundaryCheck pkgs;
           };
         in
@@ -612,6 +669,7 @@
 
       devShells = forAllSystems (pkgs:
         let
+          system = pkgs.stdenv.hostPlatform.system;
           rsmScripts = mkRsmScripts pkgs;
           quarto = mkQuarto pkgs;
           rsmScriptList = builtins.attrValues rsmScripts;
@@ -653,8 +711,9 @@
             pkgs.nodejs_22 # Node/npm for laptop installs of Claude Code.
           ];
 
-          serverPackages = basePackages ++ [
+          serverPackages = basePackages ++ pkgs.lib.optionals (system == "x86_64-linux") [
             (mkRsmClaude pkgs)
+            (mkRsmCodex pkgs)
             (mkRsmClaudeBoundaryCheck pkgs)
           ];
 
