@@ -44,17 +44,40 @@ export JUPYTER_DATA_DIR="${JUPYTER_DATA_DIR:-$RSMBASE/jupyter}"
 
 export PGDATA="${PGDATA:-$RSMBASE/postgres/data}"
 export PGHOST="${PGHOST:-$RSMBASE/postgres/socket}"
-# Per-user default TCP port: on a shared server every student would otherwise
-# bind 8765 and collide. id -u is stable per user, so this is deterministic.
+# A shared host is one where the multi-user server setup installed a system-wide
+# direnv config for every user (install/ubuntu-server-rsm-nix.sh, and sc1's NixOS
+# server module). A personal laptop never has that file.
+if [ -f /etc/direnv/direnvrc ]; then
+  _rsm_shared_host=1
+else
+  _rsm_shared_host=0
+fi
+
+# On a personal machine there is exactly one user, so the port is simply 8765 --
+# the same number on every laptop, which is what the docs and examples assume.
+# On a shared server, derive it from the uid so each student's server is
+# distinct. Postgres is socket-only (see rsm-pg-start), and each user's socket
+# lives in their own $PGHOST, so the port is really only the socket FILE name
+# (.s.PGSQL.<port>) -- but keeping it per-user on a server also keeps
+# `pg_isready -h 127.0.0.1 -p $PGPORT` from seeing a neighbour's stray listener.
 # Override by exporting PGPORT yourself before entering the env.
-export PGPORT="${PGPORT:-$(( 8765 + $(id -u) % 1000 ))}"
+if [ "$_rsm_shared_host" = 1 ]; then
+  export PGPORT="${PGPORT:-$(( 8765 + $(id -u) % 1000 ))}"
+else
+  export PGPORT="${PGPORT:-8765}"
+fi
 export PGDATABASE="${PGDATABASE:-rsm-msba}"
 export PGUSER="${PGUSER:-$(id -un)}"
-# pgweb's web UI port, per-user for the same reason as PGPORT (on a shared server
-# every student would otherwise collide on one 127.0.0.1 port). Kept clear of the
-# PGPORT range (8765-9764) so a student's pgweb port can never clash with another
-# student's Postgres port. VS Code Remote-SSH auto-forwards it to the laptop.
-export PGWEB_PORT="${PGWEB_PORT:-$(( 9800 + $(id -u) % 1000 ))}"
+# pgweb's web UI DOES bind 127.0.0.1, so on a shared server it must stay
+# per-user. Kept clear of the PGPORT range (8765-9764) so a student's pgweb port
+# can never clash with another student's Postgres port. VS Code Remote-SSH
+# auto-forwards it to the laptop.
+if [ "$_rsm_shared_host" = 1 ]; then
+  export PGWEB_PORT="${PGWEB_PORT:-$(( 9800 + $(id -u) % 1000 ))}"
+else
+  export PGWEB_PORT="${PGWEB_PORT:-9800}"
+fi
+unset _rsm_shared_host
 
 # Claude Code (and any other npm global) installs into a USER-WRITABLE prefix so
 # students and Claude can upgrade it themselves. It is intentionally NOT pinned

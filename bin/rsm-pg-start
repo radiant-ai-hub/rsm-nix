@@ -28,7 +28,15 @@ if pg_ctl status -D "$PGDATA" >/dev/null 2>&1; then
   # Already running: reload the peer-only pg_hba. If it is still listening on TCP
   # (an old, insecure start), restart to drop the TCP listener.
   pg_ctl reload -D "$PGDATA" >/dev/null 2>&1 || true
-  if pg_isready -h 127.0.0.1 -p "$PGPORT" >/dev/null 2>&1; then
+  # The socket file is named for the port (.s.PGSQL.<port>), so a server still
+  # listening on a previously configured PGPORT is invisible to clients that now
+  # expect a different one -- they fail with "No such file or directory" on a
+  # socket that is right there. postmaster.pid line 4 is the live port.
+  _running_port="$(sed -n 4p "$PGDATA/postmaster.pid" 2>/dev/null || true)"
+  if [ -n "$_running_port" ] && [ "$_running_port" != "$PGPORT" ]; then
+    echo "Restarting PostgreSQL: running on port $_running_port, expected $PGPORT"
+    pg_ctl restart -D "$PGDATA" -w -l "$log_file" -o "$_pg_opts"
+  elif pg_isready -h 127.0.0.1 -p "$PGPORT" >/dev/null 2>&1; then
     echo "Restarting PostgreSQL to drop its TCP listener (127.0.0.1:$PGPORT)"
     pg_ctl restart -D "$PGDATA" -w -l "$log_file" -o "$_pg_opts"
   else

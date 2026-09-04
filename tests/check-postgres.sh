@@ -66,6 +66,41 @@ if grep -vE '^[[:space:]]*#|^[[:space:]]*$' "$PGDATA/pg_hba.conf" | grep -qiE '(
 fi
 echo "  ok: pg_hba.conf is socket + peer only"
 
+# --- the example notebook must actually run ----------------------------------
+# check-notebook-imports.sh only proves the kernel can import; nothing executed
+# examples/notebook_postgres.ipynb, so it shipped connecting to 127.0.0.1 while
+# the server had been made socket-only. Run its code cells for real.
+echo "== example notebook connects over the socket =="
+_nb=""
+for _cand in "$(cd "$(dirname "$0")/.." && pwd)/examples/notebook_postgres.ipynb" \
+             "$RSM_WORKSPACE/examples/notebook_postgres.ipynb"; do
+  [ -f "$_cand" ] && { _nb="$_cand"; break; }
+done
+if [ -z "$_nb" ]; then
+  echo "  skip: notebook_postgres.ipynb not found"
+else
+  _py="${RSM_UV_ENV:-$RSMBASE/envs/nix-uv}/bin/python"
+  [ -x "$_py" ] || _py="$(command -v python3)"
+  "$_py" - "$_nb" <<'PY'
+import json, sys
+
+path = sys.argv[1]
+nb = json.load(open(path))
+code = "\n".join(
+    "".join(c["source"]) for c in nb["cells"] if c["cell_type"] == "code"
+)
+
+# The server has no TCP listener; a notebook that dials loopback cannot work.
+if "127.0.0.1" in code or "localhost" in code:
+    sys.exit(
+        "  FAIL: notebook connects over TCP; the server is socket-only. Use PGHOST."
+    )
+
+exec(compile(code, path, "exec"), {"__name__": "__main__"})
+print("  ok: notebook executed against the socket")
+PY
+fi
+
 echo "== rsm-pg-stop =="
 rsm-pg-stop
 
