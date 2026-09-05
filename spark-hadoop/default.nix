@@ -89,6 +89,7 @@ let
       pkgs.coreutils
       pkgs.findutils
       pkgs.gnugrep
+      pkgs.procps
       hadoop
       java
       python
@@ -118,7 +119,36 @@ let
       PY
     '';
   };
+
+  runner = pkgs.writeShellApplication {
+    name = "rsm-spark-hadoop";
+    runtimeInputs = [
+      pkgs.bashInteractive
+      pkgs.coreutils
+      pkgs.findutils
+      pkgs.gnugrep
+      pkgs.procps
+      hadoop
+      java
+      python
+      spark
+    ];
+    text = ''
+      rsm_uv_env="''${RSM_UV_ENV:-}"
+      if [ -n "$rsm_uv_env" ] && [ -x "$rsm_uv_env/bin/python3" ]; then
+        export PYSPARK_PYTHON="$rsm_uv_env/bin/python3"
+        export PYSPARK_DRIVER_PYTHON="$rsm_uv_env/bin/python3"
+      fi
+      unset rsm_uv_env
+      ${envHook}
+
+      if [ "$#" -eq 0 ]; then
+        exec bash
+      fi
+      exec "$@"
+    '';
+  };
 in
 {
-  inherit hadoop java spark sparkHadoopEnv envHook proof;
+  inherit hadoop java spark sparkHadoopEnv envHook proof runner;
 }

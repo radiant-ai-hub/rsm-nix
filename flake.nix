@@ -100,6 +100,287 @@
             '';
           };
 
+      claudeCodeVersion = "2.1.251";
+
+      mkClaudeCodeNative = pkgs:
+        let
+          system = pkgs.stdenv.hostPlatform.system;
+        in
+        if system != "x86_64-linux" then
+          throw "rsm managed Claude Code is currently packaged only for x86_64-linux"
+        else
+          pkgs.stdenvNoCC.mkDerivation {
+            pname = "claude-code-bin";
+            version = claudeCodeVersion;
+            src = pkgs.fetchurl {
+              url = "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-x64/-/claude-code-linux-x64-${claudeCodeVersion}.tgz";
+              hash = "sha256-fi1tE7rM1kzS2ah4FkOuI6SNsAmtdG0d8M/sONXtCkQ=";
+            };
+            nativeBuildInputs = [ pkgs.patchelf ];
+            dontConfigure = true;
+            dontBuild = true;
+            unpackPhase = ''
+              runHook preUnpack
+              tar -xzf "$src" --strip-components=1
+              runHook postUnpack
+            '';
+            installPhase = ''
+              runHook preInstall
+              install -Dm0755 claude "$out/bin/claude-code-real"
+              patchelf \
+                --set-interpreter "${pkgs.glibc}/lib/ld-linux-x86-64.so.2" \
+                --set-rpath "${pkgs.lib.makeLibraryPath [ pkgs.glibc ]}" \
+                "$out/bin/claude-code-real"
+              runHook postInstall
+            '';
+          };
+
+      mkRsmClaude = pkgs:
+        let
+          claudeCode = mkClaudeCodeNative pkgs;
+          emptyHome = pkgs.runCommand "rsm-claude-empty-home" { } ''
+            mkdir -p "$out/rsm-msba"
+          '';
+        in
+        pkgs.writeShellApplication {
+          name = "claude";
+          runtimeInputs = with pkgs; [
+            bubblewrap
+            coreutils
+            getent
+            glibc.bin
+            gnugrep
+            gnused
+            bash
+            cacert
+          ];
+          excludeShellChecks = [ "SC2016" ];
+          text = ''
+            set -euo pipefail
+
+            fail() {
+              printf 'claude: %s\n' "$*" >&2
+              exit 126
+            }
+
+            user="$(id -un)"
+            uid="$(id -u)"
+            [ "$uid" != "0" ] || fail "managed RSM Claude is for non-root users"
+
+            home="$(getent passwd "$user" | cut -d: -f6)"
+            [ -n "$home" ] || fail "could not resolve home for $user"
+            case "$home" in
+              /home/*) ;;
+              *) fail "managed RSM Claude expects a /home/<user> home; got $home" ;;
+            esac
+
+            if id -nG "$user" 2>/dev/null | tr ' ' '\n' | grep -qx rds_managed; then
+              exec bwrap \
+                --dev-bind / / \
+                --tmpfs /etc/claude-code \
+                --tmpfs /etc/codex \
+                --unsetenv RSM_SERVER_MANAGED_CLAUDE \
+                --unsetenv RSM_FLAKE \
+                --unsetenv RSM_WORKSPACE \
+                --unsetenv RSMBASE \
+                --unsetenv RSM_UV_ENV \
+                --unsetenv NPM_CONFIG_PREFIX \
+                --unsetenv NPM_CONFIG_CACHE \
+                --unsetenv CLAUDE_CONFIG_DIR \
+                --unsetenv CLAUDE_PROJECTS_DIR \
+                ${claudeCode}/bin/claude-code-real "$@"
+            fi
+
+            workspace="$home/rsm-msba"
+            [ -d "$workspace" ] || fail "create the workspace first: run rsm-msba from $home on sc1"
+
+            workspace_real="$(realpath -e "$workspace" 2>/dev/null || true)"
+            [ -n "$workspace_real" ] || fail "could not resolve $workspace"
+            [ "$workspace_real" = "$workspace" ] || fail "$workspace must be a real directory, not a symlink"
+
+            cwd="$(pwd -P)"
+            case "$cwd" in
+              "$workspace"|"$workspace"/*) ;;
+              *) fail "run managed Claude from $workspace or a subdirectory; current directory is $cwd" ;;
+            esac
+
+            rsm_flake_src="''${RSM_FLAKE:-/opt/rsm-nix}"
+            if [ ! -e "$rsm_flake_src/flake.nix" ] && [ -e "$home/rsm-nix/flake.nix" ]; then
+              rsm_flake_src="$home/rsm-nix"
+            fi
+            if [ -e "$rsm_flake_src/flake.nix" ]; then
+              rsm_flake_src="$(realpath -e "$rsm_flake_src")"
+            fi
+
+            claude_home="$workspace/.rsm-msba/claude"
+            claude_projects="$claude_home/projects"
+            tmpdir="$workspace/.rsm-msba/tmp"
+            sandbox_flake="$workspace/.rsm-msba/rsm-nix"
+            mkdir -p "$claude_projects" "$tmpdir" "$sandbox_flake"
+            chmod 700 "$workspace/.rsm-msba" "$claude_home" "$claude_projects" "$tmpdir" 2>/dev/null || true
+
+            args=(
+              --die-with-parent
+              --new-session
+              --unshare-pid
+              --unshare-ipc
+              --unshare-uts
+              --proc /proc
+              --dev /dev
+              --tmpfs /tmp
+              --dir /bin
+              --symlink ${pkgs.bash}/bin/sh /bin/sh
+              --symlink ${pkgs.bash}/bin/bash /bin/bash
+              --dir /usr
+              --dir /usr/bin
+              --ro-bind ${pkgs.coreutils}/bin/env /usr/bin/env
+              --dir /etc
+              --ro-bind-try /etc/passwd /etc/passwd
+              --ro-bind-try /etc/group /etc/group
+              --ro-bind-try /etc/nsswitch.conf /etc/nsswitch.conf
+              --ro-bind-try /etc/hosts /etc/hosts
+              --ro-bind-try /etc/resolv.conf /etc/resolv.conf
+              --ro-bind-try /etc/services /etc/services
+              --ro-bind-try /etc/protocols /etc/protocols
+              --ro-bind-try /etc/claude-code /etc/claude-code
+              --dir /run
+              --ro-bind-try /run/opengl-driver /run/opengl-driver
+              --dir /var
+              --tmpfs /var/tmp
+              --dir /nix
+              --ro-bind /nix/store /nix/store
+              --dir /home
+              --ro-bind ${emptyHome} "$home"
+              --bind "$workspace_real" "$workspace"
+            )
+
+            if [ -e "$rsm_flake_src/flake.nix" ]; then
+              args+=(--ro-bind "$rsm_flake_src" "$sandbox_flake")
+            fi
+
+            safe_path=""
+            old_ifs="$IFS"
+            IFS=:
+            for path_entry in ''${PATH:-}; do
+              [ -n "$path_entry" ] || continue
+              case "$path_entry" in
+                "$workspace/.rsm-msba/npm/bin"|*nodejs*|*/node_modules/*|/run/current-system/sw/bin) continue ;;
+              esac
+              if [ -x "$path_entry/codex" ] || [ -x "$path_entry/npm" ] || [ -x "$path_entry/npx" ] || [ -x "$path_entry/node" ] || [ -x "$path_entry/nix" ]; then
+                continue
+              fi
+              safe_path="''${safe_path:+$safe_path:}$path_entry"
+            done
+            IFS="$old_ifs"
+            if [ -z "$safe_path" ]; then
+              safe_path="${pkgs.coreutils}/bin:${pkgs.gnugrep}/bin:${pkgs.gnused}/bin:${pkgs.bash}/bin"
+            fi
+
+            common_env=(
+              --chdir "$cwd"
+              --setenv HOME "$home"
+              --setenv USER "$user"
+              --setenv LOGNAME "$user"
+              --setenv SHELL "${pkgs.bash}/bin/bash"
+              --setenv PATH "$safe_path"
+              --setenv RSM_SERVER_MANAGED_CLAUDE "1"
+              --setenv RSM_FLAKE "$sandbox_flake"
+              --setenv RSM_WORKSPACE "$workspace"
+              --setenv RSMBASE "$workspace/.rsm-msba"
+              --setenv RSM_UV_ENV "$workspace/.rsm-msba/envs/nix-uv"
+              --setenv NPM_CONFIG_PREFIX "$workspace/.rsm-msba/npm"
+              --setenv NPM_CONFIG_CACHE "$workspace/.rsm-msba/npm-cache"
+              --setenv CLAUDE_CONFIG_DIR "$claude_home"
+              --setenv CLAUDE_PROJECTS_DIR "$claude_projects"
+              --setenv TMPDIR "$tmpdir"
+              --setenv SSL_CERT_FILE "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
+              --setenv NIX_SSL_CERT_FILE "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
+            )
+
+            if [ -n "''${RSM_CLAUDE_BOUNDARY_PROBE:-}" ]; then
+              probe='set -euo pipefail
+                test -d "$RSM_WORKSPACE"
+                test -w "$RSM_WORKSPACE"
+                test -d "$RSM_FLAKE"
+                test ! -e "$HOME/.ssh"
+                test ! -e /home/vnijs
+                test ! -e /srv
+                test ! -e /mnt
+                test ! -e /etc/nixos
+                test ! -e /run/current-system
+                test ! -e /nix/var
+                for tool in codex npm npx node nix; do
+                  if command -v "$tool" >/dev/null 2>&1; then
+                    echo "$tool is visible inside managed Claude sandbox" >&2
+                    exit 1
+                  fi
+                done
+                touch "$TMPDIR/rsm-claude-boundary-write"
+                if touch "$HOME/rsm-claude-outside-workspace" 2>/dev/null; then
+                  echo "home outside workspace is writable" >&2
+                  exit 1
+                fi
+                echo "rsm-claude boundary: OK"'
+              exec bwrap "''${args[@]}" "''${common_env[@]}" ${pkgs.bash}/bin/bash -lc "$probe"
+            fi
+
+            exec bwrap "''${args[@]}" "''${common_env[@]}" ${claudeCode}/bin/claude-code-real "$@"
+          '';
+        };
+
+      mkRsmCodex = pkgs:
+        pkgs.writeShellApplication {
+          name = "codex";
+          runtimeInputs = with pkgs; [
+            bubblewrap
+            coreutils
+            gnugrep
+          ];
+          text = ''
+            set -euo pipefail
+
+            fail() {
+              printf 'codex: %s\n' "$*" >&2
+              exit 126
+            }
+
+            user="$(id -un)"
+            uid="$(id -u)"
+            [ "$uid" != "0" ] || fail "use a non-root administrator account"
+
+            if id -nG "$user" 2>/dev/null | tr ' ' '\n' | grep -qx rds_managed; then
+              exec bwrap \
+                --dev-bind / / \
+                --tmpfs /etc/codex \
+                --tmpfs /etc/claude-code \
+                --unsetenv RSM_SERVER_MANAGED_CLAUDE \
+                --unsetenv RSM_FLAKE \
+                --unsetenv RSM_WORKSPACE \
+                --unsetenv RSMBASE \
+                --unsetenv RSM_UV_ENV \
+                --unsetenv NPM_CONFIG_PREFIX \
+                --unsetenv NPM_CONFIG_CACHE \
+                ${pkgs.codex}/bin/codex "$@"
+            fi
+
+            fail "Codex is available only to rds_managed administrators on this shared server"
+          '';
+        };
+
+      mkRsmClaudeBoundaryCheck = pkgs:
+        let
+          rsmClaude = mkRsmClaude pkgs;
+        in
+        pkgs.writeShellApplication {
+          name = "rsm-claude-boundary-check";
+          runtimeInputs = [ rsmClaude pkgs.coreutils ];
+          text = ''
+            set -euo pipefail
+            cd "$HOME/rsm-msba"
+            RSM_CLAUDE_BOUNDARY_PROBE=1 exec claude
+          '';
+        };
+
       # --- rsm-* helper commands ------------------------------------------
       # Each command is the shared env header (bin/rsm-env.sh) prepended to the
       # specific script body, wrapped so its runtime tools are always on PATH.
@@ -209,7 +490,7 @@
           # the assembled zsh assets + the ZDOTDIR template it installs.
           rsm-setup = pkgs.writeShellApplication {
             name = "rsm-setup";
-            runtimeInputs = [ pythonSync pkgs.uv pkgs.python313 pkgs.coreutils pkgs.git pkgs.nodejs_22 rsm-version rsm-vscode-settings rsm-vscode-ext rsm-vscode-keybindings rsm-claude-settings rsm-mkdir rsm-refresh-folders ];
+            runtimeInputs = [ pythonSync pkgs.uv pkgs.python313 pkgs.coreutils pkgs.git rsm-version rsm-vscode-settings rsm-vscode-ext rsm-vscode-keybindings rsm-claude-settings rsm-mkdir rsm-refresh-folders ];
             excludeShellChecks = [ "SC1090" "SC1091" "SC2164" ];
             text = rsmEnvHeader + "\n" + nativeEnvHook pkgs + ''
               export RSM_OMZ_SRC="${zshOmz}"
@@ -287,6 +568,76 @@
           # folder (title + folder + date); Enter resumes the thread in its folder.
           rsm-threads = mk "rsm-threads" [ pkgs.jq pkgs.fzf pkgs.coreutils pkgs.findutils pkgs.gnused ];
         };
+
+      mkRsmServerEnv = pkgs:
+        let
+          system = pkgs.stdenv.hostPlatform.system;
+          rsmScripts = mkRsmScripts pkgs;
+          quarto = mkQuarto pkgs;
+          sparkHadoop = import ./spark-hadoop {
+            inherit pkgs;
+            python = pkgs.python313;
+          };
+          gpu = import ./gpu {
+            inherit pkgs;
+            python = pkgs.python313;
+          };
+          rsmScriptList = builtins.attrValues rsmScripts;
+          basePackages = with pkgs; [
+            bashInteractive
+            python313
+            quarto
+            postgresql_16
+            pgweb
+            duckdb
+            git
+            git-lfs
+            gh
+            prettier
+            graphviz
+            zsh
+            eza
+            zoxide
+            cacert
+            coreutils
+            gnused
+            gnugrep
+            which
+            just
+            jq
+            ruff
+            sparkHadoop.runner
+          ] ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
+            pkgs.gfortran
+            pkgs.pkg-config
+          ] ++ rsmScriptList;
+          packages = basePackages ++ pkgs.lib.optionals (system == "x86_64-linux") [
+            (mkRsmClaude pkgs)
+            (mkRsmClaudeBoundaryCheck pkgs)
+          ];
+          env = pkgs.buildEnv {
+            name = "rsm-server-env";
+            paths = packages;
+            ignoreCollisions = true;
+            pathsToLink = [ "/bin" "/lib" "/share" ];
+          };
+          hook = pkgs.writeTextFile {
+            name = "rsm-server-env-hook";
+            destination = "/share/rsm-msba/server-env-hook.sh";
+            text = ''
+              ${rsmEnvHeader}
+              export SSL_CERT_FILE="''${SSL_CERT_FILE:-${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt}"
+              export NIX_SSL_CERT_FILE="''${NIX_SSL_CERT_FILE:-$SSL_CERT_FILE}"
+            '' + nativeEnvHook pkgs + ''
+              export PATH="${env}/bin''${PATH:+:$PATH}"
+              ${builtins.readFile ./shell/rsm-shell-hook.sh}
+              ${gpu.envHook}
+            '';
+          };
+        in
+        {
+          inherit env hook packages;
+        };
     in
     {
       packages = forAllSystems (pkgs:
@@ -298,21 +649,32 @@
             inherit pkgs;
             python = pkgs.python313;
           };
+          rsmServerEnv = mkRsmServerEnv pkgs;
+          serverPackages = pkgs.lib.optionalAttrs (system == "x86_64-linux") {
+            claude-code-native = mkClaudeCodeNative pkgs;
+            rsm-claude = mkRsmClaude pkgs;
+            rsm-codex = mkRsmCodex pkgs;
+            rsm-claude-boundary-check = mkRsmClaudeBoundaryCheck pkgs;
+          };
         in
-        rsmScripts // {
+        rsmScripts // serverPackages // {
           quarto-bin = quarto;
           spark-hadoop-env = sparkHadoop.sparkHadoopEnv;
           spark-hadoop-proof = sparkHadoop.proof;
+          rsm-spark-hadoop = sparkHadoop.runner;
+          rsm-server-env = rsmServerEnv.env;
+          rsm-server-env-hook = rsmServerEnv.hook;
           default = rsmScripts.rsm-setup;
         });
 
       devShells = forAllSystems (pkgs:
         let
+          system = pkgs.stdenv.hostPlatform.system;
           rsmScripts = mkRsmScripts pkgs;
           quarto = mkQuarto pkgs;
           rsmScriptList = builtins.attrValues rsmScripts;
 
-          corePackages = with pkgs; [
+          basePackages = with pkgs; [
             python313
             # NOTE: `uv` is intentionally NOT here. The dev shell gets the
             # guarded wrapper (rsmScripts.uv, appended via rsmScriptList below),
@@ -325,7 +687,6 @@
             git
             git-lfs
             gh
-            nodejs_22 # Node runtime for Claude Code (installed per-user via npm)
             prettier # markdown/JS/JSON formatter (also normalizes rendered docs)
             graphviz
             zsh
@@ -345,6 +706,16 @@
             pkgs.gfortran
             pkgs.pkg-config
           ] ++ rsmScriptList;
+
+          corePackages = basePackages ++ [
+            pkgs.nodejs_22 # Node/npm for laptop installs of Claude Code.
+          ];
+
+          serverPackages = basePackages ++ pkgs.lib.optionals (system == "x86_64-linux") [
+            (mkRsmClaude pkgs)
+            (mkRsmCodex pkgs)
+            (mkRsmClaudeBoundaryCheck pkgs)
+          ];
 
           baseHook = ''
             ${rsmEnvHeader}
@@ -376,6 +747,11 @@
             shellHook = baseHook + gpu.envHook;
           };
 
+          server = pkgs.mkShell {
+            packages = serverPackages;
+            shellHook = baseHook + gpu.envHook;
+          };
+
           gpu = pkgs.mkShell {
             packages = corePackages ++ [ gpu.proof ];
             shellHook = baseHook + gpu.envHook + ''
@@ -389,6 +765,7 @@
 
           spark-hadoop = pkgs.mkShell {
             packages = corePackages ++ [
+              pkgs.procps
               sparkHadoop.java
               sparkHadoop.sparkHadoopEnv
               sparkHadoop.proof
@@ -460,6 +837,8 @@
             meta.description = "Bootstrap the RSM-MSBA workspace (uv env, kernel, folders)";
           };
         });
+
+      nixosModules.rsm-server = import ./nixos/rsm-server.nix;
 
       formatter = forAllSystems (pkgs: pkgs.nixpkgs-fmt);
     };

@@ -10,6 +10,236 @@ let
   rsmMkdir = rsm-nix.packages.${system}.rsm-mkdir;
   rsmClone = rsm-nix.packages.${system}.rsm-clone;
   rsmProjectCheck = rsm-nix.packages.${system}.rsm-project-check;
+  rsmClaude = rsm-nix.packages.${system}.rsm-claude;
+  rsmClaudeBoundaryCheck = rsm-nix.packages.${system}.rsm-claude-boundary-check;
+  rsmServerEnv = rsm-nix.packages.${system}.rsm-server-env;
+  rsmServerEnvHook = rsm-nix.packages.${system}.rsm-server-env-hook;
+  rsmFlakePath = "/opt/rsm-nix";
+  managedStudentUsers =
+    lib.filterAttrs
+      (_: user:
+        (lib.elem "rsm" (user.extraGroups or [ ]) || (user.group or null) == "rsm")
+        && !(lib.elem "rds_managed" (user.extraGroups or [ ]) || (user.group or null) == "rds_managed")
+        && (user.uid or null) != null)
+      config.users.users;
+  managedStudentUids = map (user: toString user.uid) (lib.attrValues managedStudentUsers);
+  managedStudentUidWords = lib.concatStringsSep " " managedStudentUids;
+  hasManagedStudents = managedStudentUids != [ ];
+  managedClaudeSettings = {
+    allowManagedPermissionRulesOnly = true;
+    allowManagedMcpServersOnly = true;
+    allowedMcpServers = [ ];
+    disableClaudeAiConnectors = true;
+    disableSideloadFlags = true;
+    strictPluginOnlyCustomization = [ "mcp" ];
+    permissions = {
+      disableAutoMode = "disable";
+      disableBypassPermissionsMode = "disable";
+      deny = [
+        "Read(//home/**)"
+        "Read(//root/**)"
+        "Read(//srv/**)"
+        "Read(//mnt/**)"
+        "Read(//etc/nixos/**)"
+      ];
+    };
+    sandbox = {
+      enabled = true;
+      failIfUnavailable = true;
+      allowUnsandboxedCommands = false;
+      bwrapPath = "${pkgs.bubblewrap}/bin/bwrap";
+      socatPath = "${pkgs.socat}/bin/socat";
+      filesystem = {
+        denyRead = [
+          "~/"
+          "/home"
+          "/root"
+          "/srv"
+          "/mnt"
+          "/etc/nixos"
+        ];
+        allowRead = [ "~/rsm-msba" ];
+        allowManagedReadPathsOnly = true;
+        denyWrite = [
+          "~/"
+          "/home"
+          "/root"
+          "/srv"
+          "/mnt"
+          "/etc"
+        ];
+        allowWrite = [ "~/rsm-msba" ];
+      };
+      network = {
+        allowManagedDomainsOnly = true;
+        strictAllowlist = true;
+        allowedDomains = [
+          "api.anthropic.com:443"
+          "claude.ai:443"
+          "console.anthropic.com:443"
+          "github.com:443"
+          "*.github.com:443"
+          "*.githubusercontent.com:443"
+          "pypi.org:443"
+          "files.pythonhosted.org:443"
+          "*.pythonhosted.org:443"
+        ];
+      };
+    };
+  };
+  codexRequirements = ''
+    allowed_approval_policies = ["on-request"]
+    allowed_sandbox_modes = ["workspace-write"]
+    allowed_web_search_modes = []
+    default_permissions = "rsm-workspace"
+    allow_login_shell = false
+    allow_managed_hooks_only = true
+    allow_remote_control = false
+    check_for_update_on_startup = false
+
+    [allowed_permission_profiles]
+    "rsm-workspace" = true
+    ":read-only" = false
+    ":workspace" = false
+    ":danger-full-access" = false
+
+    [features]
+    apps = false
+    browser_use = false
+    browser_use_external = false
+    browser_use_full_cdp_access = false
+    computer_use = false
+    fast_mode = false
+    in_app_browser = false
+    in_app_updates = false
+    memories = false
+    multi_agent = false
+    plugin_sharing = false
+    plugins = false
+    remote_plugin = false
+    workspace_dependencies = false
+
+    [feedback]
+    enabled = false
+
+    [marketplaces]
+    restrict_to_allowed_sources = true
+
+    [mcp_servers]
+
+    [permissions.filesystem]
+    deny_read = [
+      "/etc/nixos/**",
+      "/home/*/.ssh/**",
+      "/home/*/.aws/**",
+      "/home/*/.config/**",
+      "/home/*/.claude/**",
+      "/home/*/.codex/**",
+      "/home/vnijs/**",
+      "/mnt/**",
+      "/root/**",
+      "/srv/**",
+    ]
+
+    [permissions.rsm-workspace.workspace_roots]
+    "~/rsm-msba" = true
+
+    [permissions.rsm-workspace.filesystem]
+    ":minimal" = "read"
+    "~/.ssh" = "deny"
+    "~/.aws" = "deny"
+    "~/.config" = "deny"
+    "~/.claude" = "deny"
+    "~/.codex" = "deny"
+    "~/rsm-nix" = "deny"
+    "/etc/nixos" = "deny"
+    "/home/vnijs" = "deny"
+    "/mnt" = "deny"
+    "/root" = "deny"
+    "/srv" = "deny"
+
+    [permissions.rsm-workspace.filesystem.":workspace_roots"]
+    "." = "write"
+    "**/.env" = "deny"
+    "**/.env.*" = "deny"
+    "**/secrets/**" = "deny"
+
+    [permissions.rsm-workspace.network]
+    enabled = true
+
+    [permissions.rsm-workspace.network.domains]
+    "api.openai.com" = "allow"
+    "chatgpt.com" = "allow"
+    "github.com" = "allow"
+    "**.github.com" = "allow"
+    "**.githubusercontent.com" = "allow"
+    "pypi.org" = "allow"
+    "files.pythonhosted.org" = "allow"
+    "**.pythonhosted.org" = "allow"
+
+    [experimental_network]
+    enabled = true
+    managed_allowed_domains_only = true
+    allow_local_binding = false
+    allow_upstream_proxy = false
+    dangerously_allow_all_unix_sockets = false
+    dangerously_allow_non_loopback_proxy = false
+
+    [experimental_network.domains]
+    "api.openai.com" = "allow"
+    "chatgpt.com" = "allow"
+    "github.com" = "allow"
+    "**.github.com" = "allow"
+    "**.githubusercontent.com" = "allow"
+    "pypi.org" = "allow"
+    "files.pythonhosted.org" = "allow"
+    "**.pythonhosted.org" = "allow"
+  '';
+  codexManagedConfig = ''
+    approval_policy = "on-request"
+    sandbox_mode = "workspace-write"
+    default_permissions = "rsm-workspace"
+
+    [sandbox_workspace_write]
+    network_access = false
+  '';
+  rsmCodex = pkgs.writeShellApplication {
+    name = "codex";
+    runtimeInputs = with pkgs; [
+      bubblewrap
+      coreutils
+      gnugrep
+    ];
+    text = ''
+      set -euo pipefail
+
+      fail() {
+        printf 'codex: %s\n' "$*" >&2
+        exit 126
+      }
+
+      user="$(id -un)"
+      uid="$(id -u)"
+      [ "$uid" != "0" ] || fail "use a non-root administrator account"
+
+      if id -nG "$user" 2>/dev/null | tr ' ' '\n' | grep -qx rds_managed; then
+        exec bwrap \
+          --dev-bind / / \
+          --tmpfs /etc/codex \
+          --tmpfs /etc/claude-code \
+          --unsetenv RSM_SERVER_MANAGED_CLAUDE \
+          --unsetenv RSM_FLAKE \
+          --unsetenv RSM_WORKSPACE \
+          --unsetenv RSMBASE \
+          --unsetenv RSM_UV_ENV \
+          --unsetenv NPM_CONFIG_PREFIX \
+          --unsetenv NPM_CONFIG_CACHE \
+          ${pkgs.codex}/bin/codex "$@"
+      fi
+
+      fail "Codex is available only to rds_managed administrators on this shared server"
+    '';
+  };
 in
 {
   # --- VS Code Remote-SSH fix (the important one) ----------------------------
@@ -30,19 +260,19 @@ in
 
   # --- SSH access (key-only) -------------------------------------------------
   services.openssh = {
-    enable = true;
+    enable = lib.mkDefault true;
     settings = {
-      PasswordAuthentication = false;
-      KbdInteractiveAuthentication = false;
-      AllowTcpForwarding = true; # forward pgweb / Postgres back to the laptop
-      X11Forwarding = false;
+      PasswordAuthentication = lib.mkDefault false;
+      KbdInteractiveAuthentication = lib.mkDefault false;
+      AllowTcpForwarding = lib.mkDefault true; # forward pgweb / Postgres back to the laptop
+      X11Forwarding = lib.mkDefault false;
     };
   };
 
   # Only SSH is exposed. Per-student Postgres/pgweb are reached through SSH
   # port-forwarding, never published on the network.
-  networking.firewall.enable = true;
-  networking.firewall.allowedTCPPorts = [ 22 ];
+  networking.firewall.enable = lib.mkDefault true;
+  networking.firewall.allowedTCPPorts = lib.mkDefault [ 22 ];
 
   # zsh is the environment's native shell. Enabling it here lets students.nix set
   # it as the login shell. The interactiveShellInit hook loads the full rsm shell
@@ -75,11 +305,19 @@ in
   # only the downloads are shared. setgid + a default ACL keep new cache entries
   # group-writable regardless of each user's umask.
   users.groups.rsm = { };
+  users.groups.rds_managed = lib.mkDefault { };
 
-  systemd.tmpfiles.rules = [
-    "d /srv/uv-cache 2775 root rsm - -"
-    "a+ /srv/uv-cache - - - - d:g:rsm:rwx,g:rsm:rwx"
-  ];
+  # Students use the root-built /run/current-system/sw RSM environment. They do
+  # not need the daemon for coursework, so keep Nix evaluation and installation
+  # to root and the managed administrator group.
+  nix.settings.allowed-users = lib.mkForce [ "root" "@rds_managed" ];
+  nix.settings.trusted-users = lib.mkForce [ "root" "@rds_managed" ];
+  systemd.sockets.nix-daemon.socketConfig = {
+    SocketMode = lib.mkForce "0660";
+    SocketUser = lib.mkForce "root";
+    SocketGroup = lib.mkForce "rds_managed";
+  };
+
   # Use the shared cache only when this user can actually write it (i.e. is in
   # the `rsm` group); otherwise a per-user cache, so `uv` never errors out for a
   # user who isn't in the group. Set via shell init (not sessionVariables) so the
@@ -90,7 +328,31 @@ in
     else
       export UV_CACHE_DIR="$HOME/.cache/uv"
     fi
+    if id -nG 2>/dev/null | tr ' ' '\n' | grep -qx rsm; then
+      export RSM_SERVER_MANAGED_CLAUDE=1
+      export RSM_FLAKE=${rsmFlakePath}
+    fi
   '';
+
+  environment.etc."claude-code/managed-settings.json" = {
+    text = builtins.toJSON managedClaudeSettings;
+    mode = "0444";
+  };
+
+  environment.etc."claude-code/managed-mcp.json" = {
+    text = builtins.toJSON { mcpServers = { }; };
+    mode = "0444";
+  };
+
+  environment.etc."codex/requirements.toml" = {
+    text = codexRequirements;
+    mode = "0444";
+  };
+
+  environment.etc."codex/managed_config.toml" = {
+    text = codexManagedConfig;
+    mode = "0444";
+  };
 
   # --- Per-user Postgres port ------------------------------------------------
   # Handled in the env header (rsm-nix/bin/rsm-env.sh): PGPORT defaults to
@@ -118,22 +380,79 @@ in
     rsmMkdir # `rsm-mkdir` — set up a folder (nested or standalone) as a project
     rsmClone # `rsm-clone` — git clone + set the clone up as a project
     rsmProjectCheck # `rsm-project-check` — verify a project's imports
+    rsmClaude # managed `claude` wrapper for shared servers
+    rsmCodex # admin-only `codex` wrapper for shared servers
+    rsmClaudeBoundaryCheck # smoke-test the outer filesystem boundary
+    rsmServerEnv # root-built server shell closure for no-Nix student direnv
+    rsmServerEnvHook # /run/current-system/sw/share/rsm-msba/server-env-hook.sh
+    bubblewrap
+    socat
+  ];
+  environment.pathsToLink = [ "/share/rsm-msba" ];
+
+  # --- Root-owned flake checkout ---------------------------------------------
+  # Shared servers use one immutable, root-owned flake source. Students can read
+  # it, but they cannot change the environment definition or shadow it with a
+  # writable per-user checkout.
+  systemd.tmpfiles.rules = [
+    "d /srv/uv-cache 2775 root rsm - -"
+    "a+ /srv/uv-cache - - - - d:g:rsm:rwx,g:rsm:rwx"
+    "L+ ${rsmFlakePath} - - - - ${rsm-nix}"
   ];
 
-  # --- Seed each student's flake checkout ------------------------------------
-  # Clone rsm-nix to ~/rsm-nix for every member of the `rsm` group that does not
-  # have it yet, then let them run `rsm-setup` once to build their personal
-  # nix-uv env. The real flake is the single source of truth — no toy template.
+  # Managed student accounts keep loopback, DNS, and HTTPS. Other outbound
+  # traffic is blocked at the OS layer, independent of Claude/Codex settings.
+  networking.firewall.extraCommands = lib.mkIf hasManagedStudents ''
+    rsm_student_allow4() {
+      iptables -C OUTPUT "$@" 2>/dev/null || iptables -A OUTPUT "$@"
+    }
+    rsm_student_allow6() {
+      ip6tables -C OUTPUT "$@" 2>/dev/null || ip6tables -A OUTPUT "$@"
+    }
+    for uid in ${managedStudentUidWords}; do
+      rsm_student_allow4 -m owner --uid-owner "$uid" -o lo -j ACCEPT
+      rsm_student_allow4 -m owner --uid-owner "$uid" -p udp --dport 53 -j ACCEPT
+      rsm_student_allow4 -m owner --uid-owner "$uid" -p tcp --dport 53 -j ACCEPT
+      rsm_student_allow4 -m owner --uid-owner "$uid" -p tcp --dport 443 -j ACCEPT
+      rsm_student_allow4 -m owner --uid-owner "$uid" -j REJECT
+
+      rsm_student_allow6 -m owner --uid-owner "$uid" -o lo -j ACCEPT
+      rsm_student_allow6 -m owner --uid-owner "$uid" -p udp --dport 53 -j ACCEPT
+      rsm_student_allow6 -m owner --uid-owner "$uid" -p tcp --dport 53 -j ACCEPT
+      rsm_student_allow6 -m owner --uid-owner "$uid" -p tcp --dport 443 -j ACCEPT
+      rsm_student_allow6 -m owner --uid-owner "$uid" -j REJECT
+    done
+  '';
+
+  networking.firewall.extraStopCommands = lib.mkIf hasManagedStudents ''
+    rsm_student_delete4() {
+      while iptables -D OUTPUT "$@" 2>/dev/null; do :; done
+    }
+    rsm_student_delete6() {
+      while ip6tables -D OUTPUT "$@" 2>/dev/null; do :; done
+    }
+    for uid in ${managedStudentUidWords}; do
+      rsm_student_delete4 -m owner --uid-owner "$uid" -o lo -j ACCEPT
+      rsm_student_delete4 -m owner --uid-owner "$uid" -p udp --dport 53 -j ACCEPT
+      rsm_student_delete4 -m owner --uid-owner "$uid" -p tcp --dport 53 -j ACCEPT
+      rsm_student_delete4 -m owner --uid-owner "$uid" -p tcp --dport 443 -j ACCEPT
+      rsm_student_delete4 -m owner --uid-owner "$uid" -j REJECT
+
+      rsm_student_delete6 -m owner --uid-owner "$uid" -o lo -j ACCEPT
+      rsm_student_delete6 -m owner --uid-owner "$uid" -p udp --dport 53 -j ACCEPT
+      rsm_student_delete6 -m owner --uid-owner "$uid" -p tcp --dport 53 -j ACCEPT
+      rsm_student_delete6 -m owner --uid-owner "$uid" -p tcp --dport 443 -j ACCEPT
+      rsm_student_delete6 -m owner --uid-owner "$uid" -j REJECT
+    done
+  '';
+
   systemd.services.rsm-seed-workspaces = {
-    description = "Clone rsm-nix into each rsm-group home (if missing)";
+    description = "Prepare RSM-MSBA workspace directories for rsm-group users";
     wantedBy = [ "multi-user.target" ];
-    after = [ "network-online.target" ];
-    wants = [ "network-online.target" ];
-    path = [ pkgs.git pkgs.coreutils pkgs.getent ];
+    path = [ pkgs.coreutils pkgs.getent ];
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
-      Environment = "GIT_SSL_CAINFO=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
     };
     script = ''
       set -u
@@ -141,10 +460,7 @@ in
       for u in $members; do
         home="$(getent passwd "$u" | cut -d: -f6)"
         [ -n "$home" ] || continue
-        if [ ! -e "$home/rsm-nix/flake.nix" ]; then
-          git clone https://github.com/radiant-ai-hub/rsm-nix.git "$home/rsm-nix" || true
-          chown -R "$u":rsm "$home/rsm-nix" || true
-        fi
+        install -d -m 0700 -o "$u" -g "$u" "$home" "$home/rsm-msba" "$home/rsm-msba/.rsm-msba"
       done
     '';
   };
