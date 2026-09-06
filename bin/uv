@@ -26,7 +26,36 @@ if [ -n "${RSM_UV_ENV:-}" ] && [ -z "${RSM_ALLOW_SHARED_SYNC:-}" ]; then
   # VIRTUAL_ENV; every other (project) command targets UV_PROJECT_ENVIRONMENT.
   # Empty means "uv will pick ./.venv itself", which is never the shared env.
   case " $* " in
-    *" pip "*) _rsm_target="${VIRTUAL_ENV:-}" ;;
+    *" pip "*)
+      _rsm_target="${VIRTUAL_ENV:-}"
+      # ...unless the command names an interpreter explicitly. `--python` /
+      # `-p` OVERRIDE VIRTUAL_ENV in real uv, so honouring VIRTUAL_ENV alone
+      # refused commands that never went near the shared env. The CI workflow
+      # in the student assignment repos is exactly that case: inside
+      # `nix develop` VIRTUAL_ENV IS the shared env (rsm-shell-hook activates
+      # it), yet the install is aimed at a job-local venv:
+      #   uv pip install --python "$RUNNER_TEMP/ci-venv/bin/python" ...
+      _rsm_want=""
+      for _rsm_arg in "$@"; do
+        if [ -n "$_rsm_want" ]; then
+          _rsm_target="$_rsm_arg"; _rsm_want=""; continue
+        fi
+        case "$_rsm_arg" in
+          --python=*) _rsm_target="${_rsm_arg#--python=}" ;;
+          --python|-p) _rsm_want=1 ;;
+          -p*) _rsm_target="${_rsm_arg#-p}" ;;
+        esac
+      done
+      # A trailing `--python` with no value leaves _rsm_target at VIRTUAL_ENV,
+      # which is the conservative answer. An interpreter path names the env's
+      # bin/python, not the env root, so trim it back to the root before the
+      # comparison below -- otherwise `--python $RSM_UV_ENV/bin/python`, the
+      # one spelling that IS dangerous, would slip through.
+      case "$_rsm_target" in
+        */bin/python*) _rsm_target="${_rsm_target%/bin/python*}" ;;
+      esac
+      unset _rsm_want _rsm_arg
+      ;;
     *) _rsm_target="${UV_PROJECT_ENVIRONMENT:-}" ;;
   esac
 

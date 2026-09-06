@@ -112,12 +112,28 @@ guard 3 "uv sync at the shared env"    env UV_PROJECT_ENVIRONMENT="$RSM_UV_ENV" 
 guard 3 "uv add at the shared env"     env UV_PROJECT_ENVIRONMENT="$RSM_UV_ENV" uv add typing-extensions
 guard 3 "uv remove at the shared env"  env UV_PROJECT_ENVIRONMENT="$RSM_UV_ENV" uv remove typing-extensions
 guard 3 "uv pip install via VIRTUAL_ENV" env -u UV_PROJECT_ENVIRONMENT VIRTUAL_ENV="$RSM_UV_ENV" uv pip install typing-extensions
+# An explicit --python is honoured (see the fail-open block), so the ONE
+# spelling that still aims at the shared env must still be caught -- including
+# via the interpreter path rather than the env root.
+guard 3 "uv pip install --python <the shared env>" env -u UV_PROJECT_ENVIRONMENT -u VIRTUAL_ENV uv pip install --python "$RSM_UV_ENV/bin/python" typing-extensions
 canary_alive && ok "shared env survived every refused command" || bad "a refused command still wrote to the shared env"
 
 echo "== layer 3 must FAIL OPEN: harmless commands still work =="
 guard 0 "uv --version"                 uv --version
 guard 0 "uv sync at a LOCAL .venv"     env UV_PROJECT_ENVIRONMENT="$PWD/.venv" uv sync
 guard 0 "uv pip list at the shared env" env -u UV_PROJECT_ENVIRONMENT VIRTUAL_ENV="$RSM_UV_ENV" uv pip list
+
+# The assignment-repo CI case, and the reason --python is honoured at all: the
+# job runs inside `nix develop`, where rsm-shell-hook.sh has activated nix-uv,
+# so VIRTUAL_ENV IS the shared env -- but the install is aimed at a job-local
+# venv and never goes near it. Refusing this broke every mgta403 CI run.
+# -r an empty file so the probe needs no network and still says "install".
+: > "$tmp/empty-reqs.txt"
+RSM_ALLOW_SHARED_SYNC=1 uv venv --clear "$tmp/civenv" >/dev/null 2>&1
+guard 0 "uv pip install --python <job-local venv>, VIRTUAL_ENV=shared" env -u UV_PROJECT_ENVIRONMENT VIRTUAL_ENV="$RSM_UV_ENV" uv pip install --python "$tmp/civenv/bin/python" -r "$tmp/empty-reqs.txt"
+guard 0 "same, as --python=<path>" env -u UV_PROJECT_ENVIRONMENT VIRTUAL_ENV="$RSM_UV_ENV" uv pip install --python="$tmp/civenv/bin/python" -r "$tmp/empty-reqs.txt"
+guard 0 "same, as -p <path>" env -u UV_PROJECT_ENVIRONMENT VIRTUAL_ENV="$RSM_UV_ENV" uv pip install -p "$tmp/civenv/bin/python" -r "$tmp/empty-reqs.txt"
+canary_alive && ok "shared env untouched by the --python installs" || bad "a --python install still wrote to the shared env"
 
 echo "== a poisoned UV_PROJECT_ENVIRONMENT from an OLD shell is repaired on entry =="
 # Removing the default cannot help a shell that was already running when the fix
