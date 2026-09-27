@@ -16,10 +16,20 @@ export ZSH_CACHE_DIR="${ZDOTDIR}/.cache"
 ZSH_COMPDUMP="$ZSH_CACHE_DIR/.zcompdump"
 ZSH_DISABLE_COMPFIX="true"
 DISABLE_AUTO_UPDATE="true"          # oh-my-zsh is provided by Nix; don't self-update
-
-ZSH_THEME="powerlevel10k/powerlevel10k"
+if [[ -n ${RSM_BWRAP_PILOT:-} ]]; then
+  # p10k starts a gitstatus worker very early, which is noisy in the server
+  # bwrap PID namespace. Git still works normally; use a small built-in prompt.
+  ZSH_THEME=""
+else
+  ZSH_THEME="powerlevel10k/powerlevel10k"
+fi
 plugins=(git)                        # git via oh-my-zsh's own plugin format
 source "$ZSH/oh-my-zsh.sh"
+
+if [[ -n ${RSM_BWRAP_PILOT:-} ]]; then
+  PROMPT='%F{blue}%~%f %# '
+  RPROMPT='${VIRTUAL_ENV_PROMPT:-}'
+fi
 
 # Autosuggestions + syntax highlighting, sourced directly (robust across packaging)
 for _f in \
@@ -99,8 +109,9 @@ _rsm_zoxide_init() {
 }
 _rsm_zoxide_init || add-zsh-hook precmd _rsm_zoxide_init
 
-# Powerlevel10k prompt configuration.
-[[ ! -f "${ZDOTDIR}/.p10k.zsh" ]] || source "${ZDOTDIR}/.p10k.zsh"
+# Powerlevel10k prompt configuration. Disabled in the server bwrap pilot because
+# its gitstatus worker expects process semantics the sandbox intentionally lacks.
+[[ -n ${RSM_BWRAP_PILOT:-} || ! -f "${ZDOTDIR}/.p10k.zsh" ]] || source "${ZDOTDIR}/.p10k.zsh"
 
 # --- adaptive venv label + right-prompt fitting ----------------------------
 # The virtualenv indicator lives in p10k's RIGHT prompt, and zsh hides the WHOLE

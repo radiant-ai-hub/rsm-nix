@@ -22,7 +22,7 @@ up correctly.
 |---|---|
 | `notebook_intro.ipynb` | the **Python (nix-uv)** kernel: numpy, Polars, an inline plot |
 | `notebook_pyrsm.ipynb` | a **pyrsm** regression (formula interface) + a plot |
-| `notebook_postgres.ipynb` | PostgreSQL → Polars (run `rsm-pg-start` first) |
+| `notebook_postgres.ipynb` | PostgreSQL → Polars; starts the private workspace-local server if needed |
 | `notebook_random_check.ipynb` | seeded random numbers + a **fingerprint** to compare across macOS / Windows / Linux |
 
 ## Scripts
@@ -33,7 +33,7 @@ up correctly.
 | `python_data_stack.py` | numpy/**polars**/**duckdb**/sklearn/statsmodels/xgboost/plotnine | `python examples/python_data_stack.py` |
 | `pyrsm_example.py` | **pyrsm** linear + logistic regression (Polars data) | `python examples/pyrsm_example.py` |
 | `random_check.py` | seeded RNG + a one-line fingerprint to compare across platforms | `python examples/random_check.py` |
-| `postgres_python.py` | PostgreSQL via SQLAlchemy + **Polars** | `rsm-pg-start` then run it |
+| `postgres_python.py` | PostgreSQL via SQLAlchemy + **Polars**; starts the private workspace-local server if needed | `python examples/postgres_python.py` |
 | `postgres_vscode.pgsql` | PostgreSQL via the VS Code SQL extension | see comments in the file |
 | `postgres-createdb.sh` | load two practice databases (**Northwind**, **WestCoastImporters**) into PostgreSQL | `bash examples/postgres-createdb.sh` |
 | `quarto_report.qmd` | Quarto renders with the RSM Python | `quarto render examples/quarto_report.qmd` |

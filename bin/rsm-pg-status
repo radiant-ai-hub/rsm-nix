@@ -1,7 +1,24 @@
 # rsm-pg-status: report whether the workspace-local PostgreSQL is running.
 
-if pg_ctl status -D "$PGDATA" >/dev/null 2>&1; then
+pg_pid_is_safe() {
+  pid="$(sed -n 1p "$PGDATA/postmaster.pid" 2>/dev/null || true)"
+  case "$pid" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+
+  [ -r "/proc/$pid/cmdline" ] || return 1
+  cmdline="$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)"
+  case "$cmdline" in
+    *postgres*"$PGDATA"*|*postmaster*"$PGDATA"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+if pg_pid_is_safe && pg_ctl status -D "$PGDATA" >/dev/null 2>&1; then
   pg_ctl status -D "$PGDATA" || true
+  pg_isready -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" || true
+elif pg_isready -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" >/dev/null 2>&1; then
+  echo "PostgreSQL is accepting socket connections, but its postmaster PID is outside this session."
   pg_isready -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" || true
 else
   echo "PostgreSQL is not running (PGDATA=$PGDATA)"

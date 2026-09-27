@@ -1,6 +1,20 @@
 # rsm-pg-stop: stop the workspace-local PostgreSQL instance (if running).
 
-if pg_ctl status -D "$PGDATA" >/dev/null 2>&1; then
+pg_pid_is_safe() {
+  pid="$(sed -n 1p "$PGDATA/postmaster.pid" 2>/dev/null || true)"
+  case "$pid" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+
+  [ -r "/proc/$pid/cmdline" ] || return 1
+  cmdline="$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)"
+  case "$cmdline" in
+    *postgres*"$PGDATA"*|*postmaster*"$PGDATA"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+if pg_pid_is_safe && pg_ctl status -D "$PGDATA" >/dev/null 2>&1; then
   pg_ctl stop -D "$PGDATA" -m fast
   echo "Stopped PostgreSQL (PGDATA=$PGDATA)"
 else

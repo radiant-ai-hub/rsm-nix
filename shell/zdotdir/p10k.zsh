@@ -30,15 +30,28 @@
   autoload -Uz is-at-least && is-at-least 5.1 || return
 
   # The list of segments shown on the left. Fill it with the most important segments.
-  typeset -g POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(
-    # =========================[ Line #1 ]=========================
-    os_icon                 # os identifier
-    dir                     # current directory
-    vcs                     # git status
-    # =========================[ Line #2 ]=========================
-    newline                 # \n
-    prompt_char             # prompt symbol
-  )
+  if [[ -n ${RSM_BWRAP_PILOT:-} ]]; then
+    # The bwrap pilot uses a PID namespace; powerlevel10k's gitstatus worker can
+    # fail noisily there. Keep git itself available, but skip the prompt daemon.
+    typeset -g POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(
+      # =======================[ Line #1 ]=========================
+      os_icon               # os identifier
+      dir                   # current directory
+      # =======================[ Line #2 ]=========================
+      newline               # \n
+      prompt_char           # prompt symbol
+    )
+  else
+    typeset -g POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(
+      # =======================[ Line #1 ]=========================
+      os_icon               # os identifier
+      dir                   # current directory
+      vcs                   # git status
+      # =======================[ Line #2 ]=========================
+      newline               # \n
+      prompt_char           # prompt symbol
+    )
+  fi
 
   # The list of segments shown on the right. Fill it with less important segments.
   # Right prompt on the last prompt line (where you are typing your commands) gets

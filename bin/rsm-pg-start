@@ -23,10 +23,30 @@ HBA
 # listener (empty listen_addresses). Loopback is shared on a multi-user host, so
 # the only safe transport there is the private socket.
 _pg_opts="-k $PGHOST -p $PGPORT -c listen_addresses="
+_socket_file="$PGHOST/.s.PGSQL.$PGPORT"
 
-if pg_ctl status -D "$PGDATA" >/dev/null 2>&1; then
-  # Already running: reload the peer-only pg_hba. If it is still listening on TCP
-  # (an old, insecure start), restart to drop the TCP listener.
+pg_pid_is_safe() {
+  pid="$(sed -n 1p "$PGDATA/postmaster.pid" 2>/dev/null || true)"
+  case "$pid" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+
+  # Under the server bwrap wrapper, PID numbers are namespaced. A stale
+  # postmaster.pid can point at an unrelated process in the next login session;
+  # only let pg_ctl signal a PID whose cmdline is this cluster's postmaster.
+  [ -r "/proc/$pid/cmdline" ] || return 1
+  cmdline="$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)"
+  case "$cmdline" in
+    *postgres*"$PGDATA"*|*postmaster*"$PGDATA"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+pg_ctl_status_safe() {
+  pg_pid_is_safe && pg_ctl status -D "$PGDATA" >/dev/null 2>&1
+}
+
+reload_or_restart_running() {
   pg_ctl reload -D "$PGDATA" >/dev/null 2>&1 || true
   # The socket file is named for the port (.s.PGSQL.<port>), so a server still
   # listening on a previously configured PGPORT is invisible to clients that now
@@ -42,7 +62,41 @@ if pg_ctl status -D "$PGDATA" >/dev/null 2>&1; then
   else
     echo "PostgreSQL already running, socket-only (PGDATA=$PGDATA)"
   fi
+}
+
+remove_stale_start_locks() {
+  if [ -s "$PGDATA/postmaster.pid" ] && ! pg_pid_is_safe; then
+    echo "Removing stale postmaster.pid from a previous sandboxed session."
+    rm -f "$PGDATA/postmaster.pid"
+  fi
+  rm -f "$_socket_file" "$_socket_file.lock"
+}
+
+if pg_isready -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" >/dev/null 2>&1; then
+  if pg_ctl_status_safe; then
+    # Already running: reload the peer-only pg_hba. If it is still listening on
+    # TCP (an old, insecure start), restart to drop the TCP listener.
+    reload_or_restart_running
+  elif pg_isready -h 127.0.0.1 -p "$PGPORT" >/dev/null 2>&1; then
+    echo "PostgreSQL is reachable over TCP, but its postmaster PID is not safe to control." >&2
+    echo "Refusing to continue; start a fresh session or run rsm-pg-stop where the server was started." >&2
+    exit 1
+  else
+    # A server from another bwrap PID namespace can be reachable on the private
+    # socket even when pg_ctl cannot validate its PID file from this namespace.
+    echo "PostgreSQL already accepting connections (socket: $PGHOST, port: $PGPORT)"
+  fi
+elif pg_ctl_status_safe; then
+  # Already running: reload the peer-only pg_hba. If it is still listening on TCP
+  # (an old, insecure start), restart to drop the TCP listener.
+  reload_or_restart_running
 else
+  if pg_isready -h 127.0.0.1 -p "$PGPORT" >/dev/null 2>&1; then
+    echo "PostgreSQL is reachable over TCP, but its postmaster PID is not safe to control." >&2
+    echo "Refusing to continue; start a fresh session or run rsm-pg-stop where the server was started." >&2
+    exit 1
+  fi
+  remove_stale_start_locks
   pg_ctl start -D "$PGDATA" -w -l "$log_file" -o "$_pg_opts"
   echo "Started PostgreSQL (socket: $PGHOST, port: $PGPORT, log: $log_file)"
 fi

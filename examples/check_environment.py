@@ -69,9 +69,26 @@ for tool in ["python", "uv", "quarto", "psql", "git", "gh"]:
 
 # %%
 print("\n== RSM environment variables (set by the dev shell) ==")
-for var in ["RSM_FLAKE", "RSM_WORKSPACE", "RSMBASE", "RSM_UV_ENV", "PGUSER", "PGPORT", "PGDATABASE", "QUARTO_PYTHON"]:
+for var in [
+    "RSM_FLAKE",
+    "RSM_WORKSPACE",
+    "RSMBASE",
+    "RSM_UV_ENV",
+    "TMPDIR",
+    "XDG_RUNTIME_DIR",
+    "JUPYTER_RUNTIME_DIR",
+    "JUPYTER_DATA_DIR",
+    "PGUSER",
+    "PGPORT",
+    "PGDATABASE",
+    "QUARTO_PYTHON",
+]:
     print(f"  {var:14s} = {os.environ.get(var, '(unset)')}")
 check("RSM_WORKSPACE is set", bool(os.environ.get("RSM_WORKSPACE")))
+
+for var in ["TMPDIR", "XDG_RUNTIME_DIR", "JUPYTER_RUNTIME_DIR", "JUPYTER_DATA_DIR"]:
+    path = os.environ.get(var, "")
+    check(f"{var} exists and is writable", bool(path) and os.path.isdir(path) and os.access(path, os.W_OK), path or "(unset)")
 
 # %%
 print("\n== a few key packages import and report versions ==")

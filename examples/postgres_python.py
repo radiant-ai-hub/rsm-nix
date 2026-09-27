@@ -18,6 +18,8 @@
 # %%
 import getpass
 import os
+import shutil
+import subprocess
 
 from sqlalchemy import create_engine, text
 import polars as pl
@@ -26,6 +28,29 @@ user = os.environ.get("PGUSER", getpass.getuser())
 port = os.environ.get("PGPORT")  # names the socket file; set per-user, don't hard-code
 db = os.environ.get("PGDATABASE", "rsm-msba")
 host = os.environ.get("PGHOST")  # the private socket directory (peer auth, no TCP)
+
+
+def ensure_postgres() -> None:
+    pg_isready = shutil.which("pg_isready")
+    if pg_isready and host and port:
+        ready = subprocess.run(
+            [pg_isready, "-h", host, "-p", str(port), "-U", user],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        if ready.returncode == 0:
+            return
+
+    start = shutil.which("rsm-pg-start")
+    if not start:
+        raise RuntimeError("PostgreSQL is not accepting connections, and rsm-pg-start is not on PATH.")
+
+    print("PostgreSQL is not accepting connections; starting the workspace-local server...")
+    subprocess.run([start], check=True)
+
+
+ensure_postgres()
 
 # Connect over the Unix socket (host is a directory path). This is the only
 # transport on a shared server — there is no TCP listener to reach.

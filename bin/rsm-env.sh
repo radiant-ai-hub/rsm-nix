@@ -45,6 +45,18 @@ export UV_LINK_MODE="${UV_LINK_MODE:-copy}"
 export UV_PYTHON_PREFERENCE="${UV_PYTHON_PREFERENCE:-only-system}"
 export JUPYTER_PATH="${JUPYTER_PATH:-$RSMBASE/jupyter}"
 export JUPYTER_DATA_DIR="${JUPYTER_DATA_DIR:-$RSMBASE/jupyter}"
+export JUPYTER_RUNTIME_DIR="${JUPYTER_RUNTIME_DIR:-$RSMBASE/jupyter/runtime}"
+# Headless SSH sessions and lightweight server sandboxes may inherit
+# /run/user/$UID without that path being writable inside the final process
+# environment. Quarto probes XDG_RUNTIME_DIR before starting its Jupyter
+# transport, so keep a real session value only when it is usable and otherwise
+# fall back to a private runtime root inside the workspace state.
+if [ -n "${XDG_RUNTIME_DIR:-}" ] && [ -d "$XDG_RUNTIME_DIR" ] && [ -w "$XDG_RUNTIME_DIR" ]; then
+  export XDG_RUNTIME_DIR
+else
+  export XDG_RUNTIME_DIR="$RSMBASE/runtime"
+fi
+export TMPDIR="${TMPDIR:-$RSMBASE/tmp}"
 
 export PGDATA="${PGDATA:-$RSMBASE/postgres/data}"
 export PGHOST="${PGHOST:-$RSMBASE/postgres/socket}"

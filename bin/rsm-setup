@@ -122,9 +122,18 @@ mkdir -p \
   "$RSMBASE/envs" \
   "$RSMBASE/uv-cache" \
   "$RSMBASE/jupyter" \
+  "$JUPYTER_RUNTIME_DIR" \
   "$RSMBASE/postgres" \
+  "$XDG_RUNTIME_DIR" \
   "$RSMBASE/zsh" \
-  "$RSMBASE/logs"
+  "$RSMBASE/logs" \
+  "$TMPDIR"
+for _rsm_private_dir in "$XDG_RUNTIME_DIR" "$JUPYTER_RUNTIME_DIR" "$TMPDIR"; do
+  case "$_rsm_private_dir" in
+    "$RSMBASE"/*) chmod 700 "$_rsm_private_dir" 2>/dev/null || true ;;
+  esac
+done
+unset _rsm_private_dir
 
 # 1. Python environment (creates the nix-uv venv + installs course-core packages).
 rsm-python-sync

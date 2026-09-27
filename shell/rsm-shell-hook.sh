@@ -12,9 +12,19 @@ mkdir -p \
   "$RSMBASE/envs" \
   "$RSMBASE/uv-cache" \
   "$RSMBASE/jupyter" \
+  "$JUPYTER_RUNTIME_DIR" \
   "$RSMBASE/postgres" \
+  "$XDG_RUNTIME_DIR" \
   "$RSMBASE/zsh" \
-  "$RSMBASE/logs" 2>/dev/null || true
+  "$RSMBASE/logs" \
+  "$TMPDIR" 2>/dev/null || true
+
+for _rsm_private_dir in "$XDG_RUNTIME_DIR" "$JUPYTER_RUNTIME_DIR" "$TMPDIR"; do
+  case "$_rsm_private_dir" in
+    "$RSMBASE"/*) chmod 700 "$_rsm_private_dir" 2>/dev/null || true ;;
+  esac
+done
+unset _rsm_private_dir
 
 # Repair a POISONED UV_PROJECT_ENVIRONMENT inherited from the parent shell.
 #

@@ -600,8 +600,12 @@
             zoxide
             cacert
             coreutils
+            findutils
+            gawk
             gnused
             gnugrep
+            less
+            ncurses
             which
             just
             jq
@@ -610,6 +614,7 @@
           ] ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
             pkgs.gfortran
             pkgs.pkg-config
+            pkgs.procps
           ] ++ rsmScriptList;
           packages = basePackages ++ pkgs.lib.optionals (system == "x86_64-linux") [
             (mkRsmClaude pkgs)
