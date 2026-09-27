@@ -11,6 +11,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck disable=SC1091
 source "$HERE/bin/rsm-env.sh"    # provides rsm_seed_dir
+mkdir -p "$TMPDIR"
 
 fail=0
 ok()  { printf '  \033[32mok\033[0m   %s\n' "$1"; }
