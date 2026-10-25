@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+: "${HADOOP_HOME:?Enter the Spark/Hadoop profile with nix develop .#spark-hadoop}"
 
 # A single-user HDFS instance for Scalable Analytics coursework. Its state is
 # deliberately outside the Nix store and survives rsm-nix updates.
@@ -43,6 +44,17 @@ EOF
 EOF
 }
 
+start_daemon() {
+  daemon="$1"
+  if ! hdfs --daemon start "$daemon"; then
+    echo "Could not start HDFS $daemon. Recent daemon logs:" >&2
+    for log in "$HADOOP_LOG_DIR"/*"$daemon"*.log "$HADOOP_LOG_DIR"/*"$daemon"*.out; do
+      if [ -f "$log" ]; then tail -n 80 "$log" >&2; fi
+    done
+    exit 1
+  fi
+}
+
 case "${1:-}" in
   init)
     make_config
@@ -58,9 +70,9 @@ case "${1:-}" in
     ;;
   start)
     [ -f "$state/name/current/VERSION" ] || { echo "Run rsm-hdfs init first" >&2; exit 1; }
-    hdfs --daemon start namenode
-    hdfs --daemon start datanode
-    hdfs --daemon start secondarynamenode
+    start_daemon namenode
+    start_daemon datanode
+    start_daemon secondarynamenode
     ;;
   stop)
     hdfs --daemon stop secondarynamenode || true

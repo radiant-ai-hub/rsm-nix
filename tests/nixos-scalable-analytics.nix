@@ -6,7 +6,17 @@ let
     export HADOOP_CONF_DIR="$RSM_HDFS_STATE/conf"
     export HADOOP_LOG_DIR="$RSM_HDFS_STATE/logs"
     export HADOOP_PID_DIR="$RSM_HDFS_STATE/pids"
-    trap 'rsm-hdfs stop' EXIT
+    on_exit() {
+      result=$?
+      if [ "$result" -ne 0 ]; then
+        for log in "$HADOOP_LOG_DIR"/*datanode*.log; do
+          if [ -f "$log" ]; then tail -n 120 "$log"; fi
+        done
+      fi
+      rsm-hdfs stop || true
+      exit "$result"
+    }
+    trap on_exit EXIT
     rsm-hdfs init
     rsm-hdfs start
     for n in $(seq 1 40); do
@@ -37,6 +47,7 @@ pkgs.testers.runNixOSTest {
   name = "scalable-analytics";
   nodes.machine = { ... }: {
     virtualisation.memorySize = 6144;
+    virtualisation.diskSize = 8192;
     users.users.student = {
       isNormalUser = true;
       home = "/home/student";
