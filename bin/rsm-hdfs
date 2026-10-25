@@ -8,6 +8,9 @@ state="${RSM_HDFS_STATE:-${RSMBASE:-$HOME/rsm-msba/.rsm-msba}/hdfs}"
 export HADOOP_CONF_DIR="$state/conf"
 export HADOOP_LOG_DIR="$state/logs"
 export HADOOP_PID_DIR="$state/pids"
+# The Hadoop daemon wrapper calls renice. A non-root macOS process cannot
+# always raise its priority back to zero, so use a modest, portable niceness.
+export HADOOP_NICENESS="${HADOOP_NICENESS:-10}"
 uid="$(id -u)"
 base="${RSM_HDFS_PORT_BASE:-$((12000 + uid % 2000 * 10))}"
 if ! [[ "$base" =~ ^[0-9]+$ ]] || (( base < 1024 || base > 55000 )); then
@@ -47,6 +50,10 @@ EOF
 start_daemon() {
   daemon="$1"
   if ! hdfs --daemon start "$daemon"; then
+    for _ in 1 2 3 4 5; do
+      if hdfs --daemon status "$daemon" >/dev/null 2>&1; then return 0; fi
+      sleep 1
+    done
     echo "Could not start HDFS $daemon. Recent daemon logs:" >&2
     for log in "$HADOOP_LOG_DIR"/*"$daemon"*.log "$HADOOP_LOG_DIR"/*"$daemon"*.out; do
       if [ -f "$log" ]; then tail -n 80 "$log" >&2; fi
