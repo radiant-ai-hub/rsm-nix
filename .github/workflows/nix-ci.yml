@@ -36,7 +36,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: radiant-ai-hub/rsm-podman
-          ref: codex/scalable-analytics-native
+          ref: main
           path: rsm-podman
 
       - name: Install Determinate Nix
