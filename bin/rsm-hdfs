@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+set -euo pipefail
+: "${HADOOP_HOME:?Enter the Spark/Hadoop profile with nix develop .#spark-hadoop}"
+
+# A single-user HDFS instance for Scalable Analytics coursework. Its state is
+# deliberately outside the Nix store and survives rsm-nix updates.
+state="${RSM_HDFS_STATE:-${RSMBASE:-$HOME/rsm-msba/.rsm-msba}/hdfs}"
+export HADOOP_CONF_DIR="$state/conf"
+export HADOOP_LOG_DIR="$state/logs"
+export HADOOP_PID_DIR="$state/pids"
+# The Hadoop daemon wrapper calls renice. A non-root macOS process cannot
+# always raise its priority back to zero, so use a modest, portable niceness.
+export HADOOP_NICENESS="${HADOOP_NICENESS:-10}"
+uid="$(id -u)"
+base="${RSM_HDFS_PORT_BASE:-$((12000 + uid % 2000 * 10))}"
+if ! [[ "$base" =~ ^[0-9]+$ ]] || (( base < 1024 || base > 55000 )); then
+  echo "RSM_HDFS_PORT_BASE must be an integer from 1024 to 55000" >&2
+  exit 2
+fi
+
+make_config() {
+  mkdir -p "$HADOOP_CONF_DIR" "$HADOOP_LOG_DIR" "$HADOOP_PID_DIR" "$state/name" "$state/data"
+  if [ ! -f "$HADOOP_CONF_DIR/hadoop-env.sh" ]; then
+    cp -R "$HADOOP_HOME/etc/hadoop/." "$HADOOP_CONF_DIR/"
+    chmod -R u+w "$HADOOP_CONF_DIR"
+  fi
+  chmod u+w "$HADOOP_CONF_DIR/core-site.xml" "$HADOOP_CONF_DIR/hdfs-site.xml" 2>/dev/null || true
+  cat > "$HADOOP_CONF_DIR/core-site.xml" <<EOF
+<?xml version="1.0"?>
+<configuration>
+  <property><name>fs.defaultFS</name><value>hdfs://127.0.0.1:$base</value></property>
+</configuration>
+EOF
+  cat > "$HADOOP_CONF_DIR/hdfs-site.xml" <<EOF
+<?xml version="1.0"?>
+<configuration>
+  <property><name>dfs.replication</name><value>1</value></property>
+  <property><name>dfs.namenode.name.dir</name><value>file://$state/name</value></property>
+  <property><name>dfs.datanode.data.dir</name><value>file://$state/data</value></property>
+  <property><name>dfs.namenode.rpc-address</name><value>127.0.0.1:$base</value></property>
+  <property><name>dfs.namenode.http-address</name><value>127.0.0.1:$((base + 1))</value></property>
+  <property><name>dfs.datanode.address</name><value>127.0.0.1:$((base + 2))</value></property>
+  <property><name>dfs.datanode.http.address</name><value>127.0.0.1:$((base + 3))</value></property>
+  <property><name>dfs.datanode.ipc.address</name><value>127.0.0.1:$((base + 4))</value></property>
+  <property><name>dfs.namenode.secondary.http-address</name><value>127.0.0.1:$((base + 5))</value></property>
+</configuration>
+EOF
+}
+
+start_daemon() {
+  daemon="$1"
+  if ! hdfs --daemon start "$daemon"; then
+    for _ in 1 2 3 4 5; do
+      if hdfs --daemon status "$daemon" >/dev/null 2>&1; then return 0; fi
+      sleep 1
+    done
+    echo "Could not start HDFS $daemon. Recent daemon logs:" >&2
+    for log in "$HADOOP_LOG_DIR"/*"$daemon"*.log "$HADOOP_LOG_DIR"/*"$daemon"*.out; do
+      if [ -f "$log" ]; then tail -n 80 "$log" >&2; fi
+    done
+    exit 1
+  fi
+}
+
+case "${1:-}" in
+  init)
+    make_config
+    if [ -f "$state/name/current/VERSION" ]; then
+      echo "HDFS already initialized at $state (data preserved)"
+    else
+      if ! hdfs namenode -format -nonInteractive > "$HADOOP_LOG_DIR/format.log" 2>&1; then
+        cat "$HADOOP_LOG_DIR/format.log" >&2
+        exit 1
+      fi
+      echo "HDFS initialized at $state"
+    fi
+    ;;
+  start)
+    [ -f "$state/name/current/VERSION" ] || { echo "Run rsm-hdfs init first" >&2; exit 1; }
+    start_daemon namenode
+    start_daemon datanode
+    start_daemon secondarynamenode
+    ;;
+  stop)
+    hdfs --daemon stop secondarynamenode || true
+    hdfs --daemon stop datanode || true
+    hdfs --daemon stop namenode || true
+    ;;
+  status)
+    hdfs dfsadmin -report
+    ;;
+  urls)
+    echo "NameNode: http://127.0.0.1:$((base + 1))/"
+    echo "DataNode: http://127.0.0.1:$((base + 3))/"
+    echo "Secondary NameNode: http://127.0.0.1:$((base + 5))/"
+    ;;
+  reset)
+    [ "${2:-}" = "--yes" ] || { echo "Reset erases all HDFS data. Run: rsm-hdfs reset --yes" >&2; exit 2; }
+    "$0" stop
+    rm -rf -- "$state/name" "$state/data"
+    echo "HDFS data removed. Run rsm-hdfs init to create a fresh filesystem."
+    ;;
+  *)
+    echo "Usage: rsm-hdfs {init|start|stop|status|urls|reset --yes}" >&2
+    exit 2
+    ;;
+esac

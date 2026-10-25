@@ -18,11 +18,13 @@ echo "== hadoop version =="
 if hadoop version >/dev/null 2>&1; then ok "hadoop version"; else bad "hadoop version"; fi
 
 echo "== spark-submit --version =="
-if spark-submit --version >/dev/null 2>&1; then ok "spark-submit --version"; else bad "spark-submit --version"; fi
+if spark-submit --version 2>&1 | grep -q 'version 4.0.1'; then ok "Spark 4.0.1 (container parity)"; else bad "Spark is not 4.0.1"; fi
 
 echo "== pyspark local session =="
 if python3 - <<'PY'
+import pyspark
 from pyspark.sql import SparkSession
+assert pyspark.__version__ == "4.0.1", pyspark.__version__
 spark = (
     SparkSession.builder.master("local[1]")
     .appName("rsm-check-spark-hadoop")

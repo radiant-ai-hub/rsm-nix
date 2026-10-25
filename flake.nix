@@ -661,10 +661,16 @@
           quarto-bin = quarto;
           spark-hadoop-env = sparkHadoop.sparkHadoopEnv;
           spark-hadoop-proof = sparkHadoop.proof;
+          rsm-hdfs = sparkHadoop.hdfsCtl;
           rsm-spark-hadoop = sparkHadoop.runner;
+          rsm-spark-kernel-install = sparkHadoop.kernelInstall;
           rsm-server-env = rsmServerEnv.env;
           rsm-server-env-hook = rsmServerEnv.hook;
           default = rsmScripts.rsm-setup;
+        } // pkgs.lib.optionalAttrs (system == "x86_64-linux") {
+          nixos-scalable-analytics-test = import ./tests/nixos-scalable-analytics.nix {
+            inherit pkgs sparkHadoop;
+          };
         });
 
       devShells = forAllSystems (pkgs:
@@ -769,6 +775,8 @@
               sparkHadoop.java
               sparkHadoop.sparkHadoopEnv
               sparkHadoop.proof
+              sparkHadoop.hdfsCtl
+              sparkHadoop.kernelInstall
             ];
             shellHook = baseHook + ''
               # Prefer the uv base interpreter for PySpark if it is built.
