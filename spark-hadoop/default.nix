@@ -1,6 +1,6 @@
 # Optional Spark/Hadoop profile for the RSM-MSBA flake.
 #
-# Reuses the proven Spark 3.5 / Hadoop approach from rsm-podman-nix/spark-hadoop:
+# Reuses the Spark / Hadoop approach from rsm-podman-nix/spark-hadoop:
 # build Spark without R support and patch SPARK_DIST_CLASSPATH so it uses a
 # filtered Hadoop classpath (no YARN, no shuffle jar) for local execution.
 #
@@ -16,12 +16,12 @@ let
     };
   hadoop = pkgs.hadoop;
   java = pkgs.openjdk17_headless;
-  spark = sparkPackagesNoR.spark_3_5.overrideAttrs (old: {
+  spark = sparkPackagesNoR.spark_4_0.overrideAttrs (old: {
     # Force the JDK Spark bakes into its launcher wrappers (--set JAVA_HOME).
     # By default spark 3.5 derives this from hadoop.jdk = jdk11_headless, and
     # the Nix linux-aarch64 OpenJDK 11 build crashes under real Spark workloads
     # (ObjectSynchronizer::inflate) — Windows-ARM/WSL students would hit this.
-    # Spark 3.5 fully supports Java 17, so pin the stable jdk17 everywhere.
+    # Spark 4.0 fully supports Java 17, so pin the stable jdk17 everywhere.
     jdk = java;
     nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [
       pkgs.coreutils
@@ -54,6 +54,12 @@ let
     pathsToLink = [ "/bin" "/lib" "/share" ];
   };
 
+  hdfsCtl = pkgs.writeShellApplication {
+    name = "rsm-hdfs";
+    runtimeInputs = [ pkgs.coreutils hadoop java ];
+    text = builtins.readFile ../bin/rsm-hdfs;
+  };
+
   # Shell snippet that wires the Spark/Hadoop environment variables. Shared by
   # the devShell hook and the standalone proof app so behaviour matches.
   envHook = ''
@@ -73,6 +79,10 @@ let
         | paste -sd ':'
     )"
     export SPARK_DIST_CLASSPATH
+
+    export HADOOP_CONF_DIR="''${RSM_HDFS_STATE:-''${RSMBASE:-$HOME/rsm-msba/.rsm-msba}/hdfs}/conf"
+    export HADOOP_LOG_DIR="''${RSM_HDFS_STATE:-''${RSMBASE:-$HOME/rsm-msba/.rsm-msba}/hdfs}/logs"
+    export HADOOP_PID_DIR="''${RSM_HDFS_STATE:-''${RSMBASE:-$HOME/rsm-msba/.rsm-msba}/hdfs}/pids"
 
     spark_python="$SPARK_HOME/python"
     if [ ! -d "$spark_python/pyspark" ]; then
@@ -94,6 +104,7 @@ let
       java
       python
       spark
+      hdfsCtl
     ];
     text = ''
       ${envHook}
@@ -132,6 +143,7 @@ let
       java
       python
       spark
+      hdfsCtl
     ];
     text = ''
       rsm_uv_env="''${RSM_UV_ENV:-}"
@@ -148,7 +160,35 @@ let
       exec "$@"
     '';
   };
+
+  kernelInstall = pkgs.writeShellApplication {
+    name = "rsm-spark-kernel-install";
+    runtimeInputs = [ pkgs.coreutils ];
+    text = ''
+      base="''${RSMBASE:-$HOME/rsm-msba/.rsm-msba}"
+      python="''${RSM_UV_ENV:-$base/envs/nix-uv}/bin/python"
+      if [ ! -x "$python" ]; then
+        echo "Run rsm-setup to create the shared Python environment first" >&2
+        exit 1
+      fi
+      kernel_dir="$base/jupyter/kernels/spark-hadoop"
+      mkdir -p "$kernel_dir"
+      cat > "$kernel_dir/kernel.json" <<EOF
+      {
+        "argv": ["${runner}/bin/rsm-spark-hadoop", "$python", "-m", "ipykernel_launcher", "-f", "{connection_file}"],
+        "display_name": "Python (Spark/Hadoop)",
+        "language": "python",
+        "env": {
+          "RSMBASE": "$base",
+          "RSM_UV_ENV": "''${RSM_UV_ENV:-$base/envs/nix-uv}",
+          "RSM_WORKSPACE": "''${RSM_WORKSPACE:-$HOME/rsm-msba}"
+        }
+      }
+      EOF
+      echo "Installed Python (Spark/Hadoop) kernel at $kernel_dir"
+    '';
+  };
 in
 {
-  inherit hadoop java spark sparkHadoopEnv envHook proof runner;
+  inherit hadoop java spark sparkHadoopEnv envHook proof runner hdfsCtl kernelInstall;
 }

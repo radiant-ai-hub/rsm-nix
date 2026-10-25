@@ -382,7 +382,18 @@ activation downloads Spark and Hadoop, so expect a wait.
 cd ~/rsm-msba
 nix develop .#spark-hadoop
 rsm-spark-hadoop-proof             # Hadoop + Spark + a local PySpark session
+rsm-spark-kernel-install           # add Python (Spark/Hadoop) to VS Code notebooks
+rsm-hdfs init                      # first time only; preserves existing HDFS data
+rsm-hdfs start
+rsm-hdfs status
+rsm-hdfs urls                      # local NameNode and DataNode pages
+rsm-hdfs stop                      # when finished
 ```
+
+Choose **Python (Spark/Hadoop)** for Scalable Analytics notebooks. HDFS data
+lives in `~/rsm-msba/.rsm-msba/hdfs`. `rsm-hdfs reset --yes` erases that data;
+do it only when an exercise explicitly calls for a fresh filesystem. On a
+shared server, use local PySpark only until an isolated HDFS service is provided.
 
 ## Optional: GPUs (deep learning)
 

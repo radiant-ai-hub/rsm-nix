@@ -32,6 +32,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Checkout Scalable Analytics course notebooks
+        uses: actions/checkout@v6
+        with:
+          repository: radiant-ai-hub/rsm-podman
+          ref: codex/scalable-analytics-native
+          path: rsm-podman
+
       - name: Install Determinate Nix
         uses: DeterminateSystems/nix-installer-action@main
 
@@ -97,6 +104,13 @@ jobs:
       - name: Run Spark/Hadoop checks
         run: nix develop .#spark-hadoop -c bash tests/check-spark-hadoop.sh
 
+      - name: Run HDFS lifecycle and original course notebooks
+        env:
+          RSM_ANALYTICS_DIR: ${{ github.workspace }}/rsm-podman/files/scalable_analytics
+        run: |
+          nix develop .#spark-hadoop -c bash tests/check-scalable-analytics.sh
+          nix develop .#spark-hadoop -c bash tests/check-course-notebooks.sh
+
       # Last: installs direnv/bash into the profile, so it runs after the
       # host-mutation comparison above. Static checks on all OSes; the direnv +
       # DIRENV_BASH integration only on macOS.
@@ -105,3 +119,45 @@ jobs:
 
       - name: PostgreSQL lifecycle + multi-tenant isolation (socket-only, peer auth)
         run: nix develop -c bash tests/check-postgres.sh
+
+  nixos-vm:
+    name: NixOS VM Spark and HDFS
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: DeterminateSystems/nix-installer-action@main
+      - name: Enable KVM for the NixOS VM
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - name: Build and run the NixOS integration test
+        run: nix build .#nixos-scalable-analytics-test --print-build-logs
+
+  windows-wsl:
+    name: Windows WSL2 Ubuntu Spark, HDFS, notebooks
+    runs-on: windows-2025
+    steps:
+      - name: Install Ubuntu in WSL2
+        uses: Ubuntu/WSL/.github/actions/wsl-install@main
+        with:
+          distro: Ubuntu-24.04
+      - name: Run the checked-out revision inside WSL2
+        uses: Ubuntu/WSL/.github/actions/wsl-bash@main
+        with:
+          distro: Ubuntu-24.04
+          exec: |
+            set -euo pipefail
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq git curl xz-utils
+            git clone https://github.com/radiant-ai-hub/rsm-nix.git "$HOME/rsm-nix"
+            cd "$HOME/rsm-nix"
+            git fetch origin '${{ github.sha }}'
+            git checkout --detach '${{ github.sha }}'
+            git clone --branch codex/scalable-analytics-native https://github.com/radiant-ai-hub/rsm-podman.git "$HOME/rsm-podman"
+            curl -fsSL https://install.determinate.systems/nix | sh -s -- install --no-confirm
+            source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+            export RSM_FLAKE="$PWD" RSM_SKIP_FLAKE_UPDATE=1
+            export RSM_ANALYTICS_DIR="$HOME/rsm-podman/files/scalable_analytics"
+            nix develop -c rsm-setup
+            nix develop .#spark-hadoop -c bash tests/check-spark-hadoop.sh
+            nix develop .#spark-hadoop -c bash tests/check-scalable-analytics.sh
+            nix develop .#spark-hadoop -c bash tests/check-course-notebooks.sh
