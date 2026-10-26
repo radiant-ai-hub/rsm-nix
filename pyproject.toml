@@ -57,6 +57,8 @@ dependencies = [
   "textblob>=0.18",
   # testing
   "pytest>=8.0",
+  # discrete-event simulation
+  "simpy>=4.1",
 ]
 
 [tool.uv]
