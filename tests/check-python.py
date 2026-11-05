@@ -8,7 +8,10 @@ Exits non-zero if any required package fails to import.
 from __future__ import annotations
 
 import importlib
+import importlib.metadata
 import sys
+import tomllib
+from pathlib import Path
 
 # (import name, friendly label)
 MODULES = [
@@ -68,6 +71,18 @@ for anchor in ("numpy", "pandas", "sklearn", "xgboost"):
         print(f"  {anchor:<12} {getattr(m, '__version__', '?')}")
     except Exception:  # noqa: BLE001
         pass
+
+# rsm-update restores the shared environment from uv.lock. Check the installed
+# course package against that lock so a stale environment cannot pass imports.
+try:
+    lock = tomllib.loads((Path(__file__).resolve().parents[1] / "uv.lock").read_text())
+    expected = next(p["version"] for p in lock["package"] if p["name"] == "pyrsm")
+    installed = importlib.metadata.version("pyrsm")
+    print(f"  pyrsm        {installed} (lock: {expected})")
+    if installed != expected:
+        failures.append(f"pyrsm: installed {installed}, lock requires {expected}")
+except Exception as exc:  # noqa: BLE001
+    failures.append(f"pyrsm version check: {exc}")
 
 if failures:
     print("\nFAILED imports:", file=sys.stderr)

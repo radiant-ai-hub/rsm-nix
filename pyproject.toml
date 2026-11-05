@@ -42,7 +42,7 @@ dependencies = [
   "tqdm>=4.66",
   "requests>=2.32",
   # RSM / course packages
-  "pyrsm>=1.1",
+  "pyrsm==2.6.1",
   # xgboost: on Linux use the `xgboost-cpu` distribution to avoid pulling
   # ~500 MB of nvidia CUDA wheels (nccl) that CPU coursework never uses.
   # On macOS there is no CUDA and `xgboost-cpu` ships no wheel, so use the

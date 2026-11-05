@@ -59,6 +59,9 @@ jobs:
       - name: Run default smoke checks
         run: nix develop -c bash tests/check-default.sh
 
+      - name: Run pyrsm course example
+        run: nix develop -c python examples/pyrsm_example.py
+
       - name: rsm-mkdir folder setup (multi-path, --venv, standalone, kept-foreign)
         run: nix develop -c bash tests/check-mkdir.sh
 
@@ -152,12 +155,14 @@ jobs:
             cd "$HOME/rsm-nix"
             git fetch origin '${{ github.sha }}'
             git checkout --detach '${{ github.sha }}'
-            git clone --branch codex/scalable-analytics-native https://github.com/radiant-ai-hub/rsm-podman.git "$HOME/rsm-podman"
+            git clone --branch main https://github.com/radiant-ai-hub/rsm-podman.git "$HOME/rsm-podman"
             curl -fsSL https://install.determinate.systems/nix | sh -s -- install --no-confirm
             source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
             export RSM_FLAKE="$PWD" RSM_SKIP_FLAKE_UPDATE=1
             export RSM_ANALYTICS_DIR="$HOME/rsm-podman/files/scalable_analytics"
             nix develop -c rsm-setup
+            nix develop -c python tests/check-python.py
+            nix develop -c python examples/pyrsm_example.py
             nix develop .#spark-hadoop -c bash tests/check-spark-hadoop.sh
             nix develop .#spark-hadoop -c bash tests/check-scalable-analytics.sh
             nix develop .#spark-hadoop -c bash tests/check-course-notebooks.sh
