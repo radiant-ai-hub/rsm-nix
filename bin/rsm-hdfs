@@ -18,7 +18,9 @@ export HADOOP_PID_DIR="$state/pids"
 # always raise its priority back to zero, so use a modest, portable niceness.
 export HADOOP_NICENESS="${HADOOP_NICENESS:-10}"
 uid="$(id -u)"
-base="${RSM_HDFS_PORT_BASE:-$((12000 + uid % 2000 * 10))}"
+# Reserve six consecutive ports per user. The larger prime-sized range has no
+# collisions among the current sc2 accounts and leaves room for future users.
+base="${RSM_HDFS_PORT_BASE:-$((12000 + uid % 6173 * 6))}"
 if ! [[ "$base" =~ ^[0-9]+$ ]] || (( base < 1024 || base > 55000 )); then
   echo "RSM_HDFS_PORT_BASE must be an integer from 1024 to 55000" >&2
   exit 2
