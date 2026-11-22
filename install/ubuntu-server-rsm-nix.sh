@@ -39,7 +39,7 @@
 # Reverse everything:
 #   sudo rm -f /etc/profile.d/rsm.sh /etc/direnv/direnvrc
 #   sudo rm -f /usr/local/bin/rsm-setup /usr/local/bin/rsm-msba \
-#              /usr/local/bin/rsm-update /usr/local/bin/rsm-mkdir \
+#              /usr/local/bin/rsm-update /usr/local/bin/rsm-scalable /usr/local/bin/rsm-mkdir \
 #              /usr/local/bin/rsm-clone /usr/local/bin/rsm-project-check \
 #              /usr/local/bin/direnv
 #   sudo rm /nix/var/nix/profiles/rsm /nix/var/nix/profiles/rsm-*   # profile + generations
@@ -86,7 +86,7 @@ NIXFLAGS=(--extra-experimental-features 'nix-command flakes')
 log "rsm system profile ($PROFILE)"
 # The commands the server profile provides (rsm-clone/rsm-mkdir are the folder
 # commands students actually use; rsm-new-project was merged into rsm-mkdir).
-RSM_CMDS=(rsm-setup rsm-msba rsm-update rsm-mkdir rsm-clone rsm-project-check)
+RSM_CMDS=(rsm-setup rsm-msba rsm-update rsm-scalable rsm-mkdir rsm-clone rsm-project-check)
 
 if [ -e "$PROFILE" ]; then
   # Present already -> UPGRADE it to the latest so re-running this one-liner

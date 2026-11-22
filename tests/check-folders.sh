@@ -54,6 +54,16 @@ if [ -f "$RSM_FLAKE/courses.txt" ]; then
   done < "$RSM_FLAKE/courses.txt"
 fi
 
+echo "== MGTA 466 Scalable Analytics exercises =="
+for f in README.md test/check-pyspark.ipynb test/check-hdfs-setup.ipynb \
+         test/hdfs-handson-test.ipynb test/Shakespeare.txt; do
+  if [ -s "$RSM_WORKSPACE/mgta466/examples/$f" ]; then
+    ok "mgta466/examples/$f"
+  else
+    bad "missing mgta466/examples/$f (run rsm-update)"
+  fi
+done
+
 echo "== data folder seeded from the flake (under the workspace) =="
 if [ -d "$RSM_FLAKE/data" ]; then
   if [ -d "$RSM_WORKSPACE/data" ]; then ok "data/"; else bad "missing $RSM_WORKSPACE/data (run rsm-setup)"; fi

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-analytics_dir="${RSM_ANALYTICS_DIR:-../rsm-podman/files/scalable_analytics}"
+analytics_dir="${RSM_ANALYTICS_DIR:-${RSM_WORKSPACE:-$HOME/rsm-msba}/mgta466/examples}"
 fixture="$analytics_dir/test/Shakespeare.txt"
 [ -f "$fixture" ] || { echo "Missing $fixture" >&2; exit 2; }
 command -v rsm-hdfs >/dev/null

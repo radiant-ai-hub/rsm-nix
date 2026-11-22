@@ -14,6 +14,19 @@ echo "    flake     : $RSM_FLAKE"
 echo "    workspace : $RSM_WORKSPACE"
 echo "    state     : $RSMBASE"
 
+# The workspace is refreshed in place later in this script. A misconfigured
+# RSM_WORKSPACE inside the flake would make that refresh remove source files
+# (including examples/), so reject the layout before writing anything.
+_flake_real="$(realpath -m "$RSM_FLAKE")"
+_workspace_real="$(realpath -m "$RSM_WORKSPACE")"
+case "$_workspace_real/" in
+  "$_flake_real/"*)
+    echo "rsm-setup: RSM_WORKSPACE must be outside RSM_FLAKE ($RSM_FLAKE)" >&2
+    exit 2
+    ;;
+esac
+unset _flake_real _workspace_real
+
 # Make sure the flake is present and current. This makes `rsm-setup` the single
 # command for everything: it clones the flake if it is missing (so it works even
 # after deleting ~/rsm-nix), and fast-forwards it to the latest otherwise (so
@@ -381,6 +394,15 @@ if [ -f "$courses_file" ]; then
       echo "    course    : created $RSM_WORKSPACE/$course"
     fi
   done < "$courses_file"
+fi
+
+# 3a. Add the Scalable Analytics exercises to the course folder. Seed only
+# missing files: students may annotate the notebooks in their own workspace.
+# Keeping the source outside the general examples/ tree avoids copying the
+# 5.8 MB Shakespeare fixture into every student's workspace twice.
+if [ -d "$RSM_FLAKE/course-examples/mgta466" ]; then
+  rsm_seed_dir "$RSM_FLAKE/course-examples/mgta466" "$RSM_WORKSPACE/mgta466/examples"
+  echo "    course    : mgta466/examples/ ready (Spark and HDFS exercises)"
 fi
 
 # 3b. Repair folders that ALREADY exist. rsm-mkdir writes a folder's .envrc once;

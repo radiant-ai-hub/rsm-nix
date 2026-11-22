@@ -294,14 +294,37 @@ quarto render report.qmd
 
 ## Optional: Spark / Hadoop
 
-Scalable-analytics work uses a separate, larger profile. The first
+MGTA 466 uses an optional Spark/Hadoop profile. `rsm-update` creates
+`~/rsm-msba/mgta466` and seeds the three course notebooks plus
+`Shakespeare.txt` into `mgta466/examples/test`. The first profile
 activation downloads Spark and Hadoop, so expect a wait.
 
 ```bash
-cd ~/rsm-msba
-nix develop .#spark-hadoop
-rsm-spark-hadoop-proof             # Hadoop + Spark + a local PySpark session
+rsm-update
+rsm-scalable check                 # Spark, HDFS, and the three bundled notebooks
+rsm-scalable                       # enter the profile in ~/rsm-msba/mgta466
+code examples/test                 # open the bundled exercises
 ```
+
+The check uses temporary HDFS data and stops its services when done. In
+the `rsm-scalable` shell, select **Python (Spark/Hadoop)** for the
+notebooks. For a persistent interactive HDFS exercise, run:
+
+```bash
+rsm-hdfs init                      # safe to repeat; preserves existing data
+rsm-hdfs start
+rsm-hdfs status
+rsm-hdfs urls                      # NameNode and DataNode pages
+rsm-hdfs stop                      # when finished with the exercise
+```
+
+HDFS data lives in `~/rsm-msba/.rsm-msba/hdfs`. The final section of
+`hdfs-handson-test.ipynb` calls `rsm-hdfs reset --yes` and erases that
+data; skip it when you want to keep your files. On the shared MSBA
+server, run the check from your own account, use only the supplied
+public exercise data, and stop a persistent HDFS instance when finished.
+The bundled PySpark notebook uses one local worker, and Hadoop JVMs have
+a 512 MB heap limit.
 
 ## Updating the environment
 

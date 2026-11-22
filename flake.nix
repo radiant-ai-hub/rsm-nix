@@ -508,6 +508,9 @@
           # (pull the flake, re-sync, refresh shell/examples, update Claude Code
           # to the latest). It sets RSM_CLAUDE_LATEST so Claude is bumped.
           rsm-update = mk "rsm-update" [ rsm-setup pkgs.coreutils ];
+          # Enter the optional Spark/Hadoop profile from any folder. Nix loads
+          # the larger toolchain only when a Scalable Analytics student asks.
+          rsm-scalable = mk "rsm-scalable" [ pkgs.coreutils rsm-mkdir ];
           # rsm-mkdir: the "make a first-class RSM folder anywhere" command
           # (CWD-relative like mkdir; nested via source_up or standalone via
           # `use flake`; multi-path; --venv for an own reproducible venv). Does

@@ -2,8 +2,8 @@
 
 - `devShells.<system>.default` — Python/uv, Quarto 1.9.13, PostgreSQL 16, pgweb,
   git/git-lfs, gh, notebook support, the `rsm-*` commands.
-- `devShells.<system>.spark-hadoop` — adds Java + Spark 3.5 + Hadoop + PySpark.
-- `packages.<system>.{rsm-setup,rsm-python-sync,rsm-pg-*,rsm-pgweb,quarto-bin,spark-hadoop-env,spark-hadoop-proof}`
+- `devShells.<system>.spark-hadoop` — adds Java 17, Spark 4.0.1, Hadoop, and PySpark.
+- `packages.<system>.{rsm-setup,rsm-scalable,rsm-python-sync,rsm-pg-*,rsm-pgweb,quarto-bin,spark-hadoop-env,spark-hadoop-proof}`
 - `apps.<system>.{check,check-spark-hadoop,rsm-setup}`
 
 Supported systems: `aarch64-darwin`, `x86_64-darwin`, `aarch64-linux`,

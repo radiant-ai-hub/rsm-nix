@@ -134,6 +134,7 @@ all of this for you.
 | `rsm-msba`                                     | Bootstrap/reset: clone the flake if missing, then `rsm-setup`                                                                                                                                                                    |
 | `rsm-version`                                  | Print the environment version (the flake’s git commit) + platform                                                                                                                                                                |
 | `rsm-python-sync`                              | Refresh the base env from `uv.lock`                                                                                                                                                                                              |
+| `rsm-scalable` / `rsm-scalable check`          | Open MGTA 466’s Spark/Hadoop profile or run its bundled Spark, HDFS, and notebook checks                                                                                                                                         |
 | `rsm-mkdir [--venv] PATH...`                   | Make folder(s) first-class RSM projects to open directly in VS Code — nested or standalone, sharing the one nix-uv env (CWD-relative like `mkdir`); `--venv` gives a folder its **own** reproducible env (the conda alternative) |
 | `rsm-clone URL [DIR]`                          | `git clone` a repo AND set it up (direnv + nix-uv) so it opens directly in VS Code                                                                                                                                               |
 | `rsm-gpu-init [--cpu] PATH`                    | `rsm-mkdir --venv` plus PyTorch matched to this machine — CUDA build where a driver is present, CPU build otherwise (`--cpu` forces the smaller CPU build)                                                                       |
@@ -157,9 +158,9 @@ The preview pane shows your prompts in that thread, and
 
 - `devShells.<system>.default` — Python/uv, Quarto 1.9.13, PostgreSQL
   16, pgweb, git/git-lfs, gh, notebook support, the `rsm-*` commands.
-- `devShells.<system>.spark-hadoop` — adds Java + Spark 3.5 + Hadoop +
-  PySpark.
-- `packages.<system>.{rsm-setup,rsm-python-sync,rsm-pg-*,rsm-pgweb,quarto-bin,spark-hadoop-env,spark-hadoop-proof}`
+- `devShells.<system>.spark-hadoop` — adds Java 17, Spark 4.0.1, Hadoop,
+  and PySpark.
+- `packages.<system>.{rsm-setup,rsm-scalable,rsm-python-sync,rsm-pg-*,rsm-pgweb,quarto-bin,spark-hadoop-env,spark-hadoop-proof}`
 - `apps.<system>.{check,check-spark-hadoop,rsm-setup}`
 
 Supported systems: `aarch64-darwin`, `x86_64-darwin`, `aarch64-linux`,
@@ -393,7 +394,9 @@ the rate-limit fields are Claude Pro/Max only). The script resolves `jq`
 by absolute path and derives host/folder/branch/time with bash builtins,
 because Claude Code runs status-line/hook commands with a **minimal
 PATH** — on NixOS `jq` (and everything) lives only in the Nix profile,
-never `/usr/bin`. A `*` after the branch means uncommitted changes; `direnv!` rather than `direnv` means an `.envrc` governs the folder but has not been allowed, so none of it is in effect — run `direnv allow`.
+never `/usr/bin`. A `*` after the branch means uncommitted changes;
+`direnv!` rather than `direnv` means an `.envrc` governs the folder but
+has not been allowed, so none of it is in effect — run `direnv allow`.
 
 **Customizing / opting out.** To take ownership of a folder’s managed
 `settings.json` (and stop it being refreshed), delete the `_rsmManaged`
@@ -420,6 +423,7 @@ nix develop -c bash tests/check-mkdir.sh          # rsm-mkdir folder setup
 nix develop -c bash tests/check-claude-harness.sh # Claude Code harness + telemetry scope
 nix develop -c bash tests/check-no-host-mutation.sh
 nix develop .#spark-hadoop -c bash tests/check-spark-hadoop.sh
+rsm-scalable check                                 # bundled MGTA 466 notebooks + HDFS
 nix run .#check                                   # bundled smoke check
 ```
 

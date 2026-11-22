@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: rsm-scalable [shell|check|run COMMAND...]
+
+  rsm-scalable        Prepare mgta466, install the notebook kernel, and open
+                      the Spark/Hadoop environment in mgta466.
+  rsm-scalable check  Run Spark, HDFS, and all bundled course notebooks with
+                      temporary HDFS data; services stop when the check ends.
+  rsm-scalable run COMMAND...  Run one command in the Spark/Hadoop environment.
+EOF
+}
+
+case "${1:-shell}" in
+  help|-h|--help) usage; exit 0 ;;
+  shell|check|run) mode="${1:-shell}" ;;
+  *) usage >&2; exit 2 ;;
+esac
+
+if [ ! -f "$RSM_FLAKE/flake.nix" ]; then
+  echo "rsm-scalable: missing flake at $RSM_FLAKE; run rsm-update first" >&2
+  exit 1
+fi
+source_dir="$RSM_FLAKE/course-examples/mgta466"
+if [ ! -f "$source_dir/test/check-pyspark.ipynb" ]; then
+  echo "rsm-scalable: course examples are missing; run rsm-update first" >&2
+  exit 1
+fi
+
+course_dir="$RSM_WORKSPACE/mgta466"
+if [ ! -f "$course_dir/.envrc" ]; then
+  rsm-mkdir "$course_dir" >/dev/null
+fi
+rsm_seed_dir "$source_dir" "$course_dir/examples"
+cd "$course_dir"
+
+nix_bin="$(command -v nix || true)"
+if [ -z "$nix_bin" ] && [ -x /nix/var/nix/profiles/default/bin/nix ]; then
+  nix_bin=/nix/var/nix/profiles/default/bin/nix
+fi
+if [ -z "$nix_bin" ]; then
+  echo 'rsm-scalable: Nix is unavailable; run rsm-setup first' >&2
+  exit 1
+fi
+
+flake_ref="$RSM_FLAKE#spark-hadoop"
+case "$mode" in
+  shell)
+    "$nix_bin" develop "$flake_ref" -c rsm-spark-kernel-install
+    echo "Scalable Analytics exercises: $course_dir/examples/test"
+    echo "Run 'rsm-scalable check' in another terminal for the full check."
+    exec "$nix_bin" develop "$flake_ref"
+    ;;
+  check)
+    export RSM_ANALYTICS_DIR="$course_dir/examples"
+    exec "$nix_bin" develop "$flake_ref" -c bash "$RSM_FLAKE/tests/check-scalable-course.sh"
+    ;;
+  run)
+    shift
+    if [ "$#" -eq 0 ]; then usage >&2; exit 2; fi
+    exec "$nix_bin" develop "$flake_ref" -c "$@"
+    ;;
+esac
