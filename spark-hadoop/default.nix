@@ -66,6 +66,7 @@ let
     export JAVA_HOME="${java}"
     export SPARK_HOME="${spark}"
     export HADOOP_HOME="${hadoop}"
+    export HADOOP_HEAPSIZE_MAX="''${HADOOP_HEAPSIZE_MAX:-512m}"
     export SPARK_LOCAL_HOSTNAME="localhost"
     : "''${PYSPARK_PYTHON:=${python}/bin/python3}"
     : "''${PYSPARK_DRIVER_PYTHON:=${python}/bin/python3}"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-analytics_dir="${RSM_ANALYTICS_DIR:-../rsm-podman/files/scalable_analytics}"
+analytics_dir="${RSM_ANALYTICS_DIR:-${RSM_WORKSPACE:-$HOME/rsm-msba}/mgta466/examples}"
 test_dir="$(realpath "$analytics_dir/test")"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 [ -f "$test_dir/check-pyspark.ipynb" ] || { echo "Course notebooks not found" >&2; exit 2; }

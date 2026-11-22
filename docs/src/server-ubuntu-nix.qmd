@@ -143,12 +143,30 @@ to configure.
 
 ---
 
+## 6a. MGTA 466 Scalable Analytics on the shared server
+
+Each student runs `rsm-update` once, then opens a new terminal in
+`~/rsm-msba/mgta466`. `rsm-scalable check` tests Spark, HDFS, and the three
+bundled notebooks using temporary HDFS data. It stops the Hadoop daemons when
+finished. `rsm-scalable` opens the interactive profile in the course folder and
+installs the **Python (Spark/Hadoop)** notebook kernel. No separate
+`rsm-podman` checkout or container runtime is used.
+
+The Spark example uses `local[1]`; Hadoop JVMs have a 512 MB heap cap. An
+interactive `rsm-hdfs init` / `start` uses each student's own workspace state
+and loopback port. Students should run `rsm-hdfs stop` after the exercise and
+keep private data out of this simple-authentication HDFS instance. To view a
+NameNode page from a laptop, forward the port printed by `rsm-hdfs urls` in VS
+Code Remote-SSH's **Ports** panel.
+
+---
+
 ## 7. Capacity & maintenance
 
 - **Disk:** the shared `/nix/store` plus one uv env per student. Budget
   ~3–4 GB shared + ~1.5 GB/student. Run `nix store gc` periodically.
-- **Updates:** `git -C /home/<user>/rsm-msba pull` then `rsm-python-sync` (can be
-  scripted across accounts).
+- **Updates:** each student runs `rsm-update`; it pulls `~/rsm-nix` and syncs
+  their Python environment and course examples.
 - **Binary cache:** the default `cache.nixos.org` covers everything here. For a
   large cohort consider a local cache/substituter to save bandwidth.
 

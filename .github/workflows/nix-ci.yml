@@ -32,13 +32,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Checkout Scalable Analytics course notebooks
-        uses: actions/checkout@v6
-        with:
-          repository: radiant-ai-hub/rsm-podman
-          ref: main
-          path: rsm-podman
-
       - name: Install Determinate Nix
         uses: DeterminateSystems/nix-installer-action@main
 
@@ -89,6 +82,9 @@ jobs:
       - name: Run folder layout checks
         run: nix develop -c bash tests/check-folders.sh
 
+      - name: Reject a workspace inside the flake source
+        run: nix develop -c bash tests/check-setup-location.sh
+
       - name: rsm-clone picks the right Python for a cloned repo
         run: nix develop -c bash tests/check-clone.sh
 
@@ -107,12 +103,8 @@ jobs:
       - name: Run Spark/Hadoop checks
         run: nix develop .#spark-hadoop -c bash tests/check-spark-hadoop.sh
 
-      - name: Run HDFS lifecycle and original course notebooks
-        env:
-          RSM_ANALYTICS_DIR: ${{ github.workspace }}/rsm-podman/files/scalable_analytics
-        run: |
-          nix develop .#spark-hadoop -c bash tests/check-scalable-analytics.sh
-          nix develop .#spark-hadoop -c bash tests/check-course-notebooks.sh
+      - name: Run bundled Scalable Analytics course check
+        run: nix develop -c rsm-scalable check
 
       # Last: installs direnv/bash into the profile, so it runs after the
       # host-mutation comparison above. Static checks on all OSes; the direnv +
@@ -155,14 +147,11 @@ jobs:
             cd "$HOME/rsm-nix"
             git fetch origin '${{ github.sha }}'
             git checkout --detach '${{ github.sha }}'
-            git clone --branch main https://github.com/radiant-ai-hub/rsm-podman.git "$HOME/rsm-podman"
             curl -fsSL https://install.determinate.systems/nix | sh -s -- install --no-confirm
             source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
             export RSM_FLAKE="$PWD" RSM_SKIP_FLAKE_UPDATE=1
-            export RSM_ANALYTICS_DIR="$HOME/rsm-podman/files/scalable_analytics"
             nix develop -c rsm-setup
             nix develop -c python tests/check-python.py
             nix develop -c python examples/pyrsm_example.py
             nix develop .#spark-hadoop -c bash tests/check-spark-hadoop.sh
-            nix develop .#spark-hadoop -c bash tests/check-scalable-analytics.sh
-            nix develop .#spark-hadoop -c bash tests/check-course-notebooks.sh
+            nix develop -c rsm-scalable check

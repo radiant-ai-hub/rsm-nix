@@ -3,3 +3,4 @@
 # Add more with `rsm-mkdir <name>` or by editing this file then `rsm-setup`.
 mgta403
 mgta464
+mgta466
