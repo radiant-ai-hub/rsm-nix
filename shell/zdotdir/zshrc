@@ -31,6 +31,18 @@ unset _f
 
 autoload -Uz add-zsh-hook
 
+# --- VS Code terminals start in the workspace ------------------------------
+# A VS Code window with no folder open starts its terminals in $HOME, outside
+# the workspace, so the direnv hook below would UNLOAD the RSM environment (and
+# with it python, sed and the rest of the server env; VS Code's own shell
+# integration then fails with "command not found: sed"). A plain ssh login
+# already starts in the workspace (the server's SSH guard cds there); do the
+# same here, but only when the terminal opened in $HOME, so a folder you opened
+# yourself is never overridden. RSM_WORKSPACE is set by the server guard.
+if [[ ${TERM_PROGRAM:-} == vscode && $PWD == "$HOME" && -n ${RSM_WORKSPACE:-} && -d $RSM_WORKSPACE ]]; then
+  builtin cd -q -- "$RSM_WORKSPACE"
+fi
+
 # --- direnv ----------------------------------------------------------------
 # Hook direnv here so that `cd`-ing between folders loads/unloads the matching
 # environment -- crucially, leaving a project's local ./.venv reverts to the
